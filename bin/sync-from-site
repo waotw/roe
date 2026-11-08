@@ -24,6 +24,12 @@
 #      overwritten by the copy below. Those files are skipped and listed at
 #      the end with the command that shows the difference.
 #
+#   1d. Docs that went backwards — a doc in site/ that is an exact copy of
+#      an older committed version of Roe's copy is held back from the docs
+#      mirror and listed at the end, with the command that shows what it
+#      would undo. (Twice a Site Sync pull put old docs back into site/ and
+#      the sync committed them over newer rewrites.)
+#
 #   2. Themes — update-only. site/theme/ → current/app/themes/.
 #      --existing flag means files that exist in BOTH places are updated
 #      from /site; files only in /site are ignored (you wanted to add a
@@ -85,6 +91,29 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   BOLD='\033[1m'
   NC='\033[0m'
 fi
+# Docs that went backwards (see 1d above). Read-only, so it runs in a dry
+# run too. Each held-back file is excluded from the mirror below; an rsync
+# exclude also protects it from --delete, so Roe's copy stays as committed.
+echo "→ Docs that went backwards (read-only check, before the copy):"
+REVERTED_DOCS="$(cd current && bin/rails runner '
+  DocsRevertCheck.new(
+    site_dir: File.join(RoeSitePaths::SITE_PATH, "documentation", "roe"),
+    app_rel:  "lib/site_templates/minimum/documentation/roe",
+    repo:     Rails.root
+  ).findings.each { |f| $stdout.puts "::REVERTED::#{f.rel}|#{f.commit}|#{f.date}" }
+' 2>/dev/null | sed -n 's/^::REVERTED:://p' || true)"
+DOC_EXCLUDES=()
+if [[ -n "$REVERTED_DOCS" ]]; then
+  while IFS='|' read -r rel commit date; do
+    [[ -z "$rel" ]] && continue
+    echo "    site/documentation/roe/$rel matches $commit ($date) — held back"
+    DOC_EXCLUDES+=(--exclude="/$rel")
+  done <<< "$REVERTED_DOCS"
+else
+  echo "    none"
+fi
+echo ""
+
 echo "→ Docs (exact mirror, --delete on):"
 echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/documentation/roe/"
 # _versions.yml is excluded: it isn't content, it's release metadata that
@@ -92,7 +121,7 @@ echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/docum
 # site/'s copy over it put back stale versions after every bump — 0.3.0's
 # stamps were lost that way. An excluded file is also protected from
 # --delete, so current/'s copy stays put.
-rsync -avc $DRY_RUN --delete --exclude=_versions.yml \
+rsync -avc $DRY_RUN --delete --exclude=_versions.yml ${DOC_EXCLUDES[@]+"${DOC_EXCLUDES[@]}"} \
   site/documentation/roe/ \
   current/lib/site_templates/minimum/documentation/roe/
 echo ""
@@ -312,6 +341,27 @@ site_path_of() {
   esac
 }
 
+if [[ -n "$REVERTED_DOCS" ]]; then
+  echo -e "  ${ROE_ORANGE}================================================================"
+  echo -e "  ${BOLD}!!  DOCS THAT WENT BACKWARDS  —  NOT SYNCED${NC}"
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  while IFS='|' read -r rel commit date; do
+    [[ -z "$rel" ]] && continue
+    echo "      - site/documentation/roe/$rel"
+    echo "        Identical to Roe's copy in $commit ($date). See what syncing would undo:"
+    echo "          diff current/lib/site_templates/minimum/documentation/roe/$rel site/documentation/roe/$rel"
+  done <<< "$REVERTED_DOCS"
+  echo ""
+  echo "      Each is a byte-for-byte copy of an older version, which usually"
+  echo "      means something put it back (a Site Sync pull, a restored backup)."
+  echo "      Roe's newer copy was kept. Lines starting with < in the diff are"
+  echo "      the newer ones. To put Roe's copy back in site/:"
+  echo "        cp current/lib/site_templates/minimum/documentation/roe/<file> site/documentation/roe/<file>"
+  echo "      If you meant the old wording, change anything in it and run again."
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  echo ""
+fi
+
 if [[ -n "$APP_EDITED_FILES" ]]; then
   echo -e "  ${ROE_ORANGE}================================================================"
   echo -e "  ${BOLD}!!  EDITED IN current/  —  NOT SYNCED${NC}"
@@ -354,7 +404,7 @@ elif [[ -n "$FAILED_FILES" ]]; then
   echo "      above and run again to ship them."
   echo -e "  ${ROE_ORANGE}================================================================${NC}"
   exit 1
-elif [[ -n "$APP_EDITED_FILES" ]]; then
+elif [[ -n "$APP_EDITED_FILES$REVERTED_DOCS" ]]; then
   exit 1
 else
   echo "Done."

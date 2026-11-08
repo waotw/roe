@@ -19,7 +19,13 @@ template: links
 
 A Collection is a list of your content — posts, pages, products, or documentation — that you drop anywhere with a short block. One Collection can power an entire blog; another can add three "Featured Posts" to your home page. They can even build your site's menus — the header, footer, or sidebar (see [Build a menu, footer, or sidebar](#build-a-menu-footer-or-sidebar)).
 
+## Create a Collection
+
 You don't have to write the block by hand. In [The Editor](/documentation/roe/the-editor), click the `COLLECTION` button: it opens a form with every option below, shows each field only when it applies (the product options appear once you set the source to `products`), and writes just the fields you fill in. It then drops the finished `collection` block at your cursor. Set your Collection defaults in [Admin/Settings](/admin/configs/collections/edit).
+
+## Edit a Collection
+
+You don't have to edit Collections by hand either. When you put the caret/cursor within a Collection block, the `COLLECTION` button becomes `EDIT COLLECTION`. This allows you to edit this Collection in the builder/form.
 
 ## Options
 
@@ -27,15 +33,15 @@ You won't need most of these. Start with a bare block and add options only as yo
 
 ### Source & Filtering
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `source` | No | `posts` (default), `pages`, `documentation`, or `products` |
-| `tags` | No | Comma-separated, use `-tag` to exclude |
-| [`collection`](#build-a-menu-footer-or-sidebar) | No | Comma-separated names; gathers content tagged with a matching `collection:` field |
-| `category` | No | Filter products by category |
-| `podcast` | No | Filter posts by podcast key/name |
-| `post_type` | No | Filter posts by type: `article`, `audio`, `video`, `podcast` or `all`|
-| [`related`](#show-related-content) | No | `true` shows items linked via frontmatter `related:`|
+| Option                                          | Required | Description                                                                       |
+| ----------------------------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `source`                                        | No       | `posts` (default), `pages`, `documentation`, or `products`                        |
+| `tags`                                          | No       | Comma-separated, use `-tag` to exclude                                            |
+| [`collection`](#build-a-menu-footer-or-sidebar) | No       | Comma-separated names; gathers content tagged with a matching `collection:` field |
+| `category`                                      | No       | Filter products by category                                                       |
+| `podcast`                                       | No       | Filter posts by podcast key/name                                                  |
+| `post_type`                                     | No       | Filter posts by type: `article`, `podcast`, `music`,`audio`, `video` or `all`     |
+| [`related`](#show-related-content)              | No       | `true` shows items linked via frontmatter `related:`                              |
 
 ### Ordering
 
@@ -79,13 +85,13 @@ The [`menu`](#build-a-menu-footer-or-sidebar) template is the one exception: the
 | Option | Required | Description |
 |--------|----------|-------------|
 | `category` | No | Filter products by category |
-| `groups` | No | `enabled` to group variants together (e.g., Paperback/Hardback/Ebook of same book) |
+| `groups` | No | `true` to group variants together (e.g., Paperback/Hardback/Ebook of same book) |
 | `aspect_ratio` | No | Product image ratio: `original` (default), `square`, `portrait`, `tv`, `wide`, or `cinema` (`auto`, `landscape`, and `film` are accepted aliases) |
 | `show_description` | No | Show truncated product description (~100 chars) below the title |
 
 #### [Grouped products](/documentation/roe/products#product-variants-groups)
 
-When variants share a `group:` (e.g. Paperback/Hardback/Ebook of one book) and you set `groups: enabled`:
+When variants share a `group:` (e.g. Paperback/Hardback/Ebook of one book) and you set `groups: true`:
 
 - The grid uses the **primary** variant's image and links to its page.
 - Variant names appear in parentheses below the title (e.g. `(Paperback, Hardback)`).
@@ -142,39 +148,45 @@ post_type: article
 ```
 ````
 
-## Build a menu, footer, or sidebar
+## Build a `menu` in your header, footer or sidebar
 
 A Collection isn't only for the body of a page — it works in your **layout files** too: `header`, `footer`, and `sidebar` (edit these in [Admin → Layouts](/admin/layouts)). Instead of hand-writing links, you build the menu from your own content.
 
-The simplest way is to list the pages you want, in the order you want them. In your `header` layout file:
+The simplest way is click `ADD NAVIGATION` and use the menu builder. It will list all available pages on the left and you pick your settings on the right.
+
+Here is an example of a very simple `menu` Collection:
 
 ````
 ```collection
 template: menu
 order: blog, about, store
+style: horizontal
 ```
 ````
 
-That's the whole menu — those pages, in that exact order. No tagging, no per-page edits: the `order:` list *is* the menu. The layout editor's `SHOW LINKS` panel lists every `url_name` you can drop in.
+That's it. Those pages, in that order. The layout editor's `ADD NAVIGATION` builder lists every `url_name` you can drop in.
 
-A few things worth knowing:
+That block ↑ looks like this ↓
 
-- `template: menu` outputs a bare list of links — no headings, no dates, no excerpts.
-- The source defaults to `pages` (the usual case). Set `source: posts` or `products` to build the menu from those instead.
-- `style: horizontal` lays the links out in a row; the default, `vertical`, stacks them.
-- A `url_name` the list can't find is skipped (and logged in development, so a typo is easy to catch).
-- A menu shows every link you give it — it isn't capped at ten like the other templates.
-- In the `header` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
-
-### Or let the menu fill itself
-
-Prefer a menu that keeps itself current — every page meant for the footer shows up there, with no list to maintain? Tag the pages instead. Give each one a `collection:` field naming the menu it belongs to:
-
-```yaml
-collection: footer
+```collection
+template: menu
+order: blog, about, store
+style: horizontal
 ```
 
-The name is yours to choose — `footer`, `resources`, `main-menu`, whatever fits. Then point a `menu` Collection at that name and leave `order:` off:
+**A few things worth knowing:**
+
+- `template: menu` outputs a bare list of links — no headings, no dates, no excerpts.
+- The source defaults to `pages` (the usual case). Use `source: posts` or `products` to build the menu from those instead.
+- `style: horizontal` lays the links out in a row; the default, `vertical`, stacks them.
+- A `url_name` the list can't find is skipped (but will show up on the local site as a typo so you'll notice it).
+- A `menu` shows every link you give it — no `limit` for this Collection.
+- In the `header` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
+- You can add `show_active: true` or `show_active: false` to turn this on/off for any `menu` Collection.
+
+### Add links to the menu from any Page, Post or Product
+
+You can give a `menu` Collection a name like so:
 
 ````
 ```collection
@@ -183,9 +195,24 @@ collection: footer
 ```
 ````
 
-Every page tagged `collection: footer` now appears, alphabetically — tag a page and it joins the menu, no layout edit needed. A page can belong to more than one: `collection: footer, main-menu` puts it in both. Think of `collection:` as placement the way [tags](#source--filtering) are subject — it gathers content by the menu it belongs to instead of by topic.
+And then you can add this `collection` to the metadata for any Page, Post or Product and that link will show up in the `footer` Collection:
 
-Use whichever fits — or **both**. Give a `menu` Collection an `order:` list *and* a `collection:` name, and the menu is the two combined: listed pages come first, in your order; anything tagged but not listed follows, alphabetically. Like `related`, it works from either side — name a page in the list here, or tag the page itself — so nothing you meant to include gets dropped.
+```yaml
+---
+title: home
+collection: footer
+---
+```
+
+Every page, post or product with `collection: footer` in the metadata now appears in that collection in alphabetical order.
+
+You can think of `collection:` as a destination and when you add it to a page, you send it to that Collection.
+
+If the Collection already has an `order` with existing links, any new link will go at the end of the list.
+
+## Create a `playlist` for podcasts or music
+
+There is a `playlist` Collection template and it will create a music player from all the audio files from podcast or music posts. More info here: [Collection Templates](/documentation/roe/collections_templates/#when-to-use-the-playlist-template)
 
 ## Show `related` content
 
@@ -210,7 +237,7 @@ Add a `related` entry to any Post, Product, or Page, and the two pieces of conte
 
 The link is `bi-directional` — you set it on one side, and both sides see it. I added `blue-tshirt` to **Yellow T-shirt**, and it shows up in the `related: true` Collection on **Blue T-shirt's** page just the same.
 
-## Paginate with a "View all" link
+## Pagination with a "View all" link
 
 Often, a home page or blog page will show 5-10 posts, then link to the archive for the rest. A Collection makes this easy.
 

@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 1.6.2
-   Fingerprint: ed26ec36
+   Version: 1.6.3
+   Fingerprint: c1d44502
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -1241,12 +1241,6 @@ ul.product-tags {
 .product-tag-link {
   color: var(--color-muted);
   text-decoration: none;
-}
-
-.post-tag-link::before,
-.page-tag-link::before,
-.product-tag-link::before {
-  content: "#";
 }
 
 .post-tag-link:hover,
