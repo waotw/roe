@@ -294,4 +294,39 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     get post_path(a_post("audio", audio: "/media/audio/a.mp3").url_name)
     assert_select ".player-series", 0
   end
+
+  test "[tracks] lists the release's tracks in track order, with this one marked" do
+    t2 = a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2, duration: "3:10")
+    t1 = a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
+    a_post("music", audio: "/media/audio/x.mp3", release: "other", track_number: 1)
+
+    get post_path(t2.url_name)
+    assert_select ".track-list li.track-item", 2
+    assert_equal [ t1.title, t2.title ], css_select(".track-item a > span").map(&:text)
+    assert_select ".track-item.is-current a > span", t2.title
+    assert_select ".track-item.is-current .track-duration", "3:10"
+  end
+
+  test "[tracks] is left out for a release of one, and when the writing has a playlist" do
+    alone = a_post("music", audio: "/media/audio/a.mp3", release: "single", track_number: 1)
+    get post_path(alone.url_name)
+    assert_select ".track-list", 0
+
+    playlist = "Notes.\n\n```collection\ntemplate: playlist\nsource: posts\npost_type: music\nrelease: ep\norder: track_number\n```\n"
+    t1 = a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1, content: playlist)
+    a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
+    get post_path(t1.url_name)
+    assert_select ".track-list", 0
+    assert_select "ol.player-tracks", 1
+  end
+
+  test "the music layout's own player links the tracks before and after it" do
+    a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
+    t2 = a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
+    a_post("music", audio: "/media/audio/c.mp3", release: "ep", track_number: 3)
+
+    get post_path(t2.url_name)
+    assert_select ".post-player .player-series-prev", 1
+    assert_select ".post-player .player-series-next", 1
+  end
 end

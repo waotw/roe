@@ -42,18 +42,8 @@ class ContentScaffoldTest < ActiveSupport::TestCase
     assert_not_includes body("post", { "post_type" => "podcast", "podcast" => "myshow" }), "template: playlist"
   end
 
-  test "a music track gets its release's track list below the writing" do
-    result = body("post", { "post_type" => "music", "release" => "summer-ep" }, "Liner notes.")
-
-    assert_includes result, "post_type: music"
-    assert_includes result, "release: summer-ep"
-    assert_includes result, "order: track_number"
-    assert_operator result.index("Liner notes."), :<, result.index("template: playlist")
-  end
-
-  test "the track list is skipped until the release is known" do
-    assert_not_includes body("post", { "post_type" => "music" }), "template: playlist",
-      "without a release key the collection would gather every track on the site"
+  test "a music track gets no track list — the layout draws it" do
+    assert_not_includes body("post", { "post_type" => "music", "release" => "summer-ep" }), "template: playlist"
   end
 
   # --- pages: the title IS in the body ------------------------

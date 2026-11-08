@@ -173,7 +173,7 @@ class Admin::PostsNewFlowTest < ActionDispatch::IntegrationTest
     assert_not_includes content, "type: player"
   end
 
-  test "a music track arrives with its release's track list" do
+  test "a music track arrives with its release, and no track list — the layout draws it" do
     SiteFeature.stubs(:music_enabled?).returns(true)
     create_post(filename: "flow-music", post_type: "music",
                 fields: { audio: "/media/audio/t.mp3", release: "summer-ep", track_number: "3" })
@@ -182,8 +182,7 @@ class Admin::PostsNewFlowTest < ActionDispatch::IntegrationTest
     assert_includes content, 'post_type: "music"'
     assert_includes content, 'release: "summer-ep"'
     assert_includes content, 'track_number: "3"'
-    assert_includes content, "template: playlist"
-    assert_includes content, "order: track_number"
+    assert_not_includes content, "template: playlist"
   end
 
   test "blank create fields are left out of the frontmatter" do
@@ -196,8 +195,8 @@ class Admin::PostsNewFlowTest < ActionDispatch::IntegrationTest
     assert_not_includes content, "track_number:", "a blank number isn't written"
   end
 
-  # A single is still part of something — otherwise it gets no track list and
-  # nothing gathers it.
+  # A single is still part of something — otherwise the layout's [tracks] and
+  # the player's ⏮ ⏭ have nothing to gather it into.
   test "a music track with no release falls back to singles" do
     SiteFeature.stubs(:music_enabled?).returns(true)
     create_post(filename: "flow-single", post_type: "music",
@@ -205,8 +204,6 @@ class Admin::PostsNewFlowTest < ActionDispatch::IntegrationTest
 
     content = file_for("flow-single")
     assert_includes content, 'release: "singles"'
-    assert_includes content, "template: playlist", "singles still get a track list"
-    assert_includes content, "release: singles"
   end
 
   test "an explicit release is left alone" do

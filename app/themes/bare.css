@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 1.5.3
-   Fingerprint: f941adb1
+   Version: 1.5.4
+   Fingerprint: 058c341c
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -3110,24 +3110,28 @@ p.podcast-audio-fallback {
   right: 0;
 }
 
-/* Episode list */
+/* Episode list, and a music release's track list ([tracks]) */
 
-.episode-list {
+.episode-list,
+.track-list {
   margin-top: var(--space-8);
   border-top: 1px solid var(--color-border);
   padding-top: 0;
 }
 
-.episode-list ol {
+.episode-list ol,
+.track-list ol {
   list-style: none;
   padding-left: 0;
 }
 
-.episode-list li {
+.episode-list li,
+.track-list li {
   margin-bottom: 0;
 }
 
-.episode-list h2 {
+.episode-list h2,
+.track-list h2 {
   font-size: var(--text-base);
   font-weight: 600;
   margin-bottom: var(--space-4);
@@ -3147,15 +3151,18 @@ p.podcast-audio-fallback {
   margin-bottom: var(--space-4);
 }
 
-.episode-item {
+.episode-item,
+.track-item {
   border-bottom: 1px solid var(--color-border);
 }
 
-.episode-item.is-current {
+.episode-item.is-current,
+.track-item.is-current {
   background: var(--color-bg-dim);
 }
 
-.episode-item a {
+.episode-item a,
+.track-item a {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -3164,26 +3171,31 @@ p.podcast-audio-fallback {
   color: inherit;
 }
 
-.episode-item a:hover {
+.episode-item a:hover,
+.track-item a:hover {
   background: var(--player-btn-hover-bg);
 }
 
-.episode-item a > span {
+.episode-item a > span,
+.track-item a > span {
   font-size: 0.95rem;
 }
 
-.episode-item.is-current a > span {
+.episode-item.is-current a > span,
+.track-item.is-current a > span {
   font-weight: 600;
 }
 
-.episode-meta-row {
+.episode-meta-row,
+.track-meta-row {
   display: flex;
   gap: var(--space-3);
   font-size: 0.75rem;
   color: var(--player-meta-color);
 }
 
-.episode-number {
+.episode-number,
+.track-number {
   font-weight: 600;
 }
 

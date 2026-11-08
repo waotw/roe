@@ -17,6 +17,7 @@ class ContentLayout
       case part.to_s
       when "player"     then player?
       when "episodes"   then playlist?
+      when "tracks"     then playlist?
       when "buy_button" then buy_button?
       when "title"      then @record.is_a?(Product) && heading?
       when "image"      then @record.is_a?(Product) && leading_image?

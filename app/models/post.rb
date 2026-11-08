@@ -139,10 +139,8 @@ class Post < ApplicationRecord
         { name: "lyrics", type: :textarea, label: "Lyrics",
           hint: "The full text, if you want it kept with the track." }
       ],
-      # The music layout draws the player; the release's track list has no
-      # layout part yet, so it's written into the body. Needs `release:`
-      # before the list can be written.
-      scaffold: [ :content, :playlist ],
+      # The music layout draws the player and the release's track list.
+      scaffold: [ :content ],
       create_fields: %w[audio release track_number]
     },
     audio: {
