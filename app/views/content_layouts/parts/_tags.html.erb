@@ -1,8 +1,14 @@
-<%# The record's tags (`tags:`), one list item each. Plain text: there are
-    no tag pages to link to. Nothing when it has none. %>
+<%# The record's tags (`tags:`), one list item each. Each tag opens the site
+    search filtered to that tag — the same way a ```search block opens it
+    (search-trigger controller → site-search:open), so there are no tag
+    pages to build or keep up to date. Nothing when it has none. %>
 <% tags = record.respond_to?(:tags) ? Array(record.tags).map { |t| t.to_s.strip }.reject(&:blank?) : [] %>
 <% if tags.any? %>
   <ul class="<%= kind %>-tags">
-    <% tags.each do |tag| %><li class="<%= kind %>-tag"><%= tag %></li><% end %>
+    <% tags.each do |tag| %>
+      <li class="<%= kind %>-tag"><a href="#" class="<%= kind %>-tag-link" data-controller="search-trigger"
+         data-search-trigger-scope-value="<%= { tagsInclude: [ tag ] }.to_json %>"
+         data-action="search-trigger#open" title="Search for #<%= tag %>"><%= tag %></a></li>
+    <% end %>
   </ul>
 <% end %>

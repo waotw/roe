@@ -182,7 +182,7 @@ class ContentLayout
       when "buy_button"    then %(<button class="snipcart-add-item">Add to cart</button>)
       when "price"         then %(<p class="product-price">$10.00</p>)
       when "excerpt"       then %(<p class="#{k}-excerpt">Excerpt</p>)
-      when "tags"          then %(<ul class="#{k}-tags"><li class="#{k}-tag">tag</li></ul>)
+      when "tags"          then %(<ul class="#{k}-tags"><li class="#{k}-tag"><a class="#{k}-tag-link">tag</a></li></ul>)
       when "body"
         case k
         when "post"    then %(<div class="post-content">…the post's writing…</div>)
@@ -322,7 +322,7 @@ class ContentLayout
       when "buy_button"    then "The product's buy button. Left out when the writing has its own `button` block."
       when "price"         then "The product's price. With [price] in the layout, the buy button leaves its own price off."
       when "excerpt"       then "The #{n}'s excerpt, from `excerpt:`, as written. Nothing when it has none."
-      when "tags"          then "The #{n}'s tags, from `tags:`, as a list. Nothing when it has none."
+      when "tags"          then "The #{n}'s tags, from `tags:`, as a list. Each one opens the site search filtered to that tag. Nothing when it has none."
       else "Shows the #{n}'s `#{part}:` field when it has one, and nothing when it doesn't."
       end
     end

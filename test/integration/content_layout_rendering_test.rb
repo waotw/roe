@@ -137,6 +137,14 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "ul.post-tags > li.post-tag", "arts"
   end
 
+  test "each tag opens the site search filtered to it" do
+    site_layout("article", "[tags]\n[body]\n")
+    get post_path(a_post(tags: "arts, culture").url_name)
+    link = css_select("li.post-tag a.post-tag-link[data-controller=search-trigger]").first
+    assert_equal "arts", link.text
+    assert_equal({ "tagsInclude" => [ "arts" ] }, JSON.parse(link["data-search-trigger-scope-value"]))
+  end
+
   test "a metadata field without a part of its own shows its value" do
     site_layout("article", "[location]\n[body]\n")
     get post_path(a_post(location: "Chicago").url_name)
