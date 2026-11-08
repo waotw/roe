@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 1.6
-   Fingerprint: b8d0511a
+   Version: 1.6.1
+   Fingerprint: e3104f7e
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -2617,6 +2617,22 @@ article .content,
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4) var(--space-1) var(--space-4);
   --player-progress: 0;
+}
+
+/* ⏮ ⏭ under a podcast episode's or music track's player card: the episode
+   or track before and after it. Previous on the left, next on the right. */
+.player-series {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-2, 0.5rem) 0;
+}
+.player-series-next {
+  margin-left: auto;
+  text-align: right;
+}
+.player-series-label {
+  color: var(--color-muted, inherit);
 }
 
 /* Artwork (show_artwork) sits left of the now/transport column; drop it and the
