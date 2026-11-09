@@ -232,13 +232,14 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select ".product-top .product-price", "$12.00"
   end
 
-  test "a product whose body has its own heading, image and button shows those only" do
+  test "a product's own button replaces the layout's; a heading and image in the body show as well" do
     product = a_product(image: "/media/images/x.jpg",
       content: "![Thing](/media/images/x.jpg)\n\n# My heading\n\n```button\nsku: THING-X\n```\n\nAbout it.")
     get product_path(product.url_name)
-    assert_select "h1", 1
-    assert_select "h1.product-title", "My heading"
-    assert_select ".product-top", 0
+    assert_equal [ product.title, "My heading" ], css_select("h1.product-title").map { |h| h.text.strip }
+    assert_select ".product-top img[src='/media/images/x.jpg']", 1
+    assert_select "img[src='/media/images/x.jpg']", 2
+    assert_select ".product-top .product-price", 0, "the body's button stands in for the layout's"
   end
 
   test "an example button inside a four-backtick fence doesn't count" do

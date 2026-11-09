@@ -17,8 +17,9 @@
 #
 # Anything the type's content layout already draws (lib/site_templates/
 # layouts/content/) stays out of the body: a post's title and player, a
-# product's title, image and buy button. Older content with those blocks in
-# its body keeps them — the layout skips its own copy (ContentLayout::BodyCheck).
+# product's title, image and buy button. Older content with a player card,
+# playlist or buy button in its body keeps it, and the layout skips its own
+# copy (ContentLayout::BodyCheck); a title or image there shows twice.
 #
 # A block that needs a value it doesn't have is skipped rather than written
 # empty: no playlist until we know which release. The author fills the field

@@ -113,14 +113,14 @@ If your sidebar is the site navigation and should stay on screen, `mobile: top` 
 
 ## Content Layouts
 
-Roe uses sensible defaults, but if you would like to customize the layout of your pages and posts, you can enable content layouts here: [Settings → Roe → content](http://roe.roe:3000/admin/configs/content/edit)
+Roe uses sensible defaults, but if you would like to customize the layout of your pages and posts, you can enable content layouts here: [Settings → Roe → Content](/admin/configs/content/edit?focus=content_layouts)
 
 Content layouts do one thing: they allow you to structure content (pages, posts, etc.). There are 2 parts of the layout, blocks and `[boxes]`:
 
 - A block is a group of `[boxes]`. A blank line creates a new block.
-- A `[box]` represents an element in the layout. You can group `[boxes]` by putting them next to each other. This gives them their own `<div>`.
+- A `[box]` represents an element in the layout. You can group `[boxes]` by putting them on the same line. This gives them their own `<div>`.
 
-==Note:== As with everything in Roe, you can override global settings locally. In the case of content layouts, you can add elements to the post or page itself and these will be used instead of the ones in the layout. For example, a `[player]` might be at the top of an audio post but be at the bottom in the `audio.txt` layout. The post will always win and override the layout. The top `[player]` is used.
+==Note:== As with everything in Roe, you can override global settings locally. In the case of content layouts, you can add elements to the post or page itself and these will be used instead of the ones in the layout. For example, an audio post with its own player card at the top will override the layout's `[player]`.
 
 ### Edit a content layout
 
@@ -142,9 +142,10 @@ All available `[boxes]` are listed in the "BOXES" section above the editor. Clic
 
 A content layout with the `[body]` box and nothing else is the simplest layout possible. It renders what is in the page or post only.
 
-- The topmost block above the `[body]` box is the `<header>`.
-- The bottommost block below the `[body]` box is the `<footer>`.
-- All other blocks are groups.
+- The first block, if it's above [body], is the <header>.
+- The last block, if it's below [body], is the <footer>.
+- The block with [body] is the content.
+- Any other block is a group.
 
 You can add CSS classes to blocks and rows. To add a CSS class to a block, put the name of the class on it's own line at the top, followed by a `:`.
 

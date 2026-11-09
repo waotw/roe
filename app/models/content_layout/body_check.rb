@@ -1,13 +1,14 @@
-# Body wins: when a post's own writing already has a part, the layout's copy
-# is skipped, so nothing shows twice. Older posts carry no blocks and get the
-# layout's parts; posts written since the scaffolds carry theirs in the body.
+# Body wins: when the writing already has a player card, a playlist or a buy
+# button, the layout leaves out its own, so nothing shows twice. Only those:
+# a title or image written in the body as well shows twice, which is plain to
+# see and fix, where two players or two buttons would be confusing. Older
+# posts carry no blocks and get the layout's parts; posts written since the
+# scaffolds carry theirs in the body.
 #
 # A text scan of the raw Markdown, before it's rendered — no rendering and no
 # database work, so it costs next to nothing per page.
 class ContentLayout
   class BodyCheck
-    FENCED_CODE = /^(`{3,}|~{3,})[^\n]*\n.*?^\1[ \t]*$/m
-
     def initialize(record)
       @record = record
       @text = record.respond_to?(:content) ? record.content.to_s : ""
@@ -18,8 +19,6 @@ class ContentLayout
       when "player"     then player?
       when "playlist"   then playlist?
       when "buy_button" then buy_button?
-      when "title"      then @record.is_a?(Product) && heading?
-      when "image"      then @record.is_a?(Product) && leading_image?
       else false
       end
     end
@@ -47,17 +46,6 @@ class ContentLayout
       end
     end
 
-    def heading?
-      without_code.match?(/^#[ \t]+\S/)
-    end
-
-    # An image or gallery as the first thing in the body — where the product
-    # scaffold puts it, and what product_content treats as the product image.
-    def leading_image?
-      first = @text.lstrip.lines.first.to_s.strip
-      first.start_with?("![", "```gallery", "<img", "<picture", "<figure")
-    end
-
     # The insides of every ```name fence. A block shown as an example inside
     # a longer fence (```` or ~~~) in the docs isn't a block, so those
     # fences are taken out first.
@@ -67,10 +55,6 @@ class ContentLayout
 
     def without_examples
       @without_examples ||= @text.gsub(/^(`{4,}|~{3,})[^\n]*\n.*?^\1[ \t]*$/m, "")
-    end
-
-    def without_code
-      @without_code ||= @text.gsub(FENCED_CODE, "")
     end
   end
 end

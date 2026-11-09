@@ -1,7 +1,6 @@
 <%# A post's image is often only its card image, so on the post itself it
     shows when `image_in_header: true` — the rule from before layouts.
-    Other records show their image whenever they have one; a product whose
-    body starts with an image or gallery keeps that one (BodyCheck). %>
+    Other records show their image whenever they have one. %>
 <% image = record.metadata["image"].to_s.strip %>
 <% if image.present? %>
   <% if kind == "post" %>
