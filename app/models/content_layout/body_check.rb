@@ -16,8 +16,7 @@ class ContentLayout
     def has?(part)
       case part.to_s
       when "player"     then player?
-      when "episodes"   then playlist?
-      when "tracks"     then playlist?
+      when "playlist"   then playlist?
       when "buy_button" then buy_button?
       when "title"      then @record.is_a?(Product) && heading?
       when "image"      then @record.is_a?(Product) && leading_image?
@@ -33,8 +32,10 @@ class ContentLayout
       @record.respond_to?(:own_player_card_in_body?) && @record.own_player_card_in_body?
     end
 
+    # A playlist collection, or a player card showing its own.
     def playlist?
-      blocks("collection").any? { |config| config.match?(/^\s*template:\s*["']?playlist\b/) }
+      blocks("collection").any? { |config| config.match?(/^\s*template:\s*["']?playlist\b/) } ||
+        blocks("card").any? { |config| config.match?(/^\s*show_playlist:\s*["']?true\b/) }
     end
 
     # A product button is a ```button with no `for:`/`type:` naming another

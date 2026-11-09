@@ -72,8 +72,7 @@ module ContentLayoutHelper
   end
 
   # What several parts need, worked out once per page: the record's podcast
-  # (posts and pages), for an episode the show's other episodes, and for a
-  # music track its release's tracks.
+  # or release settings (pages, and a podcast episode's show).
   def layout_context(record, kind, layout, locals)
     podcast_key = record.respond_to?(:metadata) ? record.metadata["podcast"].to_s.presence : nil
     episode = kind == "post" && record.post_type == "podcast" && podcast_key
@@ -87,34 +86,11 @@ module ContentLayoutHelper
     release_key = kind == "page" ? record.metadata["release"].to_s.strip.presence : nil
     release_config = release_key && SiteFeature.music_enabled? ? ReleaseConfig.get(release_key) : nil
 
-    track_release = kind == "post" && record.post_type == "music" ? record.metadata["release"].to_s.strip.presence : nil
-
     {
       podcast_config: podcast_config,
       release_config: release_config,
-      podcast_episodes: episode ? podcast_episodes_for(podcast_key) : nil,
-      release_tracks: track_release && layout.parts.include?("tracks") ? release_tracks_for(track_release) : nil,
       layout_parts: layout.parts
     }.merge(locals)
-  end
-
-  # Newest first, the order the episode list and ⏮ ⏭ use.
-  def podcast_episodes_for(podcast_key)
-    Post.published
-        .where("json_extract(metadata, '$.post_type') = ?", "podcast")
-        .where("json_extract(metadata, '$.podcast') = ?", podcast_key)
-        .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
-        .to_a
-  end
-
-  # A release's tracks in track order, the order the track list and ⏮ ⏭ use
-  # (Post#series_neighbours).
-  def release_tracks_for(release_key)
-    Post.published
-        .where("json_extract(metadata, '$.post_type') = ?", "music")
-        .where("json_extract(metadata, '$.release') = ?", release_key)
-        .to_a
-        .sort_by { |track| [ track.metadata["track_number"].to_i, track.title.to_s ] }
   end
 
   def layout_block_html(block, rows)

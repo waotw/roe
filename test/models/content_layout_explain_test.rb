@@ -105,7 +105,9 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
     assert_equal %w[title subtitle date author image feed_links excerpt tags body], choices("article")
     assert_equal %w[image title price buy_button tags body category description variant], choices("product")
     assert_equal %w[title body], choices("documentation")
-    assert_includes choices("podcast"), "episodes"
+    assert_includes choices("podcast"), "playlist"
+    assert_includes choices("music"), "playlist"
+    assert_not_includes choices("audio"), "playlist"
   end
 
   test "fields are the type's metadata worth showing, not settings, and never twice" do

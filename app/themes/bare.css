@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 1.5.4
-   Fingerprint: 058c341c
+   Version: 1.5.5
+   Fingerprint: 71334d94
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -1481,10 +1481,12 @@ ol.player-tracks {
   opacity: 0.6;
   font-variant-numeric: tabular-nums;
 }
-.player-track.is-playing .player-track-title {
+.player-track.is-playing .player-track-title,
+.player-track.is-current .player-track-title {
   font-weight: 700;
 }
-.player-track.is-playing .player-track-title::before {
+.player-track.is-playing .player-track-title::before,
+.player-track.is-current .player-track-title::before {
   content: "\25B8 ";
   margin-right: 0.4rem;
 }
@@ -2413,11 +2415,12 @@ article .content,
   }
 }
 
-/* Player card (card type: player) — the transport, driven by the audio-player
-   controller. It reads a `playlist` collection on the same page (if any) to
-   build its queue. TUI-flavored: mono, compact, symbol-based transport. Play
-   state is [data-playing] on the button; progress width and handle position are
-   set inline by the controller, so here we only style appearance. */
+/* Player card (card type: player, and every post's own player) — the
+   transport, driven by player.js. It plays through a `playlist` collection
+   on the same page (if any). TUI-flavored: mono, compact, symbol-based
+   transport. Play state is [data-playing] on the button; progress width and
+   handle position are set inline by player.js, so here we only style
+   appearance. */
 .card-player {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
   font-size: var(--text-sm, 0.875rem);
@@ -2448,7 +2451,7 @@ article .content,
    column reflows full-width. Its left edge lines up with the column's. */
 .player-body {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-4);
   align-items: flex-start;
 }
 .player-main {
@@ -2472,10 +2475,8 @@ article .content,
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.player-now::before {
-  content: "\266A";
+.player-now-episode {
   opacity: 0.6;
-  margin-right: 1.05ch;
 }
 .player-now-link {
   margin-left: 0.5ch;
@@ -2568,69 +2569,7 @@ article .content,
 
 /* ============ MEDIA PLAYERS =============== */
 
-/* Audio Player */
-
-.audio-player {
-  padding: var(--space-4);
-  background: var(--player-bg);
-  border: 1px solid var(--player-border);
-  margin: var(--space-6) 0;
-}
-
-.player-header {
-  display: flex;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.player-header img {
-  border: 1px solid var(--color-border);
-  margin: 0;
-}
-
-.player-artwork {
-  width: 64px;
-  height: 64px;
-  aspect-ratio: 1;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.player-info {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.2;
-}
-
-.player-title {
-  font-weight: 600;
-  font-size: var(--text-base);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.episode-meta {
-  font-size: var(--text-sm);
-  color: var(--player-meta-color);
-  margin-top: 0.15rem;
-}
-
-.episode-meta span + span::before {
-  content: " · ";
-}
-
-.now-playing {
-  font-size: 0.75rem;
-  color: var(--player-accent);
-  margin-top: 0.2rem;
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Progress */
+/* Progress bar and times, shared by the player card */
 
 .player-progress {
   position: relative;
@@ -2638,34 +2577,6 @@ article .content,
   background: var(--player-track);
   cursor: pointer;
   margin: var(--space-1) 0;
-}
-
-.progress-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 0%;
-  background: var(--player-accent);
-  pointer-events: none;
-}
-
-.progress-handle {
-  position: absolute;
-  top: 50%;
-  left: 0%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--player-accent);
-  background: var(--color-bg);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  opacity: 0;
-}
-
-.player-progress:hover .progress-handle {
-  opacity: 1;
 }
 
 .player-time {
@@ -2676,215 +2587,99 @@ article .content,
   color: var(--player-meta-color);
 }
 
-/* Controls */
-
-.player-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
+/* Chapters and playlist, inside or under the player card: a podcast
+   episode's `chapters:` (click a row to jump there), and the show's episodes
+   or the release's tracks (`show_playlist: true`, or the layout's
+   [playlist]). Both fold away under their summary line. */
+.player-chapters,
+.player-playlist {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
 }
-
-.player-controls-center {
-  position: relative;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.controls-center {
-  display: flex;
-}
-
-.player-btn {
-  background: none;
-  border: none;
-  padding: 0.35rem;
-  cursor: pointer;
-  color: var(--player-btn-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.player-btn:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.btn-skip svg {
-  width: 30px;
-  height: 30px;
-}
-
-.btn-play {
-  width: 40px;
-  height: 40px;
-  background: var(--player-accent);
-  color: var(--player-btn-play-color);
-  border-radius: 50%;
-}
-
-.btn-play:hover {
-  background: var(--player-accent-hover);
-  color: var(--player-btn-play-color);
-}
-
-.btn-play svg {
-  width: 26px;
-  height: 26px;
-}
-
-.btn-play .icon-pause {
-  display: none;
-}
-
-.btn-play[data-playing="true"] .icon-play {
-  display: none;
-}
-
-.btn-play[data-playing="true"] .icon-pause {
-  display: block;
-}
-
-.btn-speed {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: var(--space-1) var(--space-2);
-  min-width: var(--space-12);
-  border: 1px solid var(--player-border);
-  background: var(--color-bg);
-  color: var(--player-btn-color);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-}
-
-/* Prev/Next episode */
-
-.btn-wrapper {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-}
-
-.btn-wrapper:first-child {
-  justify-content: flex-start;
-}
-
-.btn-wrapper:last-child {
-  justify-content: flex-end;
-}
-
-.btn-episode {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-3);
-  text-decoration: none;
-  color: var(--player-btn-color);
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  flex: 0 0 auto;
-  max-width: 80%;
-}
-
-a.btn-episode {
-  color: var(--player-btn-color);
-}
-
-.btn-prev {
-  justify-content: flex-start;
-}
-
-.btn-next {
-  justify-content: flex-end;
-}
-
-.btn-episode:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.btn-episode.is-disabled {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.btn-episode svg {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-}
-
-.episode-nav-title {
-  font-size: var(--text-xxs);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--player-meta-color);
-  line-height: 1.2;
-}
-
-.btn-prev .episode-nav-title {
-  text-align: left;
-}
-
-.btn-next .episode-nav-title {
-  text-align: right;
-}
-
-/* Chapters */
-
-.player-chapters {
-  border-top: 1px solid var(--player-border);
-  padding-top: var(--space-3);
-  margin-top: var(--space-3);
-}
-
-.player-chapters-heading {
-  font-size: var(--space-3);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--player-meta-color);
-  margin-bottom: var(--space-2);
-}
-
-.chapter-list {
+.player-chapters > summary,
+.player-playlist > summary {
   list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.chapter {
-  display: flex;
-  gap: var(--space-3);
-  padding: 0.35rem var(--space-2);
   cursor: pointer;
-  font-size: 0.85rem;
+  opacity: 0.7;
+}
+.player-chapters > summary::-webkit-details-marker,
+.player-playlist > summary::-webkit-details-marker {
+  display: none;
+}
+.player-chapters > summary::before,
+.player-playlist > summary::before {
+  content: "\25B8";
+  margin-right: 0.5ch;
+}
+.player-chapters[open] > summary::before,
+.player-playlist[open] > summary::before {
+  content: "\25BE";
+}
+.player-chapters > summary:hover,
+.player-playlist > summary:hover {
+  opacity: 1;
+}
+.player-playlist-count::before {
+  content: "[";
+}
+.player-playlist-count::after {
+  content: "]";
+}
+.player-playlist .collection {
+  margin: var(--space-1) 0 0 0;
 }
 
-.chapter:hover,
-.chapter.is-active {
-  background: var(--player-chapter-active-bg);
+ol.chapter-list {
+  list-style: none;
+  margin: var(--space-1) 0 0 0;
+  padding: 0;
 }
-
-.chapter.is-active {
-  font-weight: 600;
+li.chapter {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0.15rem 0;
+  cursor: pointer;
 }
-
 .chapter-time {
-  color: var(--player-meta-color);
+  min-width: 7ch;
+  text-align: right;
+  opacity: 0.6;
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  min-width: 3.5rem;
+}
+.chapter.is-active .chapter-title {
+  font-weight: 700;
+}
+.chapter.is-active .chapter-title::before {
+  margin-right: 0.4rem;
+  content: "\25B8 ";
+}
+
+/* The layout's [playlist] on its own, as a box like the card's. Straight
+   under [player] it joins the card: the card's bottom edge and the space
+   after it (set inline on .post-player) give way. */
+.post-playlist {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--color-border);
+  padding: 0 var(--space-4) var(--space-2) var(--space-4);
+}
+.post-playlist > .player-playlist {
+  margin-top: 0;
+  border-top: 0;
+}
+.post-player:has(+ .post-playlist) .card-player {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+.post-player + .post-playlist {
+  margin-top: calc(-1 * var(--space-6, 1.5rem));
+  border-top: 0;
+}
+.post-player + .post-playlist > .player-playlist {
+  border-top: 1px dashed var(--color-border);
 }
 
 /* Video Player */
@@ -3002,16 +2797,6 @@ a.video-btn {
   height: 28px;
 }
 
-.video-btn.btn-episode-nav.btn-prev.is-disabled {
-  display: none;
-}
-
-.video-btn.btn-episode-nav.is-disabled {
-  opacity: 0.3;
-  cursor: default;
-  pointer-events: none;
-}
-
 .video-time {
   color: #fff;
   font-size: 0.8125rem;
@@ -3063,140 +2848,6 @@ a.video-btn {
 
 article.post-podcast {
   margin-left: 0;
-}
-
-.podcast-hero {
-  gap: var(--space-4);
-  position: relative;
-  margin-top: var(--space-6);
-  margin-bottom: var(--space-3);
-  align-items: center;
-  justify-content: center;
-}
-
-.podcast-hero > picture img {
-  width: 100%;
-  display: block;
-  aspect-ratio: 1;
-  object-fit: cover;
-}
-
-.hero-player .audio-player {
-  background: var(--player-overlay-bg);
-  border: 1px solid var(--color-border);
-  margin: 0;
-}
-
-.podcast-hero.is-no-cover {
-  display: block;
-}
-
-.podcast-hero.is-no-cover .hero-player {
-  position: static;
-  padding: 0;
-  width: 100%;
-}
-
-.podcast-hero.is-no-cover .hero-player .audio-player {
-  background: var(--player-bg);
-  border: 1px solid var(--player-border);
-}
-
-p.podcast-audio-fallback {
-  font-size: var(--text-xs);
-  margin: 0;
-  line-height: 1;
-  position: absolute;
-  right: 0;
-}
-
-/* Episode list, and a music release's track list ([tracks]) */
-
-.episode-list,
-.track-list {
-  margin-top: var(--space-8);
-  border-top: 1px solid var(--color-border);
-  padding-top: 0;
-}
-
-.episode-list ol,
-.track-list ol {
-  list-style: none;
-  padding-left: 0;
-}
-
-.episode-list li,
-.track-list li {
-  margin-bottom: 0;
-}
-
-.episode-list h2,
-.track-list h2 {
-  font-size: var(--text-base);
-  font-weight: 600;
-  margin-bottom: var(--space-4);
-}
-
-.episode {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.episode-list-meta {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  margin-bottom: var(--space-4);
-}
-
-.episode-item,
-.track-item {
-  border-bottom: 1px solid var(--color-border);
-}
-
-.episode-item.is-current,
-.track-item.is-current {
-  background: var(--color-bg-dim);
-}
-
-.episode-item a,
-.track-item a {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  text-decoration: none;
-  color: inherit;
-}
-
-.episode-item a:hover,
-.track-item a:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.episode-item a > span,
-.track-item a > span {
-  font-size: 0.95rem;
-}
-
-.episode-item.is-current a > span,
-.track-item.is-current a > span {
-  font-weight: 600;
-}
-
-.episode-meta-row,
-.track-meta-row {
-  display: flex;
-  gap: var(--space-3);
-  font-size: 0.75rem;
-  color: var(--player-meta-color);
-}
-
-.episode-number,
-.track-number {
-  font-weight: 600;
 }
 
 /* Subscribe / feed */

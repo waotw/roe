@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: player
-   Version: 1.0
-   Fingerprint: eeb47f48
+   Version: 1.1
+   Fingerprint: 26c12816
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -31,7 +31,10 @@
 //   [data-player-ui]                  hidden until this script shows it
 //   [data-player-chapter][data-time]  a chapter row; clicking seeks there
 //   [data-player-info]                the [info] link, shown for a playlist
-//   [data-playlist] .player-track     a `playlist` collection's rows
+//   [data-playlist] .player-track     a `playlist` collection's rows; the
+//     player's own (show_playlist) first, else the first on the page
+//   .player-series                    ⏮ ⏭ links, hidden once a playlist is
+//     adopted, since the list does the same job
 (function () {
   "use strict";
 
@@ -339,7 +342,7 @@
   };
 
   Player.prototype.highlightChapter = function (current) {
-    if (!this.chapters.length) return;
+    if (!this.chapters.length || this.chaptersOff) return;
     var active = 0;
     for (var i = 0; i < this.chapters.length; i++) {
       if (current >= this.chapters[i]) active = i;
@@ -363,8 +366,8 @@
   Player.prototype.setupPlaylist = function () {
     var self = this;
     var info = this.root.querySelector("[data-player-info]");
-    var playlist = document.querySelector("[data-playlist]");
-    if (!playlist || this.root.contains(playlist)) return;
+    var playlist = this.root.querySelector("[data-playlist]") || document.querySelector("[data-playlist]");
+    if (!playlist) return;
     // The first player on the page owns the playlist.
     if (playlist._playerOwner && playlist._playerOwner !== this && document.contains(playlist._playerOwner.root)) return;
     playlist._playerOwner = this;
@@ -385,9 +388,33 @@
       });
     });
 
-    var hasOwn = !!(this.media.getAttribute("src") || this.media.querySelector("source[src]"));
-    if (!hasOwn && this.tracks.length) this.selectTrack(0, false);
+    // The playlist steps through the episodes, so ⏮ ⏭ would only repeat it.
+    Array.prototype.slice.call(this.root.querySelectorAll(".player-series")).forEach(function (nav) {
+      nav.hidden = true;
+    });
+
+    var ownSource = this.media.querySelector("source[src]");
+    var own = this.media.getAttribute("src") || (ownSource && ownSource.getAttribute("src")) || "";
+    this.ownSrc = own;
+    if (own) {
+      // Playing this post's own episode: its row is the current one, so
+      // playback runs on from there.
+      var ownPath = pathOf(own);
+      this.tracks.forEach(function (row, i) {
+        if (self.currentIndex < 0 && pathOf(self.trackSrc(row)) === ownPath) self.currentIndex = i;
+      });
+    } else if (this.tracks.length) {
+      this.selectTrack(0, false);
+    }
   };
+
+  function pathOf(src) {
+    try {
+      return decodeURI(new URL(src, window.location.href).pathname);
+    } catch (e) {
+      return src;
+    }
+  }
 
   Player.prototype.trackSrc = function (row) {
     var a = row.querySelector(".player-track-audio");
@@ -410,6 +437,17 @@
     this.media.load();
 
     this.setText("title", row.getAttribute("data-title") || "");
+    var episode = row.getAttribute("data-episode") || "";
+    this.parts("episode").forEach(function (el) {
+      el.textContent = episode;
+      el.hidden = !episode;
+    });
+    // Chapters belong to this post's own episode; another one has none here.
+    var isOwn = !!this.ownSrc && pathOf(src) === pathOf(this.ownSrc);
+    this.chaptersOff = !isOwn;
+    Array.prototype.slice.call(this.root.querySelectorAll(".player-chapters")).forEach(function (el) {
+      el.hidden = !isOwn;
+    });
     var image = row.getAttribute("data-image") || this.fallbackCover;
     this.parts("artwork").forEach(function (img) {
       if (image) {
@@ -428,6 +466,9 @@
 
     this.tracks.forEach(function (t, j) {
       t.classList.toggle("is-playing", j === index);
+      t.classList.toggle("is-current", j === index);
+      if (j === index) t.setAttribute("aria-current", "true");
+      else t.removeAttribute("aria-current");
     });
 
     if (autoplay) {

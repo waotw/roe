@@ -71,15 +71,15 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_equal %w[post-header post-player post-content], order(".post-header", ".post-player", ".post-content")
   end
 
-  test "a podcast episode has its player, body and episode list inside .podcast-episode" do
+  test "a podcast episode has its player, body and playlist inside .podcast-episode" do
     first = a_post("podcast", audio: "/media/audio/1.mp3", podcast: "show", date: "2024-01-01")
     a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01")
 
     get post_path(first.url_name)
-    assert_select ".podcast-episode .podcast-hero"
+    assert_select ".podcast-episode .post-player .card-player"
     assert_select ".podcast-episode .post-content"
-    assert_select ".podcast-episode .episode-list li", 2
-    assert_select ".episode-list li.is-current", 1
+    assert_select ".podcast-episode .post-playlist details.player-playlist[open] [data-playlist] li", 2
+    assert_select "[data-playlist] li.is-current[aria-current=true]", 1
   end
 
   # ── a site's own layout ──
@@ -289,35 +289,70 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     other = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01",
       content: "```card\ntype: player\naudio: /media/audio/song.mp3\n```")
     get post_path(other.url_name)
-    assert_select ".player-series", 0
+    assert_select ".post-content .card-player .player-series", 0
 
     get post_path(a_post("audio", audio: "/media/audio/a.mp3").url_name)
     assert_select ".player-series", 0
   end
 
-  test "[tracks] lists the release's tracks in track order, with this one marked" do
+  test "[playlist] on a music track lists the release in track order, with this one marked" do
     t2 = a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2, duration: "3:10")
     t1 = a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
     a_post("music", audio: "/media/audio/x.mp3", release: "other", track_number: 1)
 
     get post_path(t2.url_name)
-    assert_select ".track-list li.track-item", 2
-    assert_equal [ t1.title, t2.title ], css_select(".track-item a > span").map(&:text)
-    assert_select ".track-item.is-current a > span", t2.title
-    assert_select ".track-item.is-current .track-duration", "3:10"
+    assert_select ".post-playlist summary", /Tracks/
+    assert_equal [ t1.title, t2.title ], css_select(".post-playlist .player-track").map { |row| row["data-title"] }
+    assert_select ".player-track.is-current[data-title=?]", t2.title
+    assert_select ".player-track.is-current .player-track-duration", "3:10"
   end
 
-  test "[tracks] is left out for a release of one, and when the writing has a playlist" do
+  test "[playlist] is left out for a release of one, and when the writing has a playlist" do
     alone = a_post("music", audio: "/media/audio/a.mp3", release: "single", track_number: 1)
     get post_path(alone.url_name)
-    assert_select ".track-list", 0
+    assert_select ".post-playlist", 0
 
     playlist = "Notes.\n\n```collection\ntemplate: playlist\nsource: posts\npost_type: music\nrelease: ep\norder: track_number\n```\n"
     t1 = a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1, content: playlist)
     a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
     get post_path(t1.url_name)
-    assert_select ".track-list", 0
+    assert_select ".post-playlist", 0
     assert_select "ol.player-tracks", 1
+  end
+
+  test "an episodic show's playlist runs newest first, a serial show's oldest first" do
+    old = a_post("podcast", audio: "/media/audio/1.mp3", podcast: "show", date: "2024-01-01")
+    new = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01")
+
+    get post_path(old.url_name)
+    assert_equal [ new.title, old.title ], css_select(".post-playlist .player-track").map { |row| row["data-title"] }
+
+    PodcastConfig.stubs(:get).returns({ "type" => "serial" })
+    get post_path(old.url_name)
+    assert_equal [ old.title, new.title ], css_select(".post-playlist .player-track").map { |row| row["data-title"] }
+  end
+
+  test "a playlist row with no episode or track number shows none, not its position" do
+    a_post("podcast", audio: "/media/audio/1.mp3", podcast: "show", date: "2024-01-01", episode_number: 1)
+    unnumbered = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01")
+
+    get post_path(unnumbered.url_name)
+    assert_equal [ "", "E1" ], css_select(".post-playlist .player-track-number").map(&:text)
+  end
+
+  test "the player card shows S1E10 and the playlist with show_playlist, in the order asked for" do
+    card = "```card\ntype: player\nshow_playlist: true\norder: date-asc\n```\n\nNotes."
+    a_post("podcast", audio: "/media/audio/9.mp3", podcast: "show", date: "2024-01-01", season: 1, episode_number: 9)
+    ten = a_post("podcast", audio: "/media/audio/10.mp3", podcast: "show", date: "2024-02-01", season: 1, episode_number: 10, content: card)
+
+    get post_path(ten.url_name)
+    assert_select ".card-player .player-now-episode", "S1E10"
+    assert_select ".card-player details.player-playlist .player-track", 2
+    assert_equal %w[S1E9 S1E10], css_select(".player-track-number").map(&:text)
+    assert_equal %w[S1E9 S1E10], css_select(".player-track").map { |row| row["data-episode"] }
+    assert_select ".player-series", 0, "the playlist does what ⏮ ⏭ do"
+    assert_select ".post-player", 0, "the body's card stands in for the layout's player"
+    assert_select ".post-playlist", 0, "and its playlist for the layout's"
   end
 
   test "the music layout's own player links the tracks before and after it" do

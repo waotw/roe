@@ -8,4 +8,4 @@ podcast-episode:
   [player]
   [body]
   [subscribe]
-  [episodes]
+  [playlist]

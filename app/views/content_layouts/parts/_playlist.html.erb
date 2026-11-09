@@ -1,0 +1,7 @@
+<%# The episodes of this post's podcast, or the tracks of its release, as a
+    collapsible playlist the page's player plays through. Episodic shows run
+    newest first, serial shows oldest first, releases in track order. Only
+    for two or more. Skipped when the body has a playlist of its own. %>
+<% if kind == "post" && record.post_type.in?(%w[podcast music]) && (playlist = record.series_playlist_html).present? %>
+  <div class="post-playlist"><%= playlist.html_safe %></div>
+<% end %>

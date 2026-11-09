@@ -177,14 +177,14 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
   test "the Boxes section offers the type's parts and fields as buttons" do
     get "/admin/layouts/content/podcast/edit"
     boxes = css_select("button[data-layout-boxes-target=button]").map { |b| b["data-box"] }
-    assert_includes boxes, "episodes"
+    assert_includes boxes, "playlist"
     assert_includes boxes, "episode_number"
     assert_select "button[data-box=feed_links]", "[feed links]"
     assert_select "details[data-controller=remember-open][open]"
 
     get "/admin/layouts/content/article/edit"
     boxes = css_select("button[data-layout-boxes-target=button]").map { |b| b["data-box"] }
-    assert_not_includes boxes, "episodes"
+    assert_not_includes boxes, "playlist"
     assert_not_includes boxes, "episode_number"
   end
 

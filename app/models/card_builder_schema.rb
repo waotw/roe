@@ -107,7 +107,12 @@ module CardBuilderSchema
       { key: "show_artwork", type: :boolean, label: "Show artwork",
         hint: "Audio only. Show the artwork. On by default." },
       { key: "show_duration", type: :boolean, label: "Show duration",
-        hint: "Show the length under the player, from the post's duration. Off by default." }
+        hint: "Show the length under the player, from the post's duration. Off by default." },
+      { key: "show_playlist", type: :boolean, label: "Show playlist",
+        hint: "Podcast episodes and music tracks: list the show's episodes or the release's tracks under the player, in place of the previous and next links. Off by default." },
+      { key: "order", type: :select, label: "Playlist order",
+        options: %w[date date-asc episode_number track_number],
+        hint: "date is newest first, date-asc oldest first. Blank: episodic shows newest first, serial shows oldest first, releases by track number." }
     ]
   }.freeze
 

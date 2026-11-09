@@ -6,4 +6,4 @@ post-header:
 
 [player]
 [body]
-[tracks]
+[playlist]

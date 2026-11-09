@@ -74,8 +74,8 @@ class ContentLayout
       when "post"
         case @name
         when "article"                then POST_PARTS + %w[body]
-        when "podcast"                then POST_PARTS + %w[player body subscribe episodes]
-        when "music"                  then POST_PARTS + %w[player body tracks]
+        when "podcast"                then POST_PARTS + %w[player playlist body subscribe]
+        when "music"                  then POST_PARTS + %w[player playlist body]
         else                               POST_PARTS + %w[player body] # audio, video, music, extra layouts
         end
       when "page"
@@ -175,10 +175,9 @@ class ContentLayout
       when "author"        then %(<span class="#{k}-author">Author</span>)
       when "image"         then %(<img class="#{k}-image">)
       when "feed_links"    then %(<div class="feed-links"><a class="feed-link">RSS</a></div>)
-      when "player"        then @name == "podcast" ? %(<div class="podcast-hero">…player…</div>) : %(<div class="post-player">…player…</div>)
+      when "player"        then %(<div class="post-player">…player…</div>)
       when "subscribe"     then %(<div class="podcast-subscribe">…subscribe links…</div>)
-      when "episodes"      then %(<div class="episode-list">…episodes…</div>)
-      when "tracks"        then %(<div class="track-list">…tracks…</div>)
+      when "playlist"      then %(<div class="post-playlist">…playlist…</div>)
       when "podcast_title" then %(<h1 class="podcast-page-title">Show name</h1>)
       when "release_title" then %(<h1 class="release-page-title">Release name</h1>)
       when "buy_button"    then %(<button class="snipcart-add-item">Add to cart</button>)
@@ -318,8 +317,7 @@ class ContentLayout
       when "player"        then "The player for the post's `audio:` or `video:`. Left out when the writing already has a player card."
       when "body"          then "The #{n}'s writing: everything below its front matter. A layout has one [body]."
       when "subscribe"     then "Subscribe links: the podcast's apps and RSS feed, or a release's feed."
-      when "episodes"      then "The podcast's other episodes, newest first. Left out when the writing has its own playlist."
-      when "tracks"        then "The release's tracks, in track order. Left out when the writing has its own playlist."
+      when "playlist"      then "The podcast's episodes or the release's tracks, which the player plays through. Episodic shows run newest first, serial shows oldest first, releases in track order. Left out when the writing has its own playlist."
       when "podcast_title" then "The name of the podcast this page is connected to (`podcast:`)."
       when "release_title" then "The name of the release this page is connected to (`release:`)."
       when "buy_button"    then "The product's buy button. Left out when the writing has its own `button` block."

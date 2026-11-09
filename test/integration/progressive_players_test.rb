@@ -32,12 +32,12 @@ class ProgressivePlayersTest < ActionDispatch::IntegrationTest
     assert_select ".card-player audio source[src='/media/audio/track.mp3']", minimum: 1
   end
 
-  test "the podcast player plays without the script, chapters readable" do
+  test "a podcast episode's player plays without the script, chapters readable" do
     chapters = [ { "time" => 0, "title" => "Intro" }, { "time" => 75, "title" => "The Journal" }, { "time" => 3723, "title" => "Late" } ]
     get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", duration: "01:10:00", chapters: chapters).url_name)
 
-    assert_plays_without_script ".podcast-hero .audio-player[data-player=audio]"
-    assert_select ".chapter-list [data-player-chapter]", 3
+    assert_plays_without_script ".card-player[data-player=audio]"
+    assert_select ".card-player .chapter-list [data-player-chapter]", 3
     assert_select ".chapter[data-time='75.0'] .chapter-time", "1:15"
     assert_select ".chapter[data-time='3723.0'] .chapter-time", "1:02:03"
     assert_select ".chapter .chapter-title", "The Journal"

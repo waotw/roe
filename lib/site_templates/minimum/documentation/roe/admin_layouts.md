@@ -10,7 +10,7 @@ Edit layouts here: [`Admin → Layouts`](/admin/layouts)
 
 Roe has two kinds of layouts:
 
-- [Site](#site-layouts)
+- [Site Layouts](#site-layouts)
 - [Content Layouts](#content-layouts)
 
 ## Site Layouts
@@ -87,7 +87,7 @@ Nothing special here. Just add the links and copyright notice if needed. A [`men
 
 You may want to use the sidebar for navigation as well and just keep your logo or site title in the `header` Layout.
 
-To enable the sidebar, click `Create`. Its options live in the front matter[^1] at the top of the file:
+To enable the sidebar, click `Create`. Its options live in the frontmatter[^1] at the top of the file:
 
 - `position` = use `left` or `right` to move the sidebar to either side of the site.
 - `scope` = which sources (`pages`, `posts`, `products`, `documentation`) show the sidebar. It's set to `pages` by default. This means it will only show up on pages, not posts.
@@ -120,14 +120,46 @@ Content layouts do one thing: they allow you to structure content (pages, posts,
 - A block is a group of `[boxes]`. A blank line creates a new block.
 - A `[box]` represents an element in the layout. You can group `[boxes]` by putting them next to each other. This gives them their own `<div>`.
 
+==Note:== As with everything in Roe, you can override global settings locally. In the case of content layouts, you can add elements to the post or page itself and these will be used instead of the ones in the layout. For example, a `[player]` might be at the top of an audio post but be at the bottom in the `audio.txt` layout. The post will always win and override the layout. The top `[player]` is used.
+
+### Edit a content layout
+
 The layout editor has the layout on the left and a preview of the HTML that will be written on the right. The best way to learn how the layouts work is to:
 
 1. Open a layout, perhaps `article.txt`
 2. Click on a line or `[box]` in the editor
-3. The related HTML will be high-lighted in the HTML section oh the right. The information under DETAILS will update and explain what that element is doing.
+3. The related HTML will be ==high-lighted== in the HTML section on the right. The information under DETAILS will update and explain what that element is doing.
 4. Move things around and save (you can always go back to the default)
 5. Refresh the article you have open and you'll see the changes
 
 Open the diagram in the DETAILS section for a visual guide.
+
+#### Add `[boxes]`
+
+All available `[boxes]` are listed in the "BOXES" section above the editor. Click a box to add it to the layout at the caret/cursor.
+
+### Structure of a content layout
+
+A content layout with the `[body]` box and nothing else is the simplest layout possible. It renders what is in the page or post only.
+
+- The topmost block above the `[body]` box is the `<header>`.
+- The bottommost block below the `[body]` box is the `<footer>`.
+- All other blocks are groups.
+
+You can add CSS classes to blocks and groups. To add a CSS class to a block, put the name of the class on it's own line at the top, followed by a `:`.
+
+```markdown
+post-header:
+  post-header-top: [title] [feed links]
+  [subtitle]
+  post-meta: [date] [author]
+  [image]
+```
+
+This gives this block the CSS class `post-header`. You can also add a CSS class to a ROW. Notice `post-meta:` in the example above. It wraps the `[date]` and `[author]` boxes in a `<div>` with the class of `post-meta`.
+
+### Create a content layout
+
+You can add your own layouts. On the Admin → Layouts page, type the name and click `NEW LAYOUT`. Then add `layout: <layout_name>` to the frontmatter of the page or post and it will use this layout instead of the default. 
 
 [^1]: Frontmatter is a block of metadata at the start of a Markdown file, enclosed by `---` at the top/bottom. It provides information about the document that is used by the system but isn't visible when viewing the page/post.

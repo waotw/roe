@@ -290,7 +290,10 @@ module HasMarkdownExtensions
   # video, titled and with artwork from the post: what an author gets by
   # adding the card themselves, which is where players are heading.
   def template_player_card_html
-    render_player_card({ type: "player" }).html_safe
+    # A podcast with video and audio shows the video, as its page always has.
+    config = { type: "player" }
+    config[:video] = video.to_s.strip if respond_to?(:template_player_kind) && template_player_kind == :video
+    render_player_card(config).html_safe
   end
 
   private
@@ -1921,7 +1924,11 @@ module HasMarkdownExtensions
       # but 403s reads as a broken player.
       paid   = playlist_track_paid?(item)
       title  = ERB::Util.html_escape(item.title.presence || "Untitled")
-      number = ERB::Util.html_escape(player_track_number(item).presence || (i + 1).to_s)
+      # Blank without a number of its own: a position would read as one,
+      # and a blank says the episode or track needs its number.
+      number = ERB::Util.html_escape(player_episode_label(item).presence || player_track_number(item).presence || "")
+      episode = ERB::Util.html_escape(player_episode_label(item))
+      current = respond_to?(:url_name) && item.respond_to?(:url_name) && item.url_name == url_name && item.class == self.class
       audio  = ERB::Util.html_escape(item.audio.to_s.strip)
       image  = ERB::Util.html_escape(player_item_image(item))
       url    = ERB::Util.html_escape(item_path(item))
@@ -1931,7 +1938,7 @@ module HasMarkdownExtensions
       lock = paid ? paid_lock_icon : ""
 
       <<~HTML
-        <li class="player-track#{paid ? ' is-paid' : ''}" data-player-track data-paid="#{paid}" data-title="#{title}" data-image="#{image}" data-url="#{url}">
+        <li class="player-track#{paid ? ' is-paid' : ''}#{current ? ' is-current' : ''}" data-player-track data-paid="#{paid}" data-title="#{title}" data-episode="#{episode}" data-image="#{image}" data-url="#{url}"#{current ? ' aria-current="true"' : ''}>
           <div class="player-track-meta" data-player-select>
             <span class="player-track-number">#{number}</span>
             <span class="player-track-title">#{title}#{lock}</span>
@@ -2001,9 +2008,12 @@ module HasMarkdownExtensions
   # rendered as the browser's own <audio controls> with Roe's transport hidden
   # ([data-player-ui]), and site_js/player.js swaps them when it loads — so a
   # static host, or a page where the script doesn't run, still plays. The list
-  # is a separate `playlist` collection the transport adopts.
+  # is a `playlist` collection the transport adopts: one elsewhere on the page,
+  # or the card's own with `show_playlist: true`.
   def render_player_card(config, preview: false)
-    audio_src = config[:audio].presence || (respond_to?(:audio) ? audio.to_s.strip.presence : nil)
+    # A card naming only a video plays that video, not the post's audio.
+    own_audio = config[:video].blank? && respond_to?(:audio) ? audio.to_s.strip.presence : nil
+    audio_src = config[:audio].presence || own_audio
     video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
 
     if audio_src.blank? && video_src.present?
@@ -2015,7 +2025,7 @@ module HasMarkdownExtensions
         partial: "shared/video_player",
         locals: { src: video_src, label: label, extra_class: "player-video" }
       )
-      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}#{player_series_nav_html(config)}</div>)
+      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}#{player_extras_html(config)}</div>)
     end
 
     card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
@@ -2055,7 +2065,7 @@ module HasMarkdownExtensions
           #{figure_html}
           <div class="player-main">
             <div class="player-now">
-              <span class="player-now-title" data-player-part="title">#{title_html}</span>
+              #{player_episode_label_html(config)}<span class="player-now-title" data-player-part="title">#{title_html}</span>
               <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener" hidden>[info]</a>
             </div>
             <audio class="player-native" data-player-part="media" controls preload="metadata"#{native_hidden}>#{sources_html}</audio>
@@ -2072,9 +2082,115 @@ module HasMarkdownExtensions
           </div>
         </div>
         #{player_duration_html(config)}
-        #{player_series_nav_html(config)}
+        #{player_chapters_html(config)}
+        #{player_extras_html(config)}
       </div>
     HTML
+  end
+
+  # Under the transport: the show's or release's playlist with
+  # `show_playlist: true`, else ⏮ ⏭ to the episodes or tracks either side.
+  # The playlist does what ⏮ ⏭ do, so it's one or the other.
+  def player_extras_html(config)
+    if config[:show_playlist].to_s.strip.downcase == "true" && playing_own_media?(config)
+      playlist = series_playlist_html(order: config[:order])
+      return playlist if playlist.present?
+    end
+    player_series_nav_html(config)
+  end
+
+  # Does the card play this post's own audio or video? A card with neither
+  # set does; one naming another file is extra, and the post's episode
+  # label, chapters and neighbours aren't about it.
+  def playing_own_media?(config)
+    return false unless is_a?(Post)
+    sources = [ config[:audio], config[:video] ].map(&:to_s).map(&:strip).reject(&:blank?)
+    sources.empty? || sources.any? { |src| own_media?(src) }
+  end
+
+  # S1E10 before the title: a podcast episode's season and number, when it
+  # has a number (a season alone says nothing about which episode).
+  def player_episode_label_html(config)
+    label = playing_own_media?(config) ? player_episode_label(self) : ""
+    return "" if label.blank?
+    %(<span class="player-now-episode" data-player-part="episode">#{ERB::Util.html_escape(label)}</span> )
+  end
+
+  # "S1E10", "E10", or "" — for a podcast episode only.
+  def player_episode_label(item)
+    return "" unless item.respond_to?(:metadata) && item.metadata["post_type"] == "podcast"
+    number = item.metadata["episode_number"].to_s.strip
+    return "" if number.blank?
+    season = item.metadata["season"].to_s.strip
+    season.present? ? "S#{season}E#{number}" : "E#{number}"
+  end
+
+  # The episode's `chapters:` (time in seconds, title), written out so they
+  # read as a list of times without player.js; with it each one seeks.
+  # Only when the card plays the post's own audio.
+  def player_chapters_html(config)
+    return "" unless playing_own_media?(config)
+    chapters = Array(metadata["chapters"]).filter_map do |chapter|
+      next unless chapter.respond_to?(:[])
+      title = (chapter["title"] || chapter[:title]).to_s.strip
+      [ (chapter["time"] || chapter[:time]).to_f, title ] if title.present?
+    end
+    return "" if chapters.empty?
+
+    rows = chapters.map do |time, title|
+      %(<li class="chapter" data-player-chapter data-time="#{time}">) +
+        %(<span class="chapter-time">#{player_time_text(time)}</span> ) +
+        %(<span class="chapter-title">#{ERB::Util.html_escape(title)}</span></li>)
+    end.join
+
+    %(<details class="player-chapters" open><summary>Chapters</summary><ol class="chapter-list">#{rows}</ol></details>)
+  end
+
+  # 0:00 / 1:02:03, the same as player.js formatTime.
+  def player_time_text(seconds)
+    total = seconds.to_f.floor
+    total = 0 if total.negative?
+    hours, rest = total.divmod(3600)
+    minutes, secs = rest.divmod(60)
+    hours.positive? ? format("%d:%02d:%02d", hours, minutes, secs) : format("%d:%02d", minutes, secs)
+  end
+
+  public
+
+  # The playlist for this post's podcast or release — or a page's, with
+  # `podcast:` or `release:` — collapsible, for `show_playlist: true` and the
+  # layout's [playlist]. `order:` is a collection order; without one an
+  # episodic show runs newest first, a serial show oldest first, and a
+  # release in track order. Empty for fewer than two entries.
+  def series_playlist_html(order: nil)
+    podcast_key = player_context_key("podcast")
+    release_key = player_context_key("release")
+    kind = is_a?(Post) ? post_type : (podcast_key ? "podcast" : "music")
+    key, field =
+      if kind == "podcast" && podcast_key then [ podcast_key, :podcast ]
+      elsif kind == "music" && release_key then [ release_key, :release ]
+      end
+    return "" unless key
+
+    order = order.to_s.strip
+    order = default_playlist_order(kind, key) unless CollectionQuery.sort_keyword?(order)
+    config = { source: "posts", post_type: kind, field => key, template: "playlist",
+               limit: "all", order: order, show_unlisted: "true" }
+    items, total, warning = resolve_collection_items(config)
+    return "" if warning
+    count = items.count { |item| item.respond_to?(:audio) && item.audio.to_s.strip.present? }
+    return "" if count < 2
+
+    noun = kind == "music" ? "Tracks" : "Episodes"
+    %(<details class="player-playlist" open><summary>#{noun} <span class="player-playlist-count">#{count}</span></summary>) +
+      render_resolved_collection(config, items, total) + "</details>"
+  end
+
+  private
+
+  def default_playlist_order(kind, key)
+    return "track_number" if kind == "music"
+    PodcastConfig.get(key).to_h["type"].to_s.strip == "serial" ? "date-asc" : "date"
   end
 
   # ⏮ ⏭ under a player playing a podcast episode or a music track: links to
