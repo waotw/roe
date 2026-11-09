@@ -40,7 +40,7 @@ If you already have navigation and want to edit it, place the caret/cursor over 
 
 ### `menu` Collections and dynamic navigation
 
-`menu` Collections allow you to create a list of links that can change without you having to edit them. More info: [`Collection Templates`](/documentation/roe/collections_templates#when-to-use-the-menu-template) 
+`menu` Collections allow you to create a list of links that can change without you having to edit them. More info: [`Collection Templates`](/documentation/roe/collections_templates#when-to-use-the-menu-template)
 
 #### 1. Create a `menu` Collection
 
@@ -113,9 +113,9 @@ If your sidebar is the site navigation and should stay on screen, `mobile: top` 
 
 ## Content Layouts
 
-Roe uses sensible defaults but if you would like to customize the layout of your pages and posts, you can enable content layouts here: [Settings → Roe → content](http://roe.roe:3000/admin/configs/content/edit)
+Roe uses sensible defaults, but if you would like to customize the layout of your pages and posts, you can enable content layouts here: [Settings → Roe → content](http://roe.roe:3000/admin/configs/content/edit)
 
-Content layouts do one thing: they allow you to structure content (pages, posts, etc). There are 2 parts of the layout, blocks and `[boxes]`:
+Content layouts do one thing: they allow you to structure content (pages, posts, etc.). There are 2 parts of the layout, blocks and `[boxes]`:
 
 - A block is a group of `[boxes]`. A blank line creates a new block.
 - A `[box]` represents an element in the layout. You can group `[boxes]` by putting them next to each other. This gives them their own `<div>`.
@@ -128,7 +128,7 @@ The layout editor has the layout on the left and a preview of the HTML that will
 
 1. Open a layout, perhaps `article.txt`
 2. Click on a line or `[box]` in the editor
-3. The related HTML will be ==high-lighted== in the HTML section on the right. The information under DETAILS will update and explain what that element is doing.
+3. The related HTML will be ==highlighted== in the HTML section on the right. The information under DETAILS will update and explain what that element is doing.
 4. Move things around and save (you can always go back to the default)
 5. Refresh the article you have open and you'll see the changes
 
@@ -146,7 +146,7 @@ A content layout with the `[body]` box and nothing else is the simplest layout p
 - The bottommost block below the `[body]` box is the `<footer>`.
 - All other blocks are groups.
 
-You can add CSS classes to blocks and groups. To add a CSS class to a block, put the name of the class on it's own line at the top, followed by a `:`.
+You can add CSS classes to blocks and rows. To add a CSS class to a block, put the name of the class on it's own line at the top, followed by a `:`.
 
 ```markdown
 post-header:
@@ -156,10 +156,10 @@ post-header:
   [image]
 ```
 
-This gives this block the CSS class `post-header`. You can also add a CSS class to a ROW. Notice `post-meta:` in the example above. It wraps the `[date]` and `[author]` boxes in a `<div>` with the class of `post-meta`.
+This gives this block the CSS class `post-header`. You can also add a CSS class to a row. Notice `post-meta:` in the example above. It wraps the `[date]` and `[author]` boxes in a `<div>` with the class of `post-meta`.
 
 ### Create a content layout
 
-You can add your own layouts. On the Admin → Layouts page, type the name and click `NEW LAYOUT`. Then add `layout: <layout_name>` to the frontmatter of the page or post and it will use this layout instead of the default. 
+You can add your own layouts. On the Admin → Layouts page, type the name and click `NEW LAYOUT`. Then add `layout: <layout_name>` to the frontmatter of the page or post and it will use this layout instead of the default.
 
 [^1]: Frontmatter is a block of metadata at the start of a Markdown file, enclosed by `---` at the top/bottom. It provides information about the document that is used by the system but isn't visible when viewing the page/post.
