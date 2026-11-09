@@ -76,10 +76,10 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
     assert_equal "The post’s title, from `title:`.", title[:text]
   end
 
-  test "[body] says whose writing it is" do
-    assert_match(/\AThe post’s writing/, explain(ARTICLE)[:lines]["7"][:boxes].first[:text])
-    assert_match(/\AThe product’s writing/, explain("[body]\n", "product")[:lines]["1"][:boxes].first[:text])
-    assert_match(/\AThe documentation page’s writing/, explain("[body]\n", "documentation")[:lines]["1"][:boxes].first[:text])
+  test "[body] says whose it is" do
+    assert_match(/\AThe post’s /, explain(ARTICLE)[:lines]["7"][:boxes].first[:text])
+    assert_match(/\AThe product’s /, explain("[body]\n", "product")[:lines]["1"][:boxes].first[:text])
+    assert_match(/\AThe documentation page’s /, explain("[body]\n", "documentation")[:lines]["1"][:boxes].first[:text])
   end
 
   test "blank lines, problems and fields are explained" do

@@ -2,9 +2,8 @@
   <h1 class="text-3xl font-bold text-gray-900 font-sans">Layouts</h1>
   <p class="mt-2 text-sm text-gray-700 font-sans">Edit header and footer that appear on all pages.</p>
 
-  <%# COPY: placeholder wording — owner will rewrite %>
   <h2 class="mt-8 text-xl font-bold text-gray-900 font-sans">Site</h2>
-  <p class="mt-1 text-sm text-gray-700 font-sans">The global layout elements.</p>
+  <p class="mt-1 text-sm text-gray-700 font-sans">The global layouts.</p>
 
   <%# Same style as the Content table below (and the Products table), with
       no groups. %>
@@ -68,21 +67,20 @@
     </table>
   </div>
 
-  <%# Content layouts are off by default: every page uses Roe's defaults, so
-      only the heading and the way to turn them on. COPY: placeholder
-      wording — owner will rewrite %>
+  <%# Content layouts are off by default: every page uses Roe's defaults
+      unless they're turned on.%>
   <% unless SiteConfig.content_layouts? %>
     <div class="mt-10">
       <h2 class="text-xl font-bold text-gray-900 font-sans">Content</h2>
       <p class="mt-1 text-sm text-gray-700 font-sans">
         Content layouts are off. Posts, pages and products use Roe's defaults.
-        To edit them, <%= link_to "Enable content layouts", admin_edit_content_config_path(focus: "content_layouts"), class: "underline" %> in Settings → Content.
+        To edit them, <%= link_to "Enable content layouts", admin_edit_content_config_path(focus: "content_layouts"), class: "underline" %> in Settings → Roe → Content.
       </p>
     </div>
   <% else %>
     <%# Content layouts: what each type's page shows around its writing.
-        Every type opens straight into the editor; saving makes the file the
-        site's own. COPY: placeholder wording — owner will rewrite %>
+        Every type opens straight into the editor; saving will create a
+        file in site/%>
     <div class="mt-10 flex items-end justify-between gap-4">
       <div>
         <h2 class="text-xl font-bold text-gray-900 font-sans">Content</h2>

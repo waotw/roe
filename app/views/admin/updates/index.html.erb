@@ -56,14 +56,14 @@
   <%# Themes and site scripts with a newer version than the site's copy. A
       Roe update brings these in but never installs them — the site owns
       its copies — so they're offered on the Themes page, and this says so
-      right after an update, where people look. COPY: placeholder. %>
+      right after an update, where people look. %>
   <% if shipped_file_updates.any? %>
     <div class="mb-6 p-4 border border-amber-300 bg-amber-50 rounded-xs">
       <h3 class="text-sm font-semibold text-amber-900 mb-1">
         <%= pluralize(shipped_file_updates.size, "theme or script update") %> available
       </h3>
       <p class="text-sm text-amber-800 mb-2">
-        Roe ships newer versions of these files than your site has. Your copies are never replaced automatically, review and install them on the
+        Roe has newer versions of these files. Your local copies are never replaced automatically, review and install them on the
         <%= link_to "Themes page", admin_themes_path, class: "underline font-medium" %>.
       </p>
       <ul class="text-sm text-amber-800 list-disc ml-4">

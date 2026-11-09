@@ -1,6 +1,5 @@
 <%# A content layout: rows of [boxes] in blocks (see ContentLayout). A plain
-    textarea — it's short, and the parts it can hold are listed beside it.
-    COPY: placeholder wording — owner will rewrite %>
+    textarea — it's short, and the parts it can hold are listed beside it. %>
 <% content_for :title, "Edit #{@name} layout" %>
 
 <div class="flex justify-between items-start mb-5 pb-2.5 border-b border-gray-300 relative">
@@ -36,15 +35,14 @@
 
 <%# The boxes this type can use, as buttons that add them to the layout at
     the caret (layout_boxes_controller). Open the first time; whether it's
-    open or closed is remembered (remember_open_controller).
-    COPY: placeholder wording — owner will rewrite %>
+    open or closed is remembered (remember_open_controller). %>
 <div data-controller="layout-boxes">
 <details open class="mb-5 border border-gray-300 bg-white"
          data-controller="remember-open" data-remember-open-key-value="roe:layout-boxes-open"
          data-action="toggle->remember-open#save">
   <summary class="cursor-pointer select-none px-3 py-1.5 font-mono text-xs font-semibold uppercase text-gray-700 hover:bg-gray-50">Boxes</summary>
   <div class="border-t border-gray-200 px-3 py-2 text-sm">
-    <p class="mb-2 text-xs text-gray-500">Clicking a box will add it to the layout. A box already in the layout is dimmed.</p>
+    <p class="mb-2 text-xs text-gray-500">Clicking a box will add it to the layout.</p>
     <div class="flex flex-wrap items-baseline gap-1.5">
       <% @box_choices.each do |choice| %>
         <button type="button" title="<%= choice[:help] %>"
@@ -95,7 +93,6 @@
       under the caret does. Before the textarea is focused, the general
       rules show instead. %>
   <aside class="text-sm font-sans text-gray-700 min-w-0">
-    <%# COPY: placeholder wording — owner will rewrite %>
     <%# As tall as the header box and the gap under it (h-10 + gap-2), so the
         example's top lines up with the textarea's. %>
     <h2 class="flex h-12 items-end pb-1 text-xs font-semibold uppercase text-gray-600">HTML</h2>

@@ -33,7 +33,10 @@ export default class extends Controller {
     if (progress) progress.startUpload(file.name);
 
     try {
-      const data = await this.postFile(file, progress ? (f) => progress.uploadProgress(f) : null);
+      const data = await this.postFile(
+        file,
+        progress ? (f) => progress.uploadProgress(f) : null,
+      );
       if (data && data.success) {
         this.resolvePlaceholder(placeholder, data.card_html, data.message);
         if (progress) {
@@ -77,7 +80,8 @@ export default class extends Controller {
       xhr.setRequestHeader("Accept", "application/json");
       xhr.setRequestHeader("X-CSRF-Token", this.token || "");
       if (onProgress) {
-        xhr.upload.onprogress = (e) => onProgress(e.lengthComputable ? e.loaded / e.total : null);
+        xhr.upload.onprogress = (e) =>
+          onProgress(e.lengthComputable ? e.loaded / e.total : null);
       }
       xhr.onload = () => {
         try {
@@ -86,7 +90,8 @@ export default class extends Controller {
           resolve({ success: false, error: "Upload failed." });
         }
       };
-      xhr.onerror = () => resolve({ success: false, error: "Upload failed — please try again." });
+      xhr.onerror = () =>
+        resolve({ success: false, error: "Upload failed — please try again." });
       xhr.send(body);
     });
   }
@@ -132,7 +137,10 @@ export default class extends Controller {
       ? this.element
       : this.element.querySelector('[data-controller~="media-filter"]');
     if (!host) return;
-    const filter = app.getControllerForElementAndIdentifier(host, "media-filter");
+    const filter = app.getControllerForElementAndIdentifier(
+      host,
+      "media-filter",
+    );
     if (filter && typeof filter.applyFilters === "function") {
       filter.applyFilters();
     }
@@ -178,7 +186,10 @@ export default class extends Controller {
   openFromCard(event) {
     const thumb = event.currentTarget.querySelector("[data-video-progress-id]");
     if (!thumb || thumb.dataset.videoState !== "optimizing") return;
-    this.openVideoProgress(thumb.dataset.videoProgressId, thumb.dataset.videoProgressName);
+    this.openVideoProgress(
+      thumb.dataset.videoProgressId,
+      thumb.dataset.videoProgressName,
+    );
   }
 
   // Poll the card endpoint while its variants are processing, swapping the
@@ -248,7 +259,6 @@ export default class extends Controller {
 
   // The preview box of a card whose preview never arrived. Retrying polls
   // the card again, which queues the preview again (MediumController#card).
-  // COPY: placeholder wording — owner will rewrite
   previewGaveUp(card) {
     const box = card?.querySelector("[data-preview-box]");
     if (!box) return;

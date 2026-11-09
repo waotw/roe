@@ -8,8 +8,7 @@
 #
 # Descriptions are plain sentences with `code` in backticks; the editor turns
 # those into <code>.
-#
-# COPY: placeholder wording — owner will rewrite
+
 class ContentLayout
   class Explain
     PAGE_TYPES = %w[page podcast-page music-page].freeze
@@ -243,12 +242,12 @@ class ContentLayout
       cls = class_phrase(block.classes)
       case block.role
       when :header
-        "Wraps all elments from #{list} in a `<header>` with #{cls}. The [header] is the first block in the layout."
+        "Wraps all elments from #{list} in a `<header>` with #{cls}. The [header] is the topmost block in the layout above `[body]`"
       when :footer
-        "Wraps all elemnets from #{list} in a `<footer>` with #{cls}. The [footer] is the last block in the layout."
+        "Wraps all elemnets from #{list} in a `<footer>` with #{cls}. The [footer] is the last block in the layout below `[body]`"
       when :content
         others = block.parts - [ "body" ]
-        with = others.any? ? "#{box_range(others)} and the #{noun}'s writing" : "the #{noun}'s writing"
+        with = others.any? ? "#{box_range(others)} and the #{noun}'s content" : "the #{noun}'s content"
         "Wraps #{with} in a `<div>` with #{cls}."
       else
         "Puts #{list} in a `<div>` with #{cls}."
@@ -306,7 +305,7 @@ class ContentLayout
       when "title"         then "The #{n}'s title, from `title:`."
       when "subtitle"      then "The #{n}'s subtitle, from `subtitle:`. Nothing when it has none."
       when "date"          then "The #{n}'s date, from `date:`."
-      when "author"        then "The #{n}'s author, from `author:`. A podcast episode without one shows its show's author."
+      when "author"        then "The #{n}'s author, from `author:`."
       when "image"
         if @kind == "post"
           "The post's image, from `image:`. Shown only when the post has `image_in_header: true`."
@@ -314,14 +313,14 @@ class ContentLayout
           "The #{n}'s image, from `image:`."
         end
       when "feed_links"    then "RSS links: the show's feed for an episode, the release's for a track, the site's for an article."
-      when "player"        then "The player for the post's `audio:` or `video:`. Left out when the writing already has a player card."
-      when "body"          then "The #{n}'s writing: everything below its front matter. A layout has one [body]."
-      when "subscribe"     then "Subscribe links: the podcast's apps and RSS feed, or a release's feed."
-      when "playlist"      then "The podcast's episodes or the release's tracks, which the player plays through. Episodic shows run newest first, serial shows oldest first, releases in track order. Left out when the writing has its own playlist."
-      when "podcast_title" then "The name of the podcast this page is connected to (`podcast:`)."
-      when "release_title" then "The name of the release this page is connected to (`release:`)."
-      when "buy_button"    then "The product's buy button. Left out when the writing has its own `button` block."
-      when "price"         then "The product's price. With [price] in the layout, the buy button leaves its own price off."
+      when "player"        then "The player for the post's `audio:` or `video:`. Left out when the [body] already has a player card."
+      when "body"          then "The #{n}'s content: everything below its frontmatter. A layout has one [body]."
+      when "subscribe"     then "Subscribe links: Podcast and RSS links"
+      when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Left out when the `[body]` has its own playlist."
+      when "podcast_title" then "The name of the podcast in this page's metadata (`podcast:`)."
+      when "release_title" then "The name of the release in this page's metadata(`release:`)."
+      when "buy_button"    then "The product's buy button. Left out when the `[body]` has its own `button` block."
+      when "price"         then "The product's price. With `[price]` in the layout, the buy button leaves its own price off."
       when "excerpt"       then "The #{n}'s excerpt, from `excerpt:`, as written. Nothing when it has none."
       when "tags"          then "The #{n}'s tags, from `tags:`, as a list. Each one opens the site search filtered to that tag. Nothing when it has none."
       else "Shows the #{n}'s `#{part}:` field when it has one, and nothing when it doesn't."

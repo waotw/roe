@@ -1,15 +1,12 @@
 # The starter markdown a new post, page, or product is created with.
 #
-# Roe renders content from markdown, so the elements a type needs — a player, a
-# track list, a buy button — are fenced blocks in the body rather than machinery
-# in a template. Writing them in at create time means a new podcast episode
-# arrives with a working player instead of the author having to know the block
-# syntax, while everything stays plain markdown they can edit or delete.
+# What a type shows around its writing — title, player, playlist, buy button —
+# comes from its content layout, so the body starts as just the writing. The
+# exception is a page's `# title`: the page layout is only its body.
 #
-# There is deliberately NO placeholder syntax. Blocks are live: `card type:
-# player` resolves the post's audio at render, so it can't go stale. Values that
-# would be frozen into the body (a page's title) are only written where the
-# type actually needs them there.
+# There is deliberately NO placeholder syntax. Values that would be frozen into
+# the body (a page's title) are only written where the type actually needs
+# them there.
 #
 # WHICH BLOCKS: per-post-type lists live in Post::POST_TYPES[:scaffold] next to
 # that type's metadata_fields; pages and products don't vary, so they're below.
@@ -20,10 +17,6 @@
 # product's title, image and buy button. Older content with a player card,
 # playlist or buy button in its body keeps it, and the layout skips its own
 # copy (ContentLayout::BodyCheck); a title or image there shows twice.
-#
-# A block that needs a value it doesn't have is skipped rather than written
-# empty: no playlist until we know which release. The author fills the field
-# in and adds the block from the builder.
 class ContentScaffold
   # Pages and products have no sub-types.
   #
@@ -70,34 +63,10 @@ class ContentScaffold
     case block
     when :content    then @template_body.strip
     when :title      then title.present? ? "# #{title}" : nil
-    when :playlist   then playlist_block
     end
   end
 
   def title
     @metadata["title"].to_s.strip
-  end
-
-  # A playlist has to know what to gather. The association key is on the post
-  # (`podcast:` / `release:`); without it the collection would list every
-  # episode on the site, so skip it instead.
-  def playlist_block
-    post_type = @metadata["post_type"].to_s
-    key_field = post_type == "music" ? "release" : "podcast"
-    key = @metadata[key_field].to_s.strip
-    return nil if key.empty?
-
-    order = post_type == "music" ? "track_number" : "episode_number"
-    fence("collection", [
-      "template: playlist",
-      "source: posts",
-      "post_type: #{post_type}",
-      "#{key_field}: #{key}",
-      "order: #{order}"
-    ])
-  end
-
-  def fence(kind, lines)
-    "```#{kind}\n#{lines.join("\n")}\n```"
   end
 end

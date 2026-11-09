@@ -351,7 +351,7 @@ class Post < ApplicationRecord
       if key
         siblings = Post.published
           .where("json_extract(metadata, '$.post_type') = ?", post_type)
-          .where("json_extract(metadata, '$.#{field}') = ?", key)
+          .where("json_extract(metadata, ?) = ?", "$.#{field}", key)
           .to_a
           .sort_by { |p| order == "date" ? p.date.to_s : p.metadata["track_number"].to_i }
         index = siblings.index { |p| p.id == id }
