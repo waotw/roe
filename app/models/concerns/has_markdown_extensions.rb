@@ -2042,6 +2042,24 @@ module HasMarkdownExtensions
         ""
       end
 
+    # A theme with no player styles would draw an invisible play button, so
+    # the card is the browser's own controls there (PlayerThemeCheck). No
+    # data-player, so player.js leaves it alone whatever its version. With
+    # nothing of its own to play there's nothing to show: a playlist's rows
+    # each play by themselves.
+    unless PlayerThemeCheck.styled?
+      return "" if audio_src.blank?
+      return <<~HTML
+        <div class="card-player card-player-plain">
+          <div class="player-now">#{player_episode_label_html(config)}<span class="player-now-title">#{title_html}</span></div>
+          <audio class="player-native" controls preload="metadata">#{sources_html}</audio>
+          #{player_duration_html(config)}
+          #{player_chapters_html(config)}
+          #{player_extras_html(config)}
+        </div>
+      HTML
+    end
+
     show_artwork = config[:show_artwork].to_s.strip.downcase != "false"
     cover        = player_cover(config)
     art          = show_artwork ? player_card_artwork(config) : ""

@@ -211,4 +211,18 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     get post_path(media_post("audio", audio: "/media/audio/track.mp3", content: body).url_name)
     assert_equal 2, card_players, "the card standing in for the post, and the song — no third"
   end
+
+  # ── a theme with no player styles ──
+
+  test "on a theme with no player styles the card is the browser's own controls" do
+    PlayerThemeCheck.stubs(:styled?).returns(false)
+    chapters = [ { "time" => 0, "title" => "Intro" }, { "time" => 75, "title" => "Middle" } ]
+    get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", episode_number: 3, chapters: chapters).url_name)
+
+    assert_select ".card-player.card-player-plain audio[controls]:not([hidden]) source[src='/media/audio/ep.mp3']", minimum: 1
+    assert_select "[data-player]", 0, "player.js must leave it alone, whatever its version"
+    assert_select "[data-player-ui]", 0
+    assert_select ".card-player-plain .player-now-episode", "E3"
+    assert_select ".card-player-plain .chapter", 2
+  end
 end
