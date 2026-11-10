@@ -14,7 +14,8 @@
 #                       player: the audio is the enclosure.
 #
 # Links are plain: subscribe and feed links are <a> tags in a paragraph. The
-# episode list and ⏮ ⏭ stay on the site.
+# episode list and ⏮ ⏭ stay on the site, and so do the subscribe links in a
+# feed: whoever reads the item is already subscribed.
 class ContentLayout
   class Text
     include ERB::Util
@@ -62,7 +63,7 @@ class ContentLayout
       when "player"     then player_html
       when "body"       then email? ? %(<div class="post-content">\n#{@body_html}\n</div>) : @body_html
       when "feed_links" then email? ? links_paragraph("feed-links", feed_links) : ""
-      when "subscribe"  then links_paragraph("podcast-subscribe", subscribe_links)
+      when "subscribe"  then email? ? links_paragraph("podcast-subscribe", subscribe_links) : ""
       when "excerpt"    then @post.excerpt.present? ? %(<p class="post-excerpt">#{h(@post.excerpt)}</p>) : ""
       when "tags"       then @post.tags.any? ? %(<p class="post-tags">#{h(@post.tags.join(", "))}</p>) : ""
       when *ContentLayout::BUILT_PARTS then "" # site-only: episodes, buy_button, …

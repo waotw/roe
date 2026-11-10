@@ -55,6 +55,17 @@ class ContentLayoutTextTest < ActiveSupport::TestCase
     assert_operator html.index("Words."), :<, html.index("After")
   end
 
+  test "subscribe links are in the email, not in feeds or show notes" do
+    PodcastConfig.stubs(:get).returns({ "title" => "The Show", "apple_podcasts" => "https://podcasts.apple.com/x" })
+    PodcastConfig.stubs(:subscribe_links).returns([ { label: "Apple Podcasts", url: "https://podcasts.apple.com/x" } ])
+    episode = a_post("podcast", audio: "/media/audio/e.mp3", podcast: "show", subtitle: "A short line")
+
+    assert_includes text(episode, :email), "Apple Podcasts"
+    assert_not_includes text(episode, :feed), "Apple Podcasts"
+    assert_not_includes text(episode, :podcast_feed), "Apple Podcasts"
+    assert_includes text(episode, :podcast_feed), "A short line", "the subtitle stays: the notes match the post"
+  end
+
   test "the player is a Listen link in email and feeds, and nothing in a podcast feed" do
     audio = a_post("audio", audio: "/media/audio/a.mp3")
     assert_match %r{<a href="http[^"]+/posts/#{audio.url_name}">Listen</a>}, text(audio, :email)
