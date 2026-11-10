@@ -10,7 +10,7 @@ class CollectionBuilderSchemaTest < ActiveSupport::TestCase
     source heading template style limit order offset post_type podcast release
     show_unlisted tags collection related
     show_author show_excerpt show_date show_subtitle show_more show_more_text
-    category groups aspect_ratio show_description
+    category groups aspect_ratio show_description fold
   ].freeze
 
   test "every field is well-formed" do

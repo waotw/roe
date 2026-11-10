@@ -212,7 +212,7 @@ If the Collection already has an `order` with existing links, any new link will 
 
 ## Create a `playlist` for podcasts or music
 
-There is a `playlist` Collection template and it will create a music player from all the audio files from podcast or music posts. More info here: [Collection Templates](/documentation/roe/collections_templates/#when-to-use-the-playlist-template)
+The `playlist` Collection template lists podcast episodes or music tracks, and a player card on the same page plays them. More info here: [Collection Templates](/documentation/roe/collections_templates/#when-to-use-the-playlist-template)
 
 ## Show `related` content
 

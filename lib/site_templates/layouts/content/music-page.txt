@@ -2,5 +2,8 @@
 [release title]
 [artist] [release date]
 [subscribe]
-[body]
+
+[player]
 [playlist]
+
+[body]

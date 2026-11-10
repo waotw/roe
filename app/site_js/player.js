@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: player
-   Version: 1.1
-   Fingerprint: 26c12816
+   Version: 1.2
+   Fingerprint: 355b3f83
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -32,7 +32,7 @@
 //   [data-player-chapter][data-time]  a chapter row; clicking seeks there
 //   [data-player-info]                the [info] link, shown for a playlist
 //   [data-playlist] .player-track     a `playlist` collection's rows; the
-//     player's own (show_playlist) first, else the first on the page
+//     first playlist after the player, else the first on the page
 //   .player-series                    ⏮ ⏭ links, hidden once a playlist is
 //     adopted, since the list does the same job
 (function () {
@@ -358,18 +358,27 @@
 
   // ── playlist ─────────────────────────────────────────────────────────
   //
-  // A `playlist` collection elsewhere on the page becomes this player's
-  // queue: choosing a row loads it here, and playback runs on down the list.
-  // One player and one playlist per page for now. Without this file every
-  // row plays on its own, in its own browser controls.
+  // A `playlist` collection on the page becomes this player's queue:
+  // choosing a row loads it here, and playback runs on down the list. A
+  // player takes the first playlist after it, so a page can pair several
+  // ([player] then [playlist], or a card then a collection). With none after
+  // it, the first on the page. A playlist has one player. Without this file
+  // every row plays on its own, in its own browser controls.
 
   Player.prototype.setupPlaylist = function () {
     var self = this;
     var info = this.root.querySelector("[data-player-info]");
-    var playlist = this.root.querySelector("[data-playlist]") || document.querySelector("[data-playlist]");
-    if (!playlist) return;
-    // The first player on the page owns the playlist.
-    if (playlist._playerOwner && playlist._playerOwner !== this && document.contains(playlist._playerOwner.root)) return;
+    var root = this.root;
+    var all = Array.prototype.slice.call(document.querySelectorAll("[data-playlist]"));
+    var taken = function (list) {
+      return list._playerOwner && list._playerOwner !== self && document.contains(list._playerOwner.root);
+    };
+    var after = all.filter(function (list) {
+      return !root.contains(list) && (root.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    var playlist = root.querySelector("[data-playlist]") ||
+      after.filter(function (list) { return !taken(list); })[0] || all[0];
+    if (!playlist || taken(playlist)) return;
     playlist._playerOwner = this;
 
     this.info = info;

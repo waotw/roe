@@ -289,21 +289,20 @@ module HasMarkdownExtensions
   # same card, drawn with no options, so it plays the post's own audio or
   # video, titled and with artwork from the post: what an author gets by
   # adding the card themselves, which is where players are heading.
-  # A music or podcast page's player (`release:` / `podcast:`): the card with
-  # nothing of its own to play, which loads the first track of the playlist
-  # on the page. with_playlist puts the playlist inside it. Empty when the
-  # theme can't draw the player; each track then plays by itself.
-  def series_player_card_html(with_playlist:)
-    config = { type: "player" }
-    config[:show_playlist] = "true" if with_playlist
-    render_player_card(config).html_safe
-  end
 
   def template_player_card_html
     # A podcast with video and audio shows the video, as its page always has.
     config = { type: "player" }
     config[:video] = video.to_s.strip if respond_to?(:template_player_kind) && template_player_kind == :video
     render_player_card(config).html_safe
+  end
+
+  # A music or podcast page's player (`release:` / `podcast:`): the card with
+  # nothing of its own to play, which plays the playlist after it on the
+  # page. Empty when the theme can't draw the player; each track then plays
+  # by itself.
+  def series_player_card_html
+    render_player_card({ type: "player" }).html_safe
   end
 
   private
@@ -1960,7 +1959,17 @@ module HasMarkdownExtensions
       HTML
     end.join
 
-    %Q(<ol class="player-tracks" data-playlist>\n#{rows}</ol>)
+    list = %Q(<ol class="player-tracks" data-playlist>\n#{rows}</ol>)
+    return list if tracks.empty?
+
+    # It folds away under "Tracks [9]" / "Episodes [9]". `fold: true` starts
+    # it folded, `false` open. Without either, a music or podcast post's is
+    # folded (the post is about its own track or episode) and anywhere else,
+    # like a release's or podcast's page, it's open.
+    folded = collection_truthy?(config[:fold],
+      default: is_a?(Post) && respond_to?(:post_type) && post_type.in?(%w[music podcast]))
+    noun = tracks.all? { |t| t.respond_to?(:post_type) && t.post_type == "podcast" } ? "Episodes" : "Tracks"
+    %(<details class="player-playlist"#{folded ? "" : " open"}><summary>#{noun} <span class="player-playlist-count">#{tracks.size}</span></summary>\n#{list}</details>)
   end
 
   # The release/podcast cover for the player — the artwork fallback when a track
@@ -2018,8 +2027,8 @@ module HasMarkdownExtensions
   # rendered as the browser's own <audio controls> with Roe's transport hidden
   # ([data-player-ui]), and site_js/player.js swaps them when it loads — so a
   # static host, or a page where the script doesn't run, still plays. The list
-  # is a `playlist` collection the transport adopts: one elsewhere on the page,
-  # or the card's own with `show_playlist: true`.
+  # is a `playlist` collection the transport adopts: the first one after it on
+  # the page, else the first on the page.
   def render_player_card(config, preview: false)
     # A card naming only a video plays that video, not the post's audio.
     own_audio = config[:video].blank? && respond_to?(:audio) ? audio.to_s.strip.presence : nil
@@ -2116,16 +2125,10 @@ module HasMarkdownExtensions
     HTML
   end
 
-  # Under the transport: the show's or release's playlist with
-  # `show_playlist: true`, else ⏮ ⏭ to the episodes or tracks either side.
-  # The playlist does what ⏮ ⏭ do, so it's one or the other.
+  # Under the transport: ⏮ ⏭ to the episodes or tracks either side. A
+  # playlist on the page does the same job, so player.js hides them once it
+  # adopts one.
   def player_extras_html(config)
-    # A page has no media of its own: its card plays its release's or show's
-    # playlist, so the playlist is always its own.
-    if config[:show_playlist].to_s.strip.downcase == "true" && (playing_own_media?(config) || !is_a?(Post))
-      playlist = series_playlist_html(order: config[:order])
-      return playlist if playlist.present?
-    end
     player_series_nav_html(config)
   end
 
@@ -2187,12 +2190,12 @@ module HasMarkdownExtensions
 
   public
 
-  # The playlist for this post's podcast or release — or a page's, with
-  # `podcast:` or `release:` — collapsible, for `show_playlist: true` and the
-  # layout's [playlist]. `order:` is a collection order; without one an
-  # episodic show runs newest first, a serial show oldest first, and a
-  # release in track order. Empty for fewer than two entries.
-  def series_playlist_html(order: nil)
+  # The layout's [playlist]: the `playlist` collection for this post's
+  # podcast or release, or a page's (`podcast:` / `release:`). The same
+  # markup as writing the collection, so the two look and behave alike. An
+  # episodic show runs newest first, a serial show oldest first, a release
+  # in track order. Empty for fewer than two entries.
+  def series_playlist_html
     podcast_key = player_context_key("podcast")
     release_key = player_context_key("release")
     kind = is_a?(Post) ? post_type : (podcast_key ? "podcast" : "music")
@@ -2202,8 +2205,7 @@ module HasMarkdownExtensions
       end
     return "" unless key
 
-    order = order.to_s.strip
-    order = default_playlist_order(kind, key) unless CollectionQuery.sort_keyword?(order)
+    order = default_playlist_order(kind, key)
     config = { source: "posts", post_type: kind, field => key, template: "playlist",
                limit: "all", order: order, show_unlisted: "true" }
     items, total, warning = resolve_collection_items(config)
@@ -2211,9 +2213,7 @@ module HasMarkdownExtensions
     count = items.count { |item| item.respond_to?(:audio) && item.audio.to_s.strip.present? }
     return "" if count < 2
 
-    noun = kind == "music" ? "Tracks" : "Episodes"
-    %(<details class="player-playlist" open><summary>#{noun} <span class="player-playlist-count">#{count}</span></summary>) +
-      render_resolved_collection(config, items, total) + "</details>"
+    render_resolved_collection(config, items, total)
   end
 
   private

@@ -217,6 +217,12 @@ class ContentLayout
     end
 
     blocks.reject! { |block| block.rows.empty? }
+    # A playlist only lists; a player plays it. Without one each track shows
+    # the browser's own controls, which still play, so it's a warning.
+    playlist_row = blocks.flat_map(&:rows).find { |row| row.parts.include?("playlist") }
+    if playlist_row && blocks.flat_map(&:rows).none? { |row| row.parts.include?("player") }
+      warn.call(playlist_row.line, "Line #{playlist_row.line}: [playlist] has no [player] to play it, so each track shows the browser's own controls. Add [player] above it, or a player card in the writing.")
+    end
     unless body_seen
       warn.call(nil, "This layout has no [body], so the writing is shown after everything else.")
       blocks << Block.new([], [ Row.new([], [ "body" ]) ], nil)

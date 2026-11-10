@@ -9,6 +9,23 @@ class ContentLayoutTest < ActiveSupport::TestCase
     layout.blocks.map { |b| [ b.role, b.classes, b.rows.map { |r| [ r.classes, r.parts ] } ] }
   end
 
+  test "[playlist] with no [player] is kept, with a warning on its line" do
+    layout = ContentLayout.parse("music-page", "[body]\n[playlist]\n")
+    assert_includes layout.parts, "playlist"
+    assert_match(/Line 2: \[playlist\] has no \[player\]/, layout.warnings.join)
+    assert layout.problems.key?(2)
+
+    assert_empty ContentLayout.parse("music-page", "[player] [playlist]\n[body]\n").warnings
+    assert_empty ContentLayout.parse("music-page", "[playlist]\n[player]\n[body]\n").warnings
+  end
+
+  test "Roe's default layouts have no warnings" do
+    Dir.glob(ContentLayout::ROE_DIR.to_s + "/*#{ContentLayout::EXT}").each do |path|
+      name = File.basename(path, ContentLayout::EXT)
+      assert_empty ContentLayout.parse(name, File.read(path)).warnings, name
+    end
+  end
+
   test "one box per line is one part per row, in order" do
     layout = ContentLayout.parse("article", "[title]\n[subtitle]\n[body]\n")
     assert_equal [ [ "title" ], [ "subtitle" ], [ "body" ] ], layout.rows.map(&:parts)

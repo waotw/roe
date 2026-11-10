@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 1.6.6
-   Fingerprint: 33077470
+   Version: 1.6.7
+   Fingerprint: 7f63b3fd
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -2833,10 +2833,9 @@ article .content,
   color: var(--player-meta-color);
 }
 
-/* Chapters and playlist, inside or under the player card: a podcast
-   episode's `chapters:` (click a row to jump there), and the show's episodes
-   or the release's tracks (`show_playlist: true`, or the layout's
-   [playlist]). Both fold away under their summary line. */
+/* Chapters and playlist: a podcast episode's `chapters:` inside the player
+   card (click a row to jump there), and a `playlist` collection's tracks or
+   episodes. Both fold away under their summary line. */
 .player-chapters,
 .player-playlist {
   margin-top: var(--space-2);
@@ -2872,7 +2871,7 @@ article .content,
 .player-playlist-count::after {
   content: "]";
 }
-.player-playlist .collection {
+.player-playlist > .player-tracks {
   margin: var(--space-1) 0 0 0;
 }
 
@@ -2902,29 +2901,33 @@ li.chapter {
   content: "\25B8 ";
 }
 
-/* The layout's [playlist] on its own, as a box like the card's. Straight
-   under [player] it joins the card: the card's bottom edge and the space
-   after it (set inline on .post-player) give way. */
-.post-playlist {
+/* A `playlist` collection, or the layout's [playlist] (the same thing), as
+   a box like the player card's. Straight after a player — a player card in
+   the writing, or the layout's [player] — it joins it: the player's bottom
+   edge and the space between give way. */
+.collection.playlist {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
   font-size: var(--text-sm, 0.875rem);
   margin-bottom: var(--space-4);
   border: 1px solid var(--color-border);
   padding: 0 var(--space-4) var(--space-2) var(--space-4);
 }
-.post-playlist > .player-playlist {
+.collection.playlist > .player-playlist {
   margin-top: 0;
   border-top: 0;
 }
-.post-player:has(+ .post-playlist) .card-player {
+.card-player:has(+ .collection.playlist),
+.post-player:has(+ .collection.playlist) .card-player {
   margin-bottom: 0;
   border-bottom: 0;
 }
-.post-player + .post-playlist {
+.card-player + .collection.playlist,
+.post-player + .collection.playlist {
   margin-top: var(--space-0);
   border-top: 0;
 }
-.post-player + .post-playlist > .player-playlist {
+.card-player + .collection.playlist > .player-playlist,
+.post-player + .collection.playlist > .player-playlist {
   border-top: 1px dashed var(--color-border);
 }
 

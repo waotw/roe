@@ -78,7 +78,8 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     get post_path(first.url_name)
     assert_select ".podcast-episode .post-player .card-player"
     assert_select ".podcast-episode .post-content"
-    assert_select ".podcast-episode .post-playlist details.player-playlist[open] [data-playlist] li", 2
+    # On a post the playlist starts folded: the post is about its episode.
+    assert_select ".podcast-episode .collection.playlist details.player-playlist:not([open]) [data-playlist] li", 2
     assert_select "[data-playlist] li.is-current[aria-current=true]", 1
   end
 
@@ -241,25 +242,26 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "h1.release-page-title", "Summer EP"
     assert_select "span.page-author.page-artist", "The Band"
     assert_select "time.page-date.page-release-date[datetime='2026-11-09']", "November 09, 2026"
-    # No [player] in the default, so the playlist comes inside one: its tracks
-    # play in the player, not in the browser's own controls.
-    assert_select ".card-player[data-player=audio] .player-playlist .player-track", 2
-    assert_select ".post-playlist", 0
+    # The default pairs [player] and [playlist], above the writing; on a page
+    # the list starts open.
+    assert_select ".post-player + .collection.playlist details.player-playlist[open] .player-track", 2
+    assert_select ".card-player .player-playlist", 0, "the player and the list are separate"
+    html = response.body
+    assert_operator html.index("collection playlist"), :<, html.index("Notes."), "the audio comes before the writing"
   end
 
-  test "a music-page with [player] and [playlist] has one player, playing the list below it" do
+  test "[playlist] without [player] is only the list, as the collection is" do
     SiteFeature.stubs(:music_enabled?).returns(true)
     ReleaseConfig.stubs(:get).returns({ "title" => "Summer EP" })
     ReleaseConfig.stubs(:feed_enabled?).returns(false)
-    site_layout("music-page", "[player]\n[playlist]\n[body]\n")
+    site_layout("music-page", "[playlist]\n[body]\n")
     a_post("music", audio: "/media/audio/a.mp3", release: "summer-ep", track_number: 1)
     a_post("music", audio: "/media/audio/b.mp3", release: "summer-ep", track_number: 2)
     page = create(:page, metadata: { "title" => "EP", "url_name" => "ep-two", "status" => "published", "release" => "summer-ep" }, content: "Notes.")
 
     get "/#{page.url_name}"
-    assert_select ".card-player[data-player=audio]", 1
-    assert_select ".card-player .player-playlist", 0
-    assert_select ".post-playlist .player-track", 2
+    assert_select ".card-player", 0
+    assert_select ".collection.playlist .player-track", 2
   end
 
   test "a page with a player card in its body doesn't get a second one from [playlist]" do
@@ -273,7 +275,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
 
     get "/#{page.url_name}"
     assert_select ".card-player[data-player=audio]", 1
-    assert_select ".post-playlist .player-track", 2
+    assert_select ".collection.playlist .player-track", 2
   end
 
   test "[artist] is the track's own, then the release's, then the site's music artist" do
@@ -409,8 +411,8 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     a_post("music", audio: "/media/audio/x.mp3", release: "other", track_number: 1)
 
     get post_path(t2.url_name)
-    assert_select ".post-playlist summary", /Tracks/
-    assert_equal [ t1.title, t2.title ], css_select(".post-playlist .player-track").map { |row| row["data-title"] }
+    assert_select ".collection.playlist summary", /Tracks/
+    assert_equal [ t1.title, t2.title ], css_select(".collection.playlist .player-track").map { |row| row["data-title"] }
     assert_select ".player-track.is-current[data-title=?]", t2.title
     assert_select ".player-track.is-current .player-track-duration", "3:10"
   end
@@ -418,13 +420,13 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
   test "[playlist] is left out for a release of one, and when the writing has a playlist" do
     alone = a_post("music", audio: "/media/audio/a.mp3", release: "single", track_number: 1)
     get post_path(alone.url_name)
-    assert_select ".post-playlist", 0
+    assert_select ".collection.playlist", 0
 
     playlist = "Notes.\n\n```collection\ntemplate: playlist\nsource: posts\npost_type: music\nrelease: ep\norder: track_number\n```\n"
     t1 = a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1, content: playlist)
     a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
     get post_path(t1.url_name)
-    assert_select ".post-playlist", 0
+    assert_select ".collection.playlist", 1, "the writing's, not the layout's as well"
     assert_select "ol.player-tracks", 1
   end
 
@@ -433,11 +435,11 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     new = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01")
 
     get post_path(old.url_name)
-    assert_equal [ new.title, old.title ], css_select(".post-playlist .player-track").map { |row| row["data-title"] }
+    assert_equal [ new.title, old.title ], css_select(".collection.playlist .player-track").map { |row| row["data-title"] }
 
     PodcastConfig.stubs(:get).returns({ "type" => "serial" })
     get post_path(old.url_name)
-    assert_equal [ old.title, new.title ], css_select(".post-playlist .player-track").map { |row| row["data-title"] }
+    assert_equal [ old.title, new.title ], css_select(".collection.playlist .player-track").map { |row| row["data-title"] }
   end
 
   test "a playlist row with no episode or track number shows none, not its position" do
@@ -445,22 +447,36 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     unnumbered = a_post("podcast", audio: "/media/audio/2.mp3", podcast: "show", date: "2024-02-01")
 
     get post_path(unnumbered.url_name)
-    assert_equal [ "", "E1" ], css_select(".post-playlist .player-track-number").map(&:text)
+    assert_equal [ "", "E1" ], css_select(".collection.playlist .player-track-number").map(&:text)
   end
 
-  test "the player card shows S1E10 and the playlist with show_playlist, in the order asked for" do
-    card = "```card\ntype: player\nshow_playlist: true\norder: date-asc\n```\n\nNotes."
+  test "a player card and a playlist collection in the writing stand in for the layout's" do
+    card = "```card\ntype: player\n```\n\n```collection\nsource: posts\npost_type: podcast\npodcast: show\n" \
+           "order: date-asc\ntemplate: playlist\nfold: false\n```\n\nNotes."
     a_post("podcast", audio: "/media/audio/9.mp3", podcast: "show", date: "2024-01-01", season: 1, episode_number: 9)
     ten = a_post("podcast", audio: "/media/audio/10.mp3", podcast: "show", date: "2024-02-01", season: 1, episode_number: 10, content: card)
 
     get post_path(ten.url_name)
     assert_select ".card-player .player-now-episode", "S1E10"
-    assert_select ".card-player details.player-playlist .player-track", 2
+    assert_select ".card-player .player-playlist", 0, "the player and the list are separate"
+    assert_select ".collection.playlist details.player-playlist[open] .player-track", 2, "fold: false opens it on a post"
     assert_equal %w[S1E9 S1E10], css_select(".player-track-number").map(&:text)
-    assert_equal %w[S1E9 S1E10], css_select(".player-track").map { |row| row["data-episode"] }
-    assert_select ".player-series", 0, "the playlist does what ⏮ ⏭ do"
     assert_select ".post-player", 0, "the body's card stands in for the layout's player"
-    assert_select ".post-playlist", 0, "and its playlist for the layout's"
+    assert_select ".collection.playlist", 1, "and its playlist for the layout's"
+  end
+
+  test "fold: true folds a playlist collection on a page" do
+    a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
+    a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
+    list = "```collection\nsource: posts\npost_type: music\nrelease: ep\ntemplate: playlist\n%s```\n"
+    page = create(:page, metadata: { "title" => "Folded", "url_name" => "folded", "status" => "published" }, content: format(list, "fold: true\n"))
+    get "/#{page.url_name}"
+    assert_select "details.player-playlist:not([open])", 1
+    assert_select "details.player-playlist summary", /Tracks/
+
+    page.update!(content: format(list, ""))
+    get "/#{page.url_name}"
+    assert_select "details.player-playlist[open]", 1, "open by default on a page"
   end
 
   test "the music layout's own player links the tracks before and after it" do

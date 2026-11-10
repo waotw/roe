@@ -30,7 +30,7 @@ Go to [Admin → Settings](/admin/configs) and click `Enable Music`. Roe creates
 
 Every track belongs to a release, and Roe creates one called `singles` so you can start posting music immediately.
 
-You can create a collection with `template: playlist` and filter it by release: `release: singles`. This will create an audio player with all your singles in it. 
+Make a page with `release: singles` in its metadata and it becomes the page for your singles: cover, artist, a player and every track. See [Showing a release on your site](#showing-a-release-on-your-site).
 
 ## Adding a release
 
@@ -68,7 +68,7 @@ The most specific settings win:
 ### How this works in practice:
 
 - **Cover art** — if a track has it's own `image`, that is shown as the artwork for that track. If not, it will use the release's artwork for the player.
-- **Artist and audience** — if a track has it's own artist, this is used. If not, it will fallback to the `artist` set in Settings → music.yml.
+- **Artist and audience** — if a track has it's own artist, this is used. If not, it will fallback to the release's `artist`, then the `artist` set in Settings → music.yml, then the site author. The `[artist]` box in a [content layout](/documentation/roe/layouts#content-layouts) shows it; `[author]` still shows the post's author.
 
 ### An example of how this could be used:
 
@@ -158,9 +158,17 @@ The short version: `audio` is the track/mp3, `release` picks which release it be
 
 ## Showing a release on your site
 
-Use a [collection](/documentation/roe/collections) filtered to the release, ordered by track number, with the [`playlist` template](/documentation/roe/collections_templates#when-to-use-the-playlist-template):
+Add `release: summer-release` to a page. It uses the `music-page` [content layout](/documentation/roe/layouts#content-layouts): the cover, release name, artist and release date, subscribe links if the release has a feed, a player and the tracks in running order, then your writing. More here: [Release and Podcast Pages](/documentation/roe/pages#release-and-podcast-pages)
+
+Each track's own page has a player too, with ⏮ ⏭ to the tracks either side. `[playlist]` in the `music` layout lists the whole release, folded.
+
+To put a release anywhere else, use a [player card](/documentation/roe/cards#player) and a [collection](/documentation/roe/collections) with the [`playlist` template](/documentation/roe/collections_templates#when-to-use-the-playlist-template):
 
 ````markdown
+```card
+type: player
+```
+
 ```collection
 source: posts
 post_type: music

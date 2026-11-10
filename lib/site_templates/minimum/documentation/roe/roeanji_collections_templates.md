@@ -116,13 +116,19 @@ A `grid` Collection also has its own options:
 
 ### When to use the `playlist` template
 
-<mark>Music only:</mark> the `playlist` template needs the **Music** feature turned on. Until then the option doesn't appear.
+A `playlist` lays out music tracks or podcast episodes as a numbered list. A [player card](/documentation/roe/cards#player) on the same page plays it: clicking a row loads that track into the player, so a visitor can work through a release without the page jumping about.
 
-A `playlist` lays out a set of tracks as a numbered list with a single player at the top. Clicking a track loads it into that player, so a visitor can work through a release without the page jumping about.
+The number is the track's `track_number`, or the episode's label (`E10`, `S1E10`). A row with no number needs one added to that post.
 
-It's built for [music posts](/documentation/roe/posts#music). A release is a collection filtered to it and ordered by track number:
+The list folds away under a `Tracks [9]` or `Episodes [9]` line. `fold: true` starts it folded and `fold: false` open. Without `fold`, it's folded on a music or podcast post, which is about its own track or episode, and open anywhere else.
+
+A release is a collection filtered to it and ordered by track number, under a player card:
 
 ````markdown
+```card
+type: player
+```
+
 ```collection
 source: posts
 post_type: music
@@ -133,6 +139,10 @@ template: playlist
 ````
 
 `order: track_number` is what puts them in running order. Without it you'll get them by date, which is rarely what a release wants.
+
+Without a player card, each row plays on its own with the browser's audio controls. With one, the player plays the first playlist after it on the page. Straight after the card, the list joins it into one box.
+
+You may not need to write this at all. The `[player]` and `[playlist]` boxes in a [content layout](/documentation/roe/layouts#content-layouts) draw the same player and list for a music track, a podcast episode, or a [page connected to a release or podcast](/documentation/roe/pages#release-and-podcast-pages).
 
 ### When to use the `glossary` template
 

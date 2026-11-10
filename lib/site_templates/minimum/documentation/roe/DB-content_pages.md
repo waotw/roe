@@ -83,9 +83,22 @@ When you enable [Members](/documentation/roe/members), Roe generates pages for s
 
 This way, you can change the `title` or `url_name` to whatever you like and Roe will still know how to find the page.
 
-### Podcast Pages
+### Release and Podcast Pages
 
-Add `podcast: <podcast-key>` to a page's metadata to connect it to a podcast show (the key comes from your [podcast config](/documentation/roe/podcasts)). Roe will then add the show's name as its heading and shows the show's [subscribe section](/documentation/roe/podcasts#subscribe-section) beneath it — a ready-made "podcast home" page.
+Add `release: <release-key>` to a page to make it a release's page, or `podcast: <podcast-key>` to make it a podcast's page. Both are in the editor's Add Field menu, and on the new-page form, when [Music](/documentation/roe/settings-music) or [Podcasts](/documentation/roe/podcasts) is turned on.
+
+The page then uses the `music-page` or `podcast-page` [content layout](/documentation/roe/layouts#content-layouts). By default that shows:
+
+| Release page | Podcast page |
+|---|---|
+| Cover | Artwork |
+| Release name | Podcast name |
+| Artist and release date | Author |
+| Subscribe links, if the release has a feed | [Subscribe links](/documentation/roe/podcasts#subscribe-section) |
+| A player and the tracks | A player and the episodes |
+| The page's writing | The page's writing |
+
+The details come from Settings → Music or Settings → Podcasts each time the page is shown, so a change there shows up on the page. Nothing is copied into the page's file.
 
 ## Pages vs Posts
 

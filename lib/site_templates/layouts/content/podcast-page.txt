@@ -2,5 +2,8 @@
 [podcast title]
 [creator]
 [subscribe]
-[body]
+
+[player]
 [playlist]
+
+[body]

@@ -37,10 +37,8 @@ class ContentLayout
       end
     end
 
-    # A playlist collection, or a player card showing its own.
     def playlist?
-      blocks("collection").any? { |config| config.match?(/^\s*template:\s*["']?playlist\b/) } ||
-        blocks("card").any? { |config| config.match?(/^\s*show_playlist:\s*["']?true\b/) }
+      blocks("collection").any? { |config| config.match?(/^\s*template:\s*["']?playlist\b/) }
     end
 
     # A product button is a ```button with no `for:`/`type:` naming another

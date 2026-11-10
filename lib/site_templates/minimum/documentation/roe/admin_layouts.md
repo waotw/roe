@@ -159,6 +159,20 @@ post-header:
 
 This gives this block the CSS class `post-header`. You can also add a CSS class to a row. Notice `post-meta:` in the example above. It wraps the `[date]` and `[author]` boxes in a `<div>` with the class of `post-meta`.
 
+### Music and podcast boxes
+
+Music and podcast layouts have extra boxes, in their own section of BOXES: RELEASE or PODCAST. Each shows a detail from Settings → Music or Settings → Podcasts, and draws nothing when that detail isn't set.
+
+- **Release:** `[release title]`, `[artist]`, `[release date]`, `[cover]`, `[synopsis]`, `[genre]`, `[label]`, `[copyright]`
+- **Podcast:** `[podcast title]`, `[creator]`, `[artwork]`, `[description]`, `[category]`, `[podcast link]`, `[copyright]`
+- **Both:** `[subscribe]`, `[player]`, `[playlist]`
+
+They work on music tracks, podcast episodes, and pages with `release:` or `podcast:`.
+
+`[player]` plays and `[playlist]` lists, the same as a player card and a `playlist` collection in the writing. A player plays the first playlist after it, so put `[player]` on the line above `[playlist]` and they join into one box. The list is folded on a post and open on a page. A `[playlist]` with no `[player]` shows each track with the browser's own controls, and the editor warns about it.
+
+These boxes use the same CSS classes as the box they're like, plus their own. `[artist]` and `[creator]` are styled like `[author]` (`post-author post-artist`), `[release date]` like `[date]`, `[cover]` and `[artwork]` like `[image]`. Target `.post-artist` to style the artist differently.
+
 ### Create a content layout
 
 You can add your own layouts. On the Admin → Layouts page, type the name and click `NEW LAYOUT`. Then add `layout: <layout_name>` to the frontmatter of the page or post and it will use this layout instead of the default.

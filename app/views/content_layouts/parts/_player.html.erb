@@ -12,7 +12,7 @@
     <%= record.template_player_card_html %>
   </div>
 <% elsif kind == "page" && (record.metadata["release"].present? || record.metadata["podcast"].present?) && record.series_playlist_html.present? %>
-  <div class="post-player" style="margin-bottom: var(--space-6, 1.5rem);">
-    <%= record.series_player_card_html(with_playlist: false) %>
+  <div class="post-player">
+    <%= record.series_player_card_html %>
   </div>
 <% end %>

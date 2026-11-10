@@ -210,7 +210,7 @@ class ContentLayout
       when "feed_links"    then %(<div class="feed-links"><a class="feed-link">RSS</a></div>)
       when "player"        then %(<div class="post-player">…player…</div>)
       when "subscribe"     then %(<div class="podcast-subscribe">…subscribe links…</div>)
-      when "playlist"      then %(<div class="post-playlist">…playlist…</div>)
+      when "playlist"      then %(<div class="collection playlist">…playlist…</div>)
       when "podcast_title" then %(<h1 class="podcast-page-title">Show name</h1>)
       when "release_title" then %(<h1 class="release-page-title">Release name</h1>)
       when "artist"        then %(<span class="#{k}-author #{k}-artist">Artist</span>)
@@ -355,13 +355,13 @@ class ContentLayout
       when "feed_links"    then "RSS links: the show's feed for an episode, the release's for a track, the site's for an article."
       when "player"
         if @kind == "page"
-          "The player for the release's tracks or the podcast's episodes, starting on the first. Without it, [playlist] comes with its own."
+          "The player for the release's tracks or the podcast's episodes. It plays the [playlist] after it."
         else
           "The player for the post's `audio:` or `video:`. Left out when the [body] already has a player card."
         end
       when "body"          then "The #{n}'s content: everything below its frontmatter. A layout has one [body]."
       when "subscribe"     then "Subscribe links: Podcast and RSS links"
-      when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Left out when the `[body]` has its own playlist."
+      when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Folded on a post, open on a page. [player] plays it. Left out when the `[body]` has its own playlist."
       when "podcast_title" then "The name of the podcast in this page's metadata (`podcast:`)."
       when "artist"        then "The artist: the track's own `artist:`, else its release's, else the one in Music settings, else the site author. Styled like [author], with its own `artist` class."
       when "creator"       then "The podcast's author, from Podcast settings. Styled like [author], with its own `creator` class."

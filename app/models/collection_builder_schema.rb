@@ -78,6 +78,10 @@ module CollectionBuilderSchema
       options: %w[list compact links menu full glossary playlist],
       hint: "How each item is displayed. Products default to grid; everything else to list. menu is a bare link list you can hand-order and send content to. playlist is a track/episode list a player card can drive." },
 
+    { key: "fold", type: :boolean, label: "Fold",
+      hint: "true starts the list folded under its Tracks / Episodes line, false open. Blank: folded on a music or podcast post, open anywhere else.",
+      depends_on: { field: "template", value: "playlist" } },
+
     # --- Menu group: shown only when the template is `menu` ------------------
     { key: "style", type: :select, label: "Menu style",
       options: %w[vertical horizontal],
