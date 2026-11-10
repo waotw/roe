@@ -465,6 +465,21 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select ".collection.playlist", 1, "and its playlist for the layout's"
   end
 
+  test "a playlist row links to its post with ?play, and its audio is kept but hidden" do
+    a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
+    b = a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
+    list = "```collection\nsource: posts\npost_type: music\nrelease: ep\ntemplate: playlist\n```\n"
+    page = create(:page, metadata: { "title" => "List only", "url_name" => "list-only", "status" => "published" }, content: list)
+
+    get "/#{page.url_name}"
+    row = css_select(".player-track").find { |r| r["data-title"] == b.title }
+    link = row.at_css("a.player-track-link")
+    assert_equal "#{post_path(b.url_name)}?play", link["href"]
+    assert_nil link["target"], "without a player it opens in the same tab"
+    assert_select "audio.player-track-audio[hidden][src='/media/audio/b.mp3']", 1
+    assert_select "audio.player-track-audio[controls]", 0, "no browser audio bar per row"
+  end
+
   test "fold: true folds a playlist collection on a page" do
     a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
     a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)

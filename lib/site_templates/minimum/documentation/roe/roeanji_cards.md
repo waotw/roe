@@ -459,6 +459,8 @@ template: playlist
 
 A card with no `audio` or `video` on a page starts on the playlist's first track. A page can have more than one pair; each player plays the playlist after it.
 
+A playlist with no player links each row to its post. The post opens and starts its player, if the browser allows a page to start sound by itself. If not, the player is ready on that track for one tap.
+
 ### On older themes
 
 The player's look comes from your theme. A theme without the player styles gets the browser's own audio controls instead, so the audio still plays. Update the theme in [Admin → Updates](/admin/updates) to get the full player.

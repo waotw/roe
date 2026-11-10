@@ -1909,18 +1909,12 @@ module HasMarkdownExtensions
     %Q(<nav class="collection-nav"#{aria}>\n#{list}\n</nav>)
   end
 
-  # A single-player playlist over a collection of audio posts — music tracks or
-  # podcast episodes. The template emits every element and its DOM order; the
-  # theme's CSS controls the entire look (symbols, layout, type). Structure:
-  # header (cover/title/artist) ▸ now-playing ▸ transport (toggle/times/playhead)
-  # ▸ the track list. Each row also carries a native <audio controls> as the
-  # no-JS fallback; player.js hides those (adds .is-enhanced) and drives one
-  # active track through the transport, auto-advancing on end.
-  # The track/episode list on its own — `template: playlist`. Each row is a
-  # native <audio controls> (no-JS fallback) plus data attributes (title, image,
-  # url; audio via the <audio> src) so a `player` can adopt it as its queue.
-  # This is the list half of the old combined player; the transport is the
-  # `player` card.
+  # The track/episode list — `template: playlist`, and the layout's
+  # [playlist]. It only lists; a `player` card on the page plays it
+  # (player.js adopts the first playlist after the player). Each row carries
+  # what the player needs (title, image, url; the file in a hidden <audio>,
+  # which older player.js copies read). With no player, each row is a link
+  # to its post with ?play, which starts that post's player.
   def render_playlist(items, config)
     tracks = items.select do |item|
       item.respond_to?(:audio) && item.audio.to_s.strip.present?
@@ -1951,10 +1945,10 @@ module HasMarkdownExtensions
           <div class="player-track-meta" data-player-select>
             <span class="player-track-number">#{number}</span>
             <span class="player-track-title">#{title}#{lock}</span>
-            <a class="player-track-link" href="#{url}" target="_blank" rel="noopener" aria-label="Open #{title}"></a>
+            <a class="player-track-link" href="#{url}?play" aria-label="Open #{title}"></a>
             #{dur_html}
           </div>
-          <audio class="player-track-audio" controls preload="none" src="#{audio}"></audio>
+          <audio class="player-track-audio" preload="none" src="#{audio}" hidden></audio>
         </li>
       HTML
     end.join

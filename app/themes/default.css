@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 1.6.7
-   Fingerprint: 7f63b3fd
+   Version: 1.6.8
+   Fingerprint: d68e12f0
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -1651,6 +1651,18 @@ p.collection-more a:hover {
 }
 .player-track-link:hover {
   opacity: 1;
+}
+
+/* With no player on the page to play it, a playlist row is a link to its
+   post, and the link covers the whole row. player.js marks a list a player
+   has taken .is-enhanced; then a click plays the row here instead. */
+.player-tracks:not(.is-enhanced) .player-track {
+  position: relative;
+}
+.player-tracks:not(.is-enhanced) .player-track-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
 
 /* Paid tracks in a playlist, and the player's paywall notice.

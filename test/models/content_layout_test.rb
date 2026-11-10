@@ -12,7 +12,7 @@ class ContentLayoutTest < ActiveSupport::TestCase
   test "[playlist] with no [player] is kept, with a warning on its line" do
     layout = ContentLayout.parse("music-page", "[body]\n[playlist]\n")
     assert_includes layout.parts, "playlist"
-    assert_match(/Line 2: \[playlist\] has no \[player\]/, layout.warnings.join)
+    assert_match(/Line 2: \[playlist\] has no \[player\].*links to its post/, layout.warnings.join)
     assert layout.problems.key?(2)
 
     assert_empty ContentLayout.parse("music-page", "[player] [playlist]\n[body]\n").warnings

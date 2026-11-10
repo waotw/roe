@@ -169,7 +169,7 @@ Music and podcast layouts have extra boxes, in their own section of BOXES: RELEA
 
 They work on music tracks, podcast episodes, and pages with `release:` or `podcast:`.
 
-`[player]` plays and `[playlist]` lists, the same as a player card and a `playlist` collection in the writing. A player plays the first playlist after it, so put `[player]` on the line above `[playlist]` and they join into one box. The list is folded on a post and open on a page. A `[playlist]` with no `[player]` shows each track with the browser's own controls, and the editor warns about it.
+`[player]` plays and `[playlist]` lists, the same as a player card and a `playlist` collection in the writing. A player plays the first playlist after it, so put `[player]` on the line above `[playlist]` and they join into one box. The list is folded on a post and open on a page. A `[playlist]` with no `[player]` links each track to its post instead, and the editor warns about it.
 
 These boxes use the same CSS classes as the box they're like, plus their own. `[artist]` and `[creator]` are styled like `[author]` (`post-author post-artist`), `[release date]` like `[date]`, `[cover]` and `[artwork]` like `[image]`. Target `.post-artist` to style the artist differently.
 

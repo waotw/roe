@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: player
-   Version: 1.2
-   Fingerprint: 355b3f83
+   Version: 1.3
+   Fingerprint: e3e24ddd
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -35,6 +35,11 @@
 //     first playlist after the player, else the first on the page
 //   .player-series                    ⏮ ⏭ links, hidden once a playlist is
 //     adopted, since the list does the same job
+//   .player-track-link                a row's link to its post. Without a
+//     player it's the row's way in (same tab, with ?play); once a player
+//     adopts the list it opens the post in a new tab, without ?play
+//   ?play in the page's address       start this page's player on arrival,
+//     where the browser allows it
 (function () {
   "use strict";
 
@@ -389,6 +394,18 @@
     this.tracks.forEach(function (row, i) {
       var rowAudio = row.querySelector(".player-track-audio");
       if (rowAudio) rowAudio.hidden = true;
+      // The row plays here now, so its link opens the post alongside,
+      // without starting a second player there.
+      var link = row.querySelector(".player-track-link");
+      if (link) {
+        link.target = "_blank";
+        link.rel = "noopener";
+        try {
+          var url = new URL(link.href);
+          url.searchParams.delete("play");
+          link.href = url.toString();
+        } catch (e) { /* leave it */ }
+      }
       var select = row.querySelector("[data-player-select]");
       if (!select) return;
       select.addEventListener("click", function (e) {
@@ -560,6 +577,42 @@
     }
   }
 
+  // ── ?play ────────────────────────────────────────────────────────────
+  //
+  // A playlist with no player links each row to its post with ?play: start
+  // that post's player when it opens. Browsers decide whether a page may
+  // start sound itself; when one says no, the player is left ready on the
+  // track, in view, for one tap. The ?play comes off the address either way,
+  // so a refresh doesn't start it again.
+
+  function playOnArrival() {
+    var params;
+    try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+    if (!params.has("play")) return;
+
+    var own = players.filter(function (p) {
+      return p.media.getAttribute("src") || p.media.querySelector("source[src]");
+    })[0] || players[0];
+
+    params.delete("play");
+    var query = params.toString();
+    var clean = window.location.pathname + (query ? "?" + query : "") + window.location.hash;
+    try { window.history.replaceState(window.history.state, "", clean); } catch (e) { /* leave it */ }
+    if (!own) return;
+
+    var ready = function () {
+      if (own.root.scrollIntoView) own.root.scrollIntoView({ block: "nearest" });
+      var play = own.part("play");
+      if (play && play.focus) play.focus({ preventScroll: true });
+    };
+    var p = own.media.play();
+    if (p && p.then) {
+      p.then(ready, ready);
+    } else {
+      ready();
+    }
+  }
+
   // ── start ────────────────────────────────────────────────────────────
 
   function init() {
@@ -577,6 +630,7 @@
       players.push(player);
       player.enhance();
     });
+    playOnArrival();
   }
 
   if (document.readyState === "loading") {

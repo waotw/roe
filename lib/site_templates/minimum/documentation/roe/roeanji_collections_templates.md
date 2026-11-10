@@ -140,7 +140,7 @@ template: playlist
 
 `order: track_number` is what puts them in running order. Without it you'll get them by date, which is rarely what a release wants.
 
-Without a player card, each row plays on its own with the browser's audio controls. With one, the player plays the first playlist after it on the page. Straight after the card, the list joins it into one box.
+Without a player card, each row links to its post, and opening it starts that post's player where the browser allows it. With one, the player plays the first playlist after it on the page. Straight after the card, the list joins it into one box.
 
 You may not need to write this at all. The `[player]` and `[playlist]` boxes in a [content layout](/documentation/roe/layouts#content-layouts) draw the same player and list for a music track, a podcast episode, or a [page connected to a release or podcast](/documentation/roe/pages#release-and-podcast-pages).
 

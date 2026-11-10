@@ -361,7 +361,7 @@ class ContentLayout
         end
       when "body"          then "The #{n}'s content: everything below its frontmatter. A layout has one [body]."
       when "subscribe"     then "Subscribe links: Podcast and RSS links"
-      when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Folded on a post, open on a page. [player] plays it. Left out when the `[body]` has its own playlist."
+      when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Folded on a post, open on a page. [player] plays it; without one, each track links to its post. Left out when the `[body]` has its own playlist."
       when "podcast_title" then "The name of the podcast in this page's metadata (`podcast:`)."
       when "artist"        then "The artist: the track's own `artist:`, else its release's, else the one in Music settings, else the site author. Styled like [author], with its own `artist` class."
       when "creator"       then "The podcast's author, from Podcast settings. Styled like [author], with its own `creator` class."
