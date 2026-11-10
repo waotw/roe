@@ -32,7 +32,16 @@ class ContentLayout
     # fields worth showing on a page. Each is { name:, label: "[feed links]",
     # help: }.
     def box_choices
-      (parts_for_type + fields_for_type).map { |name| { name: name, label: box(name), help: curly(part_help(name)) } }
+      box_sections.flat_map { |section| section[:choices] }
+    end
+
+    # The same boxes, in sections when the type has more than one kind:
+    # a music-page's RELEASE boxes and its PAGE boxes, a track's TRACK and
+    # RELEASE. A type with one kind is a single section with no title.
+    def box_sections
+      sections_for_type.map do |title, names|
+        { title: title, choices: names.map { |name| { name: name, label: box(name), help: curly(part_help(name)) } } }
+      end
     end
 
     POST_PARTS = %w[title subtitle date author image feed_links excerpt tags].freeze
@@ -68,24 +77,49 @@ class ContentLayout
       { "post" => "post", "page" => "page", "product" => "product", "documentation" => "documentation page" }[@kind]
     end
 
+    PAGE_PARTS = %w[title subtitle image excerpt tags body].freeze
+    RELEASE_PAGE_PARTS = %w[release_title artist release_date cover synopsis genre label copyright subscribe playlist].freeze
+    PODCAST_PAGE_PARTS = %w[podcast_title creator description artwork category podcast_link copyright subscribe playlist].freeze
+    # A track's or episode's own boxes come first; these are its release's or
+    # show's. [artist] is the track's (it can have its own `artist:`).
+    TRACK_RELEASE_PARTS = %w[release_date cover synopsis genre label copyright].freeze
+    EPISODE_PODCAST_PARTS = %w[creator artwork description category podcast_link copyright].freeze
+
     def parts_for_type
+      sections_for_parts.flat_map(&:last)
+    end
+
+    # [[title, parts]] — the type's parts, by section.
+    def sections_for_parts
       case @kind
       when "post"
         case @name
-        when "article"                then POST_PARTS + %w[body]
-        when "podcast"                then POST_PARTS + %w[player playlist body subscribe]
-        when "music"                  then POST_PARTS + %w[player playlist body]
-        else                               POST_PARTS + %w[player body] # audio, video, music, extra layouts
+        when "article" then [ [ nil, POST_PARTS + %w[body] ] ]
+        when "podcast"
+          [ [ "Episode", POST_PARTS + %w[player playlist body subscribe] ], [ "Podcast", EPISODE_PODCAST_PARTS ] ]
+        when "music"
+          [ [ "Track", (POST_PARTS + %w[player playlist body]).insert(POST_PARTS.index("author") + 1, "artist") ],
+            [ "Release", TRACK_RELEASE_PARTS ] ]
+        else [ [ nil, POST_PARTS + %w[player body] ] ] # audio, video, extra layouts
         end
       when "page"
         case @name
-        when "podcast-page" then %w[podcast_title subscribe title subtitle image excerpt tags body]
-        when "music-page"   then %w[release_title subscribe title subtitle image excerpt tags body]
-        else                     %w[title subtitle image excerpt tags body]
+        when "podcast-page" then [ [ "Podcast", PODCAST_PAGE_PARTS ], [ "Page", PAGE_PARTS ] ]
+        when "music-page"   then [ [ "Release", RELEASE_PAGE_PARTS ], [ "Page", PAGE_PARTS ] ]
+        else [ [ nil, PAGE_PARTS ] ]
         end
-      when "product"       then %w[image title price buy_button tags body]
-      when "documentation" then %w[title body]
+      when "product"       then [ [ nil, %w[image title price buy_button tags body] ] ]
+      when "documentation" then [ [ nil, %w[title body] ] ]
       end
+    end
+
+    # Parts by section, with the type's other fields at the end of its own
+    # section (the first one on a post, PAGE on a page).
+    def sections_for_type
+      sections = sections_for_parts.map { |title, parts| [ title, parts.dup ] }
+      own = @kind == "page" ? sections.last : sections.first
+      own[1].concat(fields_for_type)
+      sections
     end
 
     # The type's metadata fields, in the metadata editor's order, less the
@@ -179,6 +213,12 @@ class ContentLayout
       when "playlist"      then %(<div class="post-playlist">…playlist…</div>)
       when "podcast_title" then %(<h1 class="podcast-page-title">Show name</h1>)
       when "release_title" then %(<h1 class="release-page-title">Release name</h1>)
+      when "artist"        then %(<span class="#{k}-author #{k}-artist">Artist</span>)
+      when "creator"       then %(<span class="#{k}-author #{k}-creator">Host</span>)
+      when "release_date"  then %(<time class="#{k}-date #{k}-release-date">November 9, 2026</time>)
+      when "cover", "artwork" then %(<img class="#{k}-image #{k}-#{part}">)
+      when "synopsis", "description" then %(<p class="#{k}-excerpt #{k}-#{part}">#{part.capitalize}</p>)
+      when "podcast_link"  then %(<p class="#{k}-field #{k}-podcast-link"><a>example.com</a></p>)
       when "buy_button"    then %(<button class="snipcart-add-item">Add to cart</button>)
       when "price"         then %(<p class="product-price">$10.00</p>)
       when "excerpt"       then %(<p class="#{k}-excerpt">Excerpt</p>)
@@ -318,6 +358,17 @@ class ContentLayout
       when "subscribe"     then "Subscribe links: Podcast and RSS links"
       when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Left out when the `[body]` has its own playlist."
       when "podcast_title" then "The name of the podcast in this page's metadata (`podcast:`)."
+      when "artist"        then "The artist: the track's own `artist:`, else its release's, else the one in Music settings, else the site author. Styled like [author], with its own `artist` class."
+      when "creator"       then "The podcast's author, from Podcast settings. Styled like [author], with its own `creator` class."
+      when "release_date"  then "The release's date, from Music settings. Styled like [date]."
+      when "cover"         then "The release's cover art, from Music settings."
+      when "artwork"       then "The podcast's artwork, from Podcast settings."
+      when "synopsis"      then "The release's synopsis, from Music settings. Styled like [excerpt]."
+      when "description"   then "The podcast's description, from Podcast settings. Styled like [excerpt]."
+      when "genre", "label" then "The release's #{part}, from Music settings."
+      when "category"      then "The podcast's category, from Podcast settings."
+      when "podcast_link"  then "A link to the podcast's website, from Podcast settings."
+      when "copyright"     then "The copyright line of the release or podcast, from its settings."
       when "release_title" then "The name of the release in this page's metadata(`release:`)."
       when "buy_button"    then "The product's buy button. Left out when the `[body]` has its own `button` block."
       when "price"         then "The product's price. With `[price]` in the layout, the buy button leaves its own price off."

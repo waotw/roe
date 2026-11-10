@@ -50,6 +50,12 @@ class ContentScaffold
   private
 
   def blocks
+    # A page connected to a podcast or release is that show's or release's
+    # page: its layout draws the name, so no `# title` in the body as well.
+    # Nothing else from podcast.yml or music.yml is copied in either; the
+    # layout reads it live, so it can't go stale.
+    return DEFAULT if @type == "page" && (@metadata["podcast"].present? || @metadata["release"].present?)
+
     if @type == "post"
       post_type = @metadata["post_type"].presence || "article"
       config = Post::POST_TYPES[post_type.to_sym]

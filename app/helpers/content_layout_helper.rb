@@ -52,7 +52,9 @@ module ContentLayoutHelper
   # Partials are rendered by name only from the fixed list, so a layout file
   # can't reach any other template.
   def render_layout_part(name, record, kind, context)
-    if ContentLayout::BUILT_PARTS.include?(name)
+    if ContentLayout::SERIES_PARTS.include?(name)
+      render(partial: "content_layouts/parts/series", locals: { name: name, record: record, kind: kind, context: context })
+    elsif ContentLayout::BUILT_PARTS.include?(name)
       render(partial: "content_layouts/parts/#{name}", locals: { record: record, kind: kind, context: context })
     else
       render_layout_field(name, record, kind)
@@ -72,7 +74,8 @@ module ContentLayoutHelper
   end
 
   # What several parts need, worked out once per page: the record's podcast
-  # or release settings (pages, and a podcast episode's show).
+  # or release settings (pages, and a podcast episode's show), and for the
+  # release and podcast boxes the keys and settings of either.
   def layout_context(record, kind, layout, locals)
     podcast_key = record.respond_to?(:metadata) ? record.metadata["podcast"].to_s.presence : nil
     episode = kind == "post" && record.post_type == "podcast" && podcast_key
@@ -86,9 +89,21 @@ module ContentLayoutHelper
     release_key = kind == "page" ? record.metadata["release"].to_s.strip.presence : nil
     release_config = release_key && SiteFeature.music_enabled? ? ReleaseConfig.get(release_key) : nil
 
+    series_release = record.respond_to?(:metadata) && (kind == "page" || (kind == "post" && record.post_type == "music")) ?
+      record.metadata["release"].to_s.strip.presence : nil
+    series_podcast = record.respond_to?(:metadata) && (kind == "page" || (kind == "post" && record.post_type == "podcast")) ?
+      podcast_key : nil
+
     {
       podcast_config: podcast_config,
       release_config: release_config,
+      series: {
+        music: kind == "post" ? record.post_type == "music" : series_release.present?,
+        podcast: kind == "post" ? record.post_type == "podcast" : series_podcast.present?,
+        release_key: series_release,
+        release: (series_release && SiteFeature.music_enabled? ? ReleaseConfig.get(series_release) : nil).to_h,
+        podcast_settings: (series_podcast && podcast_enabled? ? PodcastConfig.get(series_podcast) : nil).to_h
+      },
       layout_parts: layout.parts
     }.merge(locals)
   end

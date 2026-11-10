@@ -174,6 +174,17 @@ class Admin::ContentLayoutsControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller=layout-explain][data-layout-explain-initial-value*=post-header]"
   end
 
+  test "the Boxes section groups a music-page's boxes under RELEASE and PAGE; a plain page has no headings" do
+    get "/admin/layouts/content/music-page/edit"
+    assert_equal %w[Release Page], css_select("[data-controller=layout-boxes] h3").map { |h| h.text.strip }
+    assert_select "button[data-box=cover]", "[cover]"
+    assert_select "button[data-box=release_date]", "[release date]"
+
+    get "/admin/layouts/content/page/edit"
+    assert_select "[data-controller=layout-boxes] h3", 0
+    assert_select "button[data-layout-boxes-target=button]", minimum: 1
+  end
+
   test "the Boxes section offers the type's parts and fields as buttons" do
     get "/admin/layouts/content/podcast/edit"
     boxes = css_select("button[data-layout-boxes-target=button]").map { |b| b["data-box"] }

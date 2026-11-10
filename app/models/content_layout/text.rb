@@ -20,7 +20,7 @@ class ContentLayout
     include ERB::Util
 
     MODES = %i[email feed podcast_feed].freeze
-    META_PARTS = %w[date author].freeze
+    META_PARTS = %w[date author artist creator].freeze
 
     def initialize(post, mode:, body_html:, layout: ContentLayout.for(post))
       raise ArgumentError, "unknown mode #{mode.inspect}" unless MODES.include?(mode)
@@ -56,6 +56,8 @@ class ContentLayout
       when "subtitle"   then @post.subtitle.present? ? %(<p class="post-subtitle">#{h(@post.subtitle)}</p>) : ""
       when "date"       then email? ? date_html : ""
       when "author"     then email? ? author_html : ""
+      when "artist"     then email? ? byline(artist_name) : ""
+      when "creator"    then email? ? byline(creator_name) : ""
       when "image"      then image_html
       when "player"     then player_html
       when "body"       then email? ? %(<div class="post-content">\n#{@body_html}\n</div>) : @body_html
@@ -81,6 +83,22 @@ class ContentLayout
       end
       author ? %(<span class="post-author">By #{h(author)}</span>) : ""
     end
+
+    # A music post's artist, as on its page: its own, its release's, the
+    # site's music artist, the site author.
+    def artist_name
+      return nil unless @post.post_type == "music"
+      @post.metadata["artist"].to_s.strip.presence ||
+        ReleaseConfig.artist_for(@post.metadata["release"].to_s.strip.presence).to_s.strip.presence
+    end
+
+    # A podcast episode's show author.
+    def creator_name
+      return nil unless @post.post_type == "podcast" && (key = @post.metadata["podcast"].to_s.strip.presence)
+      PodcastConfig.get(key)&.dig("author").to_s.strip.presence
+    end
+
+    def byline(name) = name ? %(<span class="post-author">By #{h(name)}</span>) : ""
 
     # The header image, when the post shows it on its page
     # (`image_in_header: true`), as one email- and feed-safe <img>.

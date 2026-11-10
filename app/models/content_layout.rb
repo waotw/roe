@@ -35,12 +35,19 @@ class ContentLayout
   SITE_DIR = File.join(RoeSitePaths::SITE_LAYOUT_PATH, "content")
   ROE_DIR  = Rails.root.join("lib/site_templates/layouts/content").to_s
 
+  # Values from the record's release (music.yml) or podcast (podcast.yml),
+  # for music and podcast posts and the pages connected to them. All drawn by
+  # content_layouts/parts/_series.
+  RELEASE_VALUES = %w[artist release_date cover synopsis genre label copyright].freeze
+  PODCAST_VALUES = %w[creator description artwork category podcast_link copyright].freeze
+  SERIES_PARTS = (RELEASE_VALUES + PODCAST_VALUES).uniq.freeze
+
   # Parts with their own renderer (content_layouts/parts/_<name>). Any other
   # name is shown as a metadata field when the record has a value for it.
-  BUILT_PARTS = %w[
+  BUILT_PARTS = (%w[
     title subtitle date author image feed_links player body subscribe
     playlist podcast_title release_title buy_button price excerpt tags
-  ].freeze
+  ] + SERIES_PARTS).freeze
 
   NAME_RE = /\A[a-z0-9][a-z0-9_-]*\z/
   CLASS_RE = /\A[A-Za-z_][A-Za-z0-9_-]*\z/

@@ -34,7 +34,7 @@ module ContentMetadataSchema
   # can't be sold without a price and a SKU, and won't appear in a product
   # collection without an image. Everything else waits for the editor.
   CREATE_FIELDS = {
-    "page"    => %w[subtitle].freeze,
+    "page"    => %w[subtitle podcast release].freeze,
     "product" => %w[category price sku image].freeze
   }.freeze
 
@@ -54,7 +54,9 @@ module ContentMetadataSchema
     # cart, so the new-product form doesn't ask for them.
     names -= Product::SNIPCART_FIELDS if resource_type.to_s == "product" && !SiteFeature.snipcart_enabled?
     names.filter_map do |name|
-      as_create_field(name, schema[name.to_s])
+      config = schema[name.to_s]
+      # A field for a feature the site hasn't turned on isn't asked for.
+      as_create_field(name, config) unless config && config[:available] == false
     end
   end
 
@@ -69,7 +71,7 @@ module ContentMetadataSchema
     base = case resource_type.to_s
     when "post"    then post_fields(metadata)
     when "product" then product_fields
-    else                pages_fields
+    else                pages_fields(metadata)
     end
 
     # Each list carries a placeholder entry so this merge replaces it in place.
@@ -305,7 +307,7 @@ module ContentMetadataSchema
   # moved, renamed and re-titled and still be found.
   PAGE_TYPES = %w[signin signup upgrade account donate unsubscribe store].freeze
 
-  def self.pages_fields
+  def self.pages_fields(metadata = {})
     {
       "title" => { type: :text, label: "title", required: true },
       "subtitle" => { type: :text, label: "subtitle" },
@@ -344,6 +346,28 @@ module ContentMetadataSchema
         options: [ "" ] + PAGE_TYPES,
         hint: "Only for pages Roe has to find — sign-in, the store. Survives renaming the page."
       }
+    }.merge(page_series_fields(metadata))
+  end
+
+  # A page connected to a podcast or a release is that show's or release's
+  # page: its layout is podcast-page or music-page, with their boxes. Only
+  # offered when the feature is on; a value already in a file still shows
+  # (available: false), so saving never clears it.
+  def self.page_series_fields(metadata)
+    podcast_on = SiteFeature.podcast_enabled? rescue false
+    music_on = SiteFeature.music_enabled? rescue false
+    podcast_keys = (PodcastConfig.podcast_keys rescue [])
+    current_podcast = metadata["podcast"].to_s.strip
+    podcast_keys += [ current_podcast ] if current_podcast.present? && !podcast_keys.include?(current_podcast)
+    {
+      "podcast" => {
+        type: :select, label: "podcast", options: [ "" ] + podcast_keys, available: podcast_on,
+        hint: "Makes this the podcast's page: its layout shows the show's name, artwork, subscribe links and episodes."
+      },
+      "release" => {
+        type: :select, label: "release", options: [ "" ] + release_options(metadata["release"]), available: music_on,
+        hint: "Makes this the release's page: its layout shows the release's name, cover, artist and tracks."
+      }
     }
   end
 
@@ -362,5 +386,5 @@ module ContentMetadataSchema
     keys + [ current ]
   end
 
-  private_class_method :post_fields, :product_fields, :pages_fields
+  private_class_method :post_fields, :product_fields, :pages_fields, :page_series_fields
 end

@@ -110,6 +110,24 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
     assert_not_includes choices("audio"), "playlist"
   end
 
+  def sections(name) = ContentLayout::Explain.new(name, "").box_sections.map { |s| [ s[:title], s[:choices].map { |c| c[:name] } ] }
+
+  test "music and podcast types offer their boxes in sections; plain types in one untitled row" do
+    music_page = sections("music-page")
+    assert_equal %w[Release Page], music_page.map(&:first)
+    assert_includes music_page.first.last, "cover"
+    assert_includes music_page.first.last, "playlist"
+    assert_includes music_page.last.last, "title"
+
+    assert_equal %w[Podcast Page], sections("podcast-page").map(&:first)
+    assert_equal %w[Track Release], sections("music").map(&:first)
+    assert_includes sections("music").first.last, "artist"
+    assert_equal %w[Episode Podcast], sections("podcast").map(&:first)
+
+    assert_equal [ nil ], sections("page").map(&:first)
+    assert_equal [ nil ], sections("article").map(&:first)
+  end
+
   test "fields are the type's metadata worth showing, not settings, and never twice" do
     podcast = choices("podcast")
     assert_includes podcast, "episode_number"

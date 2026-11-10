@@ -225,6 +225,81 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select ".release-subscribe", 0
   end
 
+  # ── release and podcast boxes ──
+
+  test "a music-page shows its release's cover, title, artist, date and tracks" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    ReleaseConfig.stubs(:get).returns({ "title" => "Summer EP", "artist" => "The Band", "release_date" => "2026-11-09",
+                                        "cover" => "/media/images/ep.jpg" })
+    ReleaseConfig.stubs(:feed_enabled?).returns(false)
+    a_post("music", audio: "/media/audio/a.mp3", release: "summer-ep", track_number: 1)
+    a_post("music", audio: "/media/audio/b.mp3", release: "summer-ep", track_number: 2)
+    page = create(:page, metadata: { "title" => "EP", "url_name" => "ep-page", "status" => "published", "release" => "summer-ep" }, content: "Notes.")
+
+    get "/#{page.url_name}"
+    assert_select "img.page-image.page-cover"
+    assert_select "h1.release-page-title", "Summer EP"
+    assert_select "span.page-author.page-artist", "The Band"
+    assert_select "time.page-date.page-release-date[datetime='2026-11-09']", "November 09, 2026"
+    assert_select ".post-playlist .player-track", 2
+  end
+
+  test "[artist] is the track's own, then the release's, then the site's music artist" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    ReleaseConfig.stubs(:get).returns({ "title" => "EP", "artist" => "Release Band" })
+    own = a_post("music", audio: "/media/audio/a.mp3", release: "ep", artist: "Guest Singer")
+    get post_path(own.url_name)
+    assert_select ".post-meta span.post-author.post-artist", /Guest Singer/
+
+    from_release = a_post("music", audio: "/media/audio/b.mp3", release: "ep")
+    get post_path(from_release.url_name)
+    assert_select "span.post-artist", /Release Band/
+
+    ReleaseConfig.stubs(:get).returns({ "title" => "EP" })
+    ReleaseConfig.stubs(:global_artist).returns("Site Artist")
+    get post_path(from_release.url_name)
+    assert_select "span.post-artist", /Site Artist/
+  end
+
+  test "[author] still shows the post's own author on a music layout" do
+    site_layout("music", "post-meta: [date] [author] [artist]\n[body]\n")
+    ReleaseConfig.stubs(:get).returns({ "artist" => "The Band" })
+    post = a_post("music", audio: "/media/audio/a.mp3", release: "ep", author: "Ben")
+    get post_path(post.url_name)
+    assert_select "span.post-author:not(.post-artist)", /Ben/
+    assert_select "span.post-artist", /The Band/
+  end
+
+  test "a podcast-page shows its show's artwork, creator, description and link" do
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    PodcastConfig.stubs(:get).returns({ "title" => "The Show", "author" => "Ben", "artwork" => "show.jpg",
+                                        "description" => "A show.", "link" => "https://example.com/" })
+    site_layout("podcast-page", "[artwork]\n[podcast title]\n[creator]\n[description]\n[podcast link]\n[body]\n")
+    page = create(:page, metadata: { "title" => "Show", "url_name" => "show-page", "status" => "published", "podcast" => "show" }, content: "x")
+
+    get "/#{page.url_name}"
+    assert_select "img.page-image.page-artwork[src*='/system/images/show.jpg']"
+    assert_select "span.page-author.page-creator", "Ben"
+    assert_select "p.page-excerpt.page-description", "A show."
+    assert_select "p.page-podcast-link a[href='https://example.com/']", "example.com"
+  end
+
+  test "release and podcast boxes draw nothing on a page connected to neither" do
+    site_layout("page", "[cover]\n[artist]\n[creator]\n[release date]\n[genre]\n[body]\n")
+    page = create(:page, metadata: { "title" => "About", "url_name" => "about-plain", "status" => "published" }, content: "Hello.")
+    get "/#{page.url_name}"
+    assert_select ".page-cover, .page-artist, .page-creator, .page-release-date, .page-genre", 0
+  end
+
+  test "a podcast link that isn't a web address isn't linked" do
+    SiteFeature.stubs(:podcast_enabled?).returns(true)
+    PodcastConfig.stubs(:get).returns({ "title" => "The Show", "link" => "javascript:alert(1)" })
+    site_layout("podcast-page", "[podcast link]\n[body]\n")
+    page = create(:page, metadata: { "title" => "Show", "url_name" => "show-js", "status" => "published", "podcast" => "show" }, content: "x")
+    get "/#{page.url_name}"
+    assert_select ".page-podcast-link", 0
+  end
+
   test "a product shows its title, image and button from the layout" do
     product = a_product
     get product_path(product.url_name)

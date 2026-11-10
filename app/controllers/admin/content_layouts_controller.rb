@@ -28,7 +28,7 @@ class Admin::ContentLayoutsController < Admin::BaseController
     @sidebar_position = sidebar_position_for(@name)
     explain = ContentLayout::Explain.new(@name, @content)
     @explain = explain.as_json
-    @box_choices = explain.box_choices
+    @box_sections = explain.box_sections
   end
 
   # The editor's live help: the HTML example and what each line means, for
