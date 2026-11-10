@@ -27,8 +27,14 @@ class ContentLayout
 
     # The post's own player card; one playing another file doesn't count
     # (Post#own_player_card_in_body?, the rule the old templates used).
+    # A post's own player is a card playing its audio or video. A page has
+    # none of its own, so any player card in its body is its player.
     def player?
-      @record.respond_to?(:own_player_card_in_body?) && @record.own_player_card_in_body?
+      if @record.respond_to?(:own_player_card_in_body?)
+        @record.own_player_card_in_body?
+      else
+        blocks("card").any? { |config| config.match?(/^\s*type:\s*["']?player\b/) }
+      end
     end
 
     # A playlist collection, or a player card showing its own.

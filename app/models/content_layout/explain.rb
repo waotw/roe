@@ -78,8 +78,8 @@ class ContentLayout
     end
 
     PAGE_PARTS = %w[title subtitle image excerpt tags body].freeze
-    RELEASE_PAGE_PARTS = %w[release_title artist release_date cover synopsis genre label copyright subscribe playlist].freeze
-    PODCAST_PAGE_PARTS = %w[podcast_title creator description artwork category podcast_link copyright subscribe playlist].freeze
+    RELEASE_PAGE_PARTS = %w[release_title artist release_date cover synopsis genre label copyright subscribe player playlist].freeze
+    PODCAST_PAGE_PARTS = %w[podcast_title creator description artwork category podcast_link copyright subscribe player playlist].freeze
     # A track's or episode's own boxes come first; these are its release's or
     # show's. [artist] is the track's (it can have its own `artist:`).
     TRACK_RELEASE_PARTS = %w[release_date cover synopsis genre label copyright].freeze
@@ -353,7 +353,12 @@ class ContentLayout
           "The #{n}'s image, from `image:`."
         end
       when "feed_links"    then "RSS links: the show's feed for an episode, the release's for a track, the site's for an article."
-      when "player"        then "The player for the post's `audio:` or `video:`. Left out when the [body] already has a player card."
+      when "player"
+        if @kind == "page"
+          "The player for the release's tracks or the podcast's episodes, starting on the first. Without it, [playlist] comes with its own."
+        else
+          "The player for the post's `audio:` or `video:`. Left out when the [body] already has a player card."
+        end
       when "body"          then "The #{n}'s content: everything below its frontmatter. A layout has one [body]."
       when "subscribe"     then "Subscribe links: Podcast and RSS links"
       when "playlist"      then "The podcast's episodes or the release's tracks. Episodic shows run newest first, serial shows oldest first, releases in track order. Left out when the `[body]` has its own playlist."

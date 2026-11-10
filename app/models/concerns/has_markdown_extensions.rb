@@ -289,6 +289,16 @@ module HasMarkdownExtensions
   # same card, drawn with no options, so it plays the post's own audio or
   # video, titled and with artwork from the post: what an author gets by
   # adding the card themselves, which is where players are heading.
+  # A music or podcast page's player (`release:` / `podcast:`): the card with
+  # nothing of its own to play, which loads the first track of the playlist
+  # on the page. with_playlist puts the playlist inside it. Empty when the
+  # theme can't draw the player; each track then plays by itself.
+  def series_player_card_html(with_playlist:)
+    config = { type: "player" }
+    config[:show_playlist] = "true" if with_playlist
+    render_player_card(config).html_safe
+  end
+
   def template_player_card_html
     # A podcast with video and audio shows the video, as its page always has.
     config = { type: "player" }
@@ -2110,7 +2120,9 @@ module HasMarkdownExtensions
   # `show_playlist: true`, else ⏮ ⏭ to the episodes or tracks either side.
   # The playlist does what ⏮ ⏭ do, so it's one or the other.
   def player_extras_html(config)
-    if config[:show_playlist].to_s.strip.downcase == "true" && playing_own_media?(config)
+    # A page has no media of its own: its card plays its release's or show's
+    # playlist, so the playlist is always its own.
+    if config[:show_playlist].to_s.strip.downcase == "true" && (playing_own_media?(config) || !is_a?(Post))
       playlist = series_playlist_html(order: config[:order])
       return playlist if playlist.present?
     end

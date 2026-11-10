@@ -241,6 +241,38 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "h1.release-page-title", "Summer EP"
     assert_select "span.page-author.page-artist", "The Band"
     assert_select "time.page-date.page-release-date[datetime='2026-11-09']", "November 09, 2026"
+    # No [player] in the default, so the playlist comes inside one: its tracks
+    # play in the player, not in the browser's own controls.
+    assert_select ".card-player[data-player=audio] .player-playlist .player-track", 2
+    assert_select ".post-playlist", 0
+  end
+
+  test "a music-page with [player] and [playlist] has one player, playing the list below it" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    ReleaseConfig.stubs(:get).returns({ "title" => "Summer EP" })
+    ReleaseConfig.stubs(:feed_enabled?).returns(false)
+    site_layout("music-page", "[player]\n[playlist]\n[body]\n")
+    a_post("music", audio: "/media/audio/a.mp3", release: "summer-ep", track_number: 1)
+    a_post("music", audio: "/media/audio/b.mp3", release: "summer-ep", track_number: 2)
+    page = create(:page, metadata: { "title" => "EP", "url_name" => "ep-two", "status" => "published", "release" => "summer-ep" }, content: "Notes.")
+
+    get "/#{page.url_name}"
+    assert_select ".card-player[data-player=audio]", 1
+    assert_select ".card-player .player-playlist", 0
+    assert_select ".post-playlist .player-track", 2
+  end
+
+  test "a page with a player card in its body doesn't get a second one from [playlist]" do
+    SiteFeature.stubs(:music_enabled?).returns(true)
+    ReleaseConfig.stubs(:get).returns({ "title" => "Summer EP" })
+    ReleaseConfig.stubs(:feed_enabled?).returns(false)
+    a_post("music", audio: "/media/audio/a.mp3", release: "summer-ep", track_number: 1)
+    a_post("music", audio: "/media/audio/b.mp3", release: "summer-ep", track_number: 2)
+    page = create(:page, metadata: { "title" => "EP", "url_name" => "ep-three", "status" => "published", "release" => "summer-ep" },
+                         content: "#{CARD}\n\nNotes.")
+
+    get "/#{page.url_name}"
+    assert_select ".card-player[data-player=audio]", 1
     assert_select ".post-playlist .player-track", 2
   end
 

@@ -2,8 +2,19 @@
     belongs to or this page is connected to (`podcast:` / `release:`), as a
     collapsible playlist the page's player plays through. Episodic shows run
     newest first, serial shows oldest first, releases in track order. Only
-    for two or more. Skipped when the body has a playlist of its own. %>
+    for two or more. Skipped when the body has a playlist of its own.
+
+    A page has no player of its own, so when nothing else on it would play
+    the list (no [player] in the layout, no player card in the body), the
+    list comes inside a player. Otherwise each track would show the
+    browser's own controls. %>
 <% connected = kind == "post" ? record.post_type.in?(%w[podcast music]) : kind == "page" %>
 <% if connected && (playlist = record.series_playlist_html).present? %>
-  <div class="post-playlist"><%= playlist.html_safe %></div>
+  <% unplayed = kind == "page" && !context[:layout_parts].include?("player") && !ContentLayout::BodyCheck.new(record).has?("player") %>
+  <% card = unplayed ? record.series_player_card_html(with_playlist: true) : "" %>
+  <% if card.present? %>
+    <div class="post-player"><%= card %></div>
+  <% else %>
+    <div class="post-playlist"><%= playlist.html_safe %></div>
+  <% end %>
 <% end %>
