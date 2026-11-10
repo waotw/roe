@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 1.5.5
-   Fingerprint: 71334d94
+   Version: 1.5.6
+   Fingerprint: cc31b6cd
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -1039,6 +1039,14 @@ a.footnote-backlink-number:hover {
 
 /* ============ POST/PAGE SINGLE ============ */
 
+/* A layout's [image], [cover] and [artwork] sit outside .content, so its
+   image rule doesn't reach them. */
+.post-image,
+.page-image {
+  max-width: 100%;
+  height: auto;
+}
+
 .post-header {
   margin-bottom: var(--space-2);
 }
@@ -1457,7 +1465,7 @@ p.collection-more a {
   margin: 0 0 0 0;
 }
 
-ol.player-tracks {
+.content .player-tracks {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1468,8 +1476,10 @@ ol.player-tracks {
   padding: 0.15rem 0;
   cursor: pointer;
 }
+/* A fixed width, so titles line up whether a row shows S1E10, a
+   track number, or nothing (an episode with no number yet). */
 .player-track-number {
-  min-width: 1ch;
+  flex: 0 0 6ch;
   text-align: right;
   opacity: 0.5;
 }
@@ -1484,11 +1494,6 @@ ol.player-tracks {
 .player-track.is-playing .player-track-title,
 .player-track.is-current .player-track-title {
   font-weight: 700;
-}
-.player-track.is-playing .player-track-title::before,
-.player-track.is-current .player-track-title::before {
-  content: "\25B8 ";
-  margin-right: 0.4rem;
 }
 .player-track-link {
   color: inherit;
@@ -2425,8 +2430,8 @@ article .content,
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
   font-size: var(--text-sm, 0.875rem);
   border: 1px solid var(--color-border);
-  margin-top: var(--space-4);
-  margin-bottom: var(--space-4);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
   padding: var(--space-3) var(--space-4) var(--space-1) var(--space-4);
   --player-progress: 0;
 }
@@ -2853,7 +2858,7 @@ article.post-podcast {
 /* Subscribe / feed */
 
 .podcast-subscribe {
-  margin-top: var(--space-6);
+  margin-top: var(--space-4);
   font-size: 0.85rem;
 }
 
