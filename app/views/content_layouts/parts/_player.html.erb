@@ -6,7 +6,7 @@
 <% if kind == "post" && (player_kind = record.template_player_kind) && Post.template_players_enabled?(player_kind) %>
   <%# Inline spacing so it holds on every theme: the card itself only has
       space above it, since in a body the paragraphs around it bring theirs. %>
-  <div class="post-player" style="margin-bottom: var(--space-6, 1.5rem);">
+  <div class="post-player">
     <%= record.template_player_card_html %>
   </div>
 <% end %>

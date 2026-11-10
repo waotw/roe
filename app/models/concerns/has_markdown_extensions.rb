@@ -2228,13 +2228,13 @@ module HasMarkdownExtensions
     link = lambda do |item, rel, label|
       return "" unless item
       %(<a class="player-series-#{rel}" rel="#{rel}" href="#{ERB::Util.html_escape(item_path(item))}">) +
-        %(<span class="player-series-label">#{label}</span> ) +
+        %(<span class="player-series-label">#{label}</span><br> ) +
         %(<span class="player-series-title">#{ERB::Util.html_escape(item.title)}</span></a>)
     end
 
     %(<nav class="player-series" aria-label="#{noun.capitalize}s">) +
-      link.call(previous, "prev", "⏮ Previous #{noun}") +
-      link.call(following, "next", "Next #{noun} ⏭") +
+      link.call(previous, "prev", "⏮ Prev") +
+      link.call(following, "next", "Next ⏭") +
       "</nav>"
   end
 
