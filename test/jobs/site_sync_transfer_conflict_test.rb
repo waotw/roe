@@ -155,4 +155,29 @@ class SiteSyncTransferConflictTest < ActiveSupport::TestCase
     assert_equal %w[del.md mod.md], backed_up.sort, "only overwritten + deleted peer files"
     refute_includes backed_up, "added.md"
   end
+
+  # The peer records a file as agreed only when our copy has its size and
+  # mtime. Realigning a byte-identical file's mtime after the peer had
+  # refreshed its ledger left that file out of live's baseline, and live
+  # then reported it as "added": a pull for a file both sides held.
+  test "phantom mtimes are realigned before the peer refreshes its ledger" do
+    base = { "a.md" => e(1, 100) }
+    SiteSync::Ledger.stubs(:recorded).returns("files" => base)
+    SiteSync::Ledger.stubs(:current).returns(base)
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => base)
+    SiteSync::Ledger.stubs(:write_confirmed!)
+    SiteSync::Exchange.stubs(:can_call_peer?).returns(true)
+    SiteSync::Exchange.stubs(:call_peer)
+    SiteSync::DatabaseBackup.stubs(:pull!)
+    SiteSync.stubs(:transport).returns(stub_everything("transport"))
+    SiteSyncTransferJob.any_instance.stubs(:tidy_live?).returns(false)
+
+    order = sequence("bookkeeping")
+    SiteSyncTransferJob.any_instance.expects(:realign_phantom_mtimes!).in_sequence(order)
+    SiteSync::Exchange.expects(:refresh_peer_ledger!).in_sequence(order)
+
+    SiteSyncTransferJob.perform_now(:sync)
+
+    assert_equal :completed, status[:state]
+  end
 end

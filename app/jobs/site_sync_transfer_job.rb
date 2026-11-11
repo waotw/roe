@@ -102,6 +102,26 @@ class SiteSyncTransferJob < ApplicationJob
       ContentSync.sync_all if @pulled
     end
 
+    # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
+    # config file re-serialized by ContentSync) can leave a file byte-identical
+    # but with a fresher mtime — which the size+mtime drift check reads as a
+    # phantom "ledgers diverged" even though the content matches. Stamp the
+    # local mtime to the peer's for any such byte-identical file so the two
+    # fingerprints end genuinely equal and the sync finishes green. Only the
+    # side that can reach the peer runs this (production never initiates).
+    #
+    # This has to run before the peer refreshes its ledger below. The peer
+    # records a file as agreed only when our copy has the same size and
+    # mtime as its own; a byte-identical file with a different mtime is left
+    # out. When the realignment ran after, it fixed the mtime and our
+    # baseline, but the peer's baseline still lacked the file, so live
+    # reported it as "added" and the page asked to pull a file both sides
+    # already held.
+    if SiteSync::Exchange.can_call_peer?
+      update_step(:realigning_mtimes)
+      realign_phantom_mtimes!
+    end
+
     # Tell the peer to refresh its ledger too — for both push and
     # pull. The motivations differ slightly:
     #   - Push: peer's /site changed (we wrote to it). Without a
@@ -114,18 +134,6 @@ class SiteSyncTransferJob < ApplicationJob
     #     sides agree they're in sync now.
     update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
-
-    # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
-    # config file re-serialized by ContentSync) can leave a file byte-identical
-    # but with a fresher mtime — which the size+mtime drift check reads as a
-    # phantom "ledgers diverged" even though the content matches. Stamp the
-    # local mtime to the peer's for any such byte-identical file so the two
-    # fingerprints end genuinely equal and the sync finishes green. Only the
-    # side that can reach the peer runs this (production never initiates).
-    if SiteSync::Exchange.can_call_peer?
-      update_step(:realigning_mtimes)
-      realign_phantom_mtimes!
-    end
 
     # Phase ②: pull a fresh encrypted copy of the live database so the
     # local /site always carries a current, restorable DB blob. Distinct
