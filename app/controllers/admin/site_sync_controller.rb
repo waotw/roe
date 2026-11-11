@@ -430,8 +430,8 @@ class Admin::SiteSyncController < Admin::BaseController
     end
 
     seed_running_status(:resolve)
-    SiteSyncConflictResolutionJob.perform_later(resolutions, conflicts)
-    flash[:notice] = "Applying #{resolutions.size} resolution(s) in the background. Refresh to check progress."
+    SiteSyncConflictResolutionJob.perform_later(resolutions, conflicts, then_sync: true)
+    flash[:notice] = "Applying #{resolutions.size} resolution(s), then syncing everything else."
     redirect_to admin_site_sync_path
   end
 

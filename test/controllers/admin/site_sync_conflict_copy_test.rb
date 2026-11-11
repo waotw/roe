@@ -78,7 +78,23 @@ class Admin::SiteSyncConflictCopyTest < ActionDispatch::IntegrationTest
     assert_no_match "RESOLVE ALL BY MOST-RECENT", response.body
 
     paused_with([ edit("posts/b.md") ])
-    assert_match "RESOLVE ALL BY MOST-RECENT", response.body
+    assert_match "RESOLVE ALL BY MOST-RECENT &amp; SYNC", response.body
+  end
+
+  test "both conflict buttons say they go on to sync" do
+    paused_with([ edit("posts/b.md") ])
+    assert_match "APPLY CHOICES &amp; SYNC", response.body
+    assert_match "RESOLVE ALL BY MOST-RECENT &amp; SYNC", response.body
+  end
+
+  test "applying choices queues the resolution with the sync to follow" do
+    paused_with([ edit("posts/b.md") ])
+    SiteSyncConflictResolutionJob.expects(:perform_later)
+      .with({ "posts/b.md" => "local" }, anything, then_sync: true).once
+
+    post admin_resolve_site_sync_conflicts_path, params: { resolutions: { "posts/b.md" => "local" } }
+
+    assert_redirected_to admin_site_sync_path
   end
 
   test "an edit-only pause keeps its original wording" do

@@ -10,7 +10,23 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   # resolutions: { "path" => "local" | "live" }
   # conflicts:   the serialized conflicts from the blocked status (each has
   #              "path" and "type"), so we know the right action per path.
-  def perform(resolutions, conflicts)
+  # then_sync:   run the normal two-way sync straight after, so everything
+  #              else the conflicts held back goes across in the same run.
+  #              Without it, the page showed the rest still waiting and the
+  #              sync looked as if it had done nothing.
+  #
+  # The sync runs outside resolve!'s rescue: it writes its own status (new
+  # conflicts, a failure and what it re-assessed), and resolve! catching its
+  # error would overwrite that with a plain "resolution failed". New
+  # conflicts stop there and are shown as usual; nothing here runs again.
+  def perform(resolutions, conflicts, then_sync: false)
+    resolve!(resolutions, conflicts, then_sync: then_sync)
+    SiteSyncTransferJob.perform_now(:sync) if then_sync
+  end
+
+  private
+
+  def resolve!(resolutions, conflicts, then_sync:)
     @started_at = started_at = Time.current
     resolutions = resolutions.to_h
     plan = build_plan(resolutions, conflicts)
@@ -78,6 +94,11 @@ class SiteSyncConflictResolutionJob < ApplicationJob
       at:       started_at
     )
 
+    # With a sync to follow, the status stays "running" so the page keeps
+    # polling instead of reloading onto a finished resolve, and the sync
+    # tells the peer when it's done.
+    return if then_sync
+
     write_status(state: :completed, kind: :resolve, started_at: started_at, completed_at: Time.current)
     SiteSync::Exchange.call_peer if SiteSync::Exchange.can_call_peer?
   rescue => e
@@ -85,8 +106,6 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     write_status(state: :failed, kind: :resolve, error: e.message, completed_at: Time.current)
     raise
   end
-
-  private
 
   # The baseline means "the state both sides are known to hold". Only paths
   # this run actually transferred or deleted qualify; everything else keeps

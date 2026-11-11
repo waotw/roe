@@ -83,6 +83,8 @@ The first push may take several minutes depending on how much media you have. Su
 
 You might have edited the same post or page on the live site and the local site. If this happens, you will be asked to confirm which file should be kept. By default, Roe will prioritize the file that was modified more recently.
 
+Click `APPLY CHOICES & SYNC` (or `RESOLVE ALL BY MOST-RECENT & SYNC`) and Roe applies your choices, then syncs everything else in the same run. If that sync finds new conflicts, it stops and asks again. `CANCEL` changes nothing.
+
 ### Sync Status
 
 The Site Sync page shows:
