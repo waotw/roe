@@ -1963,22 +1963,30 @@ module HasMarkdownExtensions
     folded = collection_truthy?(config[:fold],
       default: is_a?(Post) && respond_to?(:post_type) && post_type.in?(%w[music podcast]))
     noun = tracks.all? { |t| t.respond_to?(:post_type) && t.post_type == "podcast" } ? "Episodes" : "Tracks"
-    release = playlist_release_title(tracks)
+    series = playlist_series_title(tracks)
     # Plain text around the name, so a theme that doesn't know the class
-    # still reads "Tracks [2] - Soft Sphinx Energy".
-    named = release ? %( - <span class="player-playlist-release">#{ERB::Util.html_escape(release)}</span>) : ""
+    # still reads "Tracks [2] - Soft Sphinx Energy". The class says what it
+    # names: player-playlist-release or player-playlist-podcast.
+    named = series ? %( - <span class="player-playlist-#{series[:kind]}">#{ERB::Util.html_escape(series[:title])}</span>) : ""
     %(<details class="player-playlist"#{folded ? "" : " open"}><summary>#{noun} <span class="player-playlist-count">#{tracks.size}</span>#{named}</summary>\n#{list}</details>)
   end
 
-  # The release's title when every track is from the same one, else nil: a
-  # list mixing releases (or with podcast episodes in it) has no one name.
-  def playlist_release_title(tracks)
+  # The release's or podcast's title when every track comes from the same
+  # one, as { kind:, title: }, else nil: a list that mixes releases, podcasts,
+  # or the two has no one name.
+  def playlist_series_title(tracks)
     keys = tracks.map do |t|
-      next unless t.respond_to?(:post_type) && t.post_type == "music" && t.respond_to?(:metadata)
-      t.metadata["release"].to_s.strip.presence
+      next unless t.respond_to?(:post_type) && t.respond_to?(:metadata)
+      field = { "music" => "release", "podcast" => "podcast" }[t.post_type]
+      key = field && t.metadata[field].to_s.strip.presence
+      key && [ field, key ]
     end
     return nil if keys.empty? || keys.include?(nil) || keys.uniq.size != 1
-    ReleaseConfig.get(keys.first).to_h["title"].to_s.strip.presence
+
+    kind, key = keys.first
+    config = kind == "release" ? ReleaseConfig.get(key) : PodcastConfig.get(key)
+    title = config.to_h["title"].to_s.strip.presence
+    title && { kind: kind, title: title }
   end
 
   # The release/podcast cover for the player — the artwork fallback when a track

@@ -497,6 +497,17 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "summary .player-playlist-release", 0, "tracks from two releases have no one name"
   end
 
+  test "a playlist from one podcast is named after it" do
+    PodcastConfig.stubs(:get).returns({ "title" => "The Briefcase" })
+    a_post("podcast", audio: "/media/audio/a.mp3", podcast: "brief", episode_number: 1)
+    a_post("podcast", audio: "/media/audio/b.mp3", podcast: "brief", episode_number: 2)
+    list = "```collection\nsource: posts\npost_type: podcast\ntemplate: playlist\n```\n"
+    page = create(:page, metadata: { "title" => "Eps", "url_name" => "eps", "status" => "published" }, content: list)
+    get "/#{page.url_name}"
+    assert_select "details.player-playlist summary", text: /\AEpisodes\s*2 - The Briefcase\z/
+    assert_select "summary .player-playlist-podcast", "The Briefcase"
+  end
+
   test "fold: true folds a playlist collection on a page" do
     a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
     a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
