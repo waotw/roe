@@ -3,12 +3,12 @@
     saved before the change was made. %>
 <% labels = { "to_live" => "Local → Live", "to_local" => "Live → Local" } %>
 <% actions = { "added" => "added", "changed" => "changed", "deleted" => "deleted" } %>
-<% rows = event[:changes].map do |c|
-     available = c[:before_sha].nil? || SiteSync::Versions.object?(c[:before_sha])
-     done = available && SiteSync::VersionRestore.matches?(c[:path], c[:before_sha], size: c[:before_size])
-     c.merge(available: available, done: done)
-   end %>
-<% outstanding = rows.count { |c| c[:available] && !c[:done] } %>
+<%# Only a file's latest change can be undone (SiteSync::VersionRestore.row_states):
+    once it's restored, the restore's own entry is where to undo it. %>
+<% notes = { restored: "restored since", changed: "changed again since", in_place: "earlier version in place", no_copy: "no saved copy" } %>
+<% rows = event[:changes].map { |c| c.merge(state: row_states[c[:id]]) } %>
+<% outstanding = rows.count { |c| c[:state] == :undo } %>
+<% restore_event = event[:kind] == "restore" %>
 <div class="bg-white border border-gray-300 rounded-xs overflow-hidden">
   <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-baseline justify-between gap-2">
     <div>
@@ -20,8 +20,13 @@
     </div>
     <div class="flex items-center gap-3">
       <span class="text-xs text-gray-500"><%= rows.size %> file<%= "s" if rows.size != 1 %></span>
-      <%= link_to "RESTORE SITE TO THIS SYNC", admin_site_sync_history_point_path(event[:id]),
-            class: "inline-flex items-center px-2 py-1 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-900 font-mono text-xs rounded-xs" %>
+      <% if point_restorable %>
+        <%= link_to "RESTORE SITE TO THIS SYNC", admin_site_sync_history_point_path(event[:id]),
+              class: "inline-flex items-center px-2 py-1 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-900 font-mono text-xs rounded-xs" %>
+      <% else %>
+        <span class="inline-flex items-center px-2 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
+              title="The site already matches how it was after this <%= event[:kind] %>.">RESTORE SITE TO THIS SYNC</span>
+      <% end %>
     </div>
   </div>
 
@@ -29,21 +34,17 @@
     <ul class="divide-y divide-gray-100">
       <% rows.each do |c| %>
         <li class="px-4 py-1.5 flex items-center gap-3 text-xs">
-          <% if c[:available] && !c[:done] %>
+          <% if c[:state] == :undo %>
             <input type="checkbox" name="change_ids[]" value="<%= c[:id] %>" class="shrink-0"
                    data-check-all-target="checkbox" data-action="change->check-all#update">
           <% else %>
             <span class="w-[13px] shrink-0"></span>
           <% end %>
-          <span class="w-24 shrink-0 text-gray-500"><%= event[:kind] == "restore" ? "Restored" : labels[c[:direction]] %></span>
+          <span class="w-24 shrink-0 text-gray-500"><%= restore_event ? "Restored" : labels[c[:direction]] %></span>
           <span class="w-16 shrink-0 text-gray-700"><%= actions[c[:action]] %></span>
           <span class="truncate text-gray-900" title="<%= c[:path] %>"><%= c[:path] %></span>
           <span class="ml-auto shrink-0 text-gray-500">
-            <% if c[:done] %>
-              earlier version in place
-            <% elsif !c[:available] %>
-              no saved copy
-            <% end %>
+            <%= notes[c[:state]] %>
           </span>
         </li>
       <% end %>
@@ -62,10 +63,10 @@
         <button type="submit"
                 class="inline-flex items-center px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 font-mono text-xs rounded-xs cursor-pointer"
                 data-confirm="Put the selected files back to the version before this change? What's there now is saved first, so you can undo this too.">
-          RESTORE SELECTED
+          <%= restore_event ? "UNDO SELECTED" : "RESTORE SELECTED" %>
         </button>
         <p class="text-xs text-gray-600 font-sans">
-          Puts each file back the way it was before this sync, on this computer. Select all to undo the whole sync. Sync to send it to live.
+          Restores files to the state before the sync. Select and restore all to undo the whole sync.
         </p>
       <% end %>
     </div>

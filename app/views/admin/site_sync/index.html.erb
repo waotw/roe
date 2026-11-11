@@ -648,9 +648,9 @@
         <h2 class="text-lg font-semibold text-gray-900">Public/Local Site Sync</h2>
         <%# Only once there's something to read — a link to an empty page is
             just a dead end on a screen that already has plenty on it. %>
-        <% if SiteSync::History.exist? %>
-          <%= link_to "View sync history →", admin_site_sync_history_path,
-                class: "text-xs text-blue-600 hover:text-blue-900 font-sans" %>
+        <% if SiteSync::History.exist? || File.exist?(SiteSync::Versions.db_path) %>
+          <%= link_to "SYNC HISTORY", admin_site_sync_history_path,
+                class: "mt-2 uppercase inline-flex items-center px-3 py-1.5 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs whitespace-nowrap" %>
         <% end %>
       </div>
       <%# Synchronous exchange ping — handy for testing without

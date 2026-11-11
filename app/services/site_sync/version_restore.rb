@@ -26,7 +26,13 @@ module SiteSync
       rows = Versions.changes_by_id(ids)
       raise Error, "Those changes are no longer in the history." if rows.empty?
 
-      new(rows.to_h { |c| [ c[:path], c[:before_sha] ] }).call
+      # The same rule the page shows: only a file's latest change can be
+      # undone. An older one has been restored or changed again since.
+      states = row_states([ { changes: rows } ])
+      undoable = rows.select { |c| states[c[:id]] == :undo }
+      raise Error, "Those files have changed since. Undo the latest change to each one instead." if undoable.empty?
+
+      new(undoable.to_h { |c| [ c[:path], c[:before_sha] ] }).call
     end
 
     # The whole site as it was just after `event_id`: only paths that differ
@@ -37,19 +43,59 @@ module SiteSync
 
     # What restoring to `event_id` would change, as { path => sha or nil }.
     # Paths already matching are left out, so this is also the preview.
-    def self.plan_for_point(event_id)
-      Versions.state_after(event_id.to_i).reject { |rel, sha| matches?(rel, sha) }
+    # `hashes` is shared between calls on one page, so each file on disk is
+    # read at most once however many restore points are checked.
+    def self.plan_for_point(event_id, hashes: {})
+      Versions.state_after(event_id.to_i).reject { |rel, sha| matches?(rel, sha, hashes: hashes) }
+    end
+
+    # Whether restoring to `event_id` would write anything: something differs
+    # and there's a saved copy (or nothing) to put in its place.
+    def self.point_restorable?(event_id, hashes: {})
+      plan_for_point(event_id, hashes: hashes).any? { |_, sha| sha.nil? || Versions.object?(sha) }
     end
 
     # Whether the file on disk is already that version (nil = absent). With
     # the version's size, a file of another size is settled without reading it.
-    def self.matches?(rel, sha, size: nil)
+    def self.matches?(rel, sha, size: nil, hashes: {})
       abs = File.join(RoeSitePaths::SITE_PATH, rel)
       return !File.exist?(abs) if sha.nil?
       return false unless File.file?(abs)
       return false if size && File.size(abs) != size
 
-      Digest::SHA256.file(abs).hexdigest == sha
+      hashes[rel] ||= Digest::SHA256.file(abs).hexdigest
+      hashes[rel] == sha
+    end
+
+    # How each change in `events` can be acted on in the history:
+    #   :undo         the latest change to its file, with a saved copy to go back to
+    #   :restored     a restore came after it
+    #   :changed      a later sync changed the file again
+    #   :in_place     the file is already the version before this change
+    #   :no_copy      no saved copy of the version before
+    # Only the latest change to a file can be undone, so a file can't be
+    # restored twice from two places, and a restore is undone from its own
+    # entry.
+    def self.row_states(events, hashes: {})
+      changes = events.flat_map { |e| e[:changes] }
+      return {} if changes.empty?
+
+      later = Versions.changes_after(changes.map { |c| c[:path] }.uniq, changes.map { |c| c[:id] }.min)
+                      .group_by { |c| c[:path] }
+      changes.to_h do |c|
+        following = later[c[:path]].to_a.find { |l| l[:id] > c[:id] }
+        state =
+          if following
+            following[:kind] == "restore" ? :restored : :changed
+          elsif c[:before_sha] && !Versions.object?(c[:before_sha])
+            :no_copy
+          elsif matches?(c[:path], c[:before_sha], size: c[:before_size], hashes: hashes)
+            :in_place
+          else
+            :undo
+          end
+        [ c[:id], state ]
+      end
     end
 
     def initialize(targets)

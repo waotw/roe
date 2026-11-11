@@ -327,6 +327,9 @@ class Admin::SiteSyncController < Admin::BaseController
     # restorable; earlier ones from the old log, restorable only from a
     # snapshot.
     @version_events = SiteSync::Versions.events(limit: 100)
+    hashes = {}
+    @row_states = SiteSync::VersionRestore.row_states(@version_events, hashes: hashes)
+    @point_restorable = @version_events.to_h { |e| [ e[:id], SiteSync::VersionRestore.point_restorable?(e[:id], hashes: hashes) ] }
     @events = SiteSync::History.recent
     if (oldest = @version_events.last)
       @events = @events.select { |e| e.at && e.at < oldest[:at] - 1.second }

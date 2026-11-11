@@ -33,7 +33,8 @@ class Admin::SiteSyncVersionHistoryTest < ActionDispatch::IntegrationTest
     assert_select "input[name='change_ids[]']", 1
     assert_match @rel, response.body
     assert_match "RESTORE SELECTED", response.body
-    assert_select "a[href=?]", admin_site_sync_history_point_path(@event), text: "RESTORE SITE TO THIS SYNC"
+    assert_select "a[href=?]", admin_site_sync_history_point_path(@event), count: 0 # already as it was after it
+    assert_select "span[title]", text: "RESTORE SITE TO THIS SYNC"
   end
 
   test "SELECT ALL is offered when a sync has more than one file to undo" do
@@ -50,7 +51,24 @@ class Admin::SiteSyncVersionHistoryTest < ActionDispatch::IntegrationTest
 
     get admin_site_sync_history_path
     assert_select "form[data-controller='check-all'] [data-check-all-target='toggle']", text: "SELECT ALL"
-    assert_select "input[data-check-all-target='checkbox']", 3
+    assert_select "input[data-check-all-target='checkbox']", 2, "the first sync's row was changed again since"
+  end
+
+  test "after a restore, only the restore's own entry offers to undo it" do
+    change = SiteSync::Versions.history_of(@rel).first
+    post admin_restore_site_sync_versions_path, params: { change_ids: [ change[:id] ] }
+    get admin_site_sync_history_path
+
+    assert_select "input[name='change_ids[]']", 1
+    assert_select "input[name='change_ids[]'][value=?]", SiteSync::Versions.history_of(@rel).first[:id].to_s
+    assert_match "restored since", response.body
+    assert_match "UNDO SELECTED", response.body
+    assert_select "a[href=?]", admin_site_sync_history_point_path(@event), text: "RESTORE SITE TO THIS SYNC"
+  end
+
+  test "Site Sync links to the history with a button" do
+    get admin_site_sync_path
+    assert_select "a[href=?]", admin_site_sync_history_path, text: "SYNC HISTORY"
   end
 
   test "restoring selected changes puts the old version back" do

@@ -6,8 +6,8 @@
     <div class="font-sans">
       <h1 class="text-3xl font-semibold text-gray-900">Sync History</h1>
       <p class="mt-2 text-sm text-gray-700">
-        Every change Site Sync has made, newest first. Before a sync replaces or deletes a file, the old version is kept on this computer
-        <% if (days = SiteSync::Versions.keep_days) %>for <%= days %> days<% end %>, so any change can be put back.
+        Every change Site Sync has made, most recent first. Before a sync replaces or deletes a file, the old version is saved on this computer
+        <% if (days = SiteSync::Versions.keep_days) %>for <%= days %> days<% end %>.
       </p>
     </div>
     <div class="ml-4 mt-0">
@@ -19,7 +19,7 @@
   <% if @version_events.any? %>
     <div class="mt-8 space-y-4">
       <% @version_events.each do |event| %>
-        <%= render "version_event", event: event %>
+        <%= render "version_event", event: event, row_states: @row_states, point_restorable: @point_restorable[event[:id]] %>
       <% end %>
     </div>
   <% end %>

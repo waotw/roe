@@ -104,4 +104,43 @@ class SiteSync::VersionRestoreTest < ActiveSupport::TestCase
     assert_equal [ "../outside.md", "/etc/hosts", secret ].sort, result.skipped
     assert_empty result.restored + result.removed
   end
+
+  # Only a file's latest change can be undone; once restored, the restore's
+  # own entry is where to undo it.
+  test "a restored file can only be undone from the restore" do
+    rel = "#{DIR}/post.md"
+    File.write(site(rel), "mine")
+    pull(rel, "live's")
+    sync_change = SiteSync::Versions.history_of(rel).first
+    SiteSync::VersionRestore.changes([ sync_change[:id] ])
+    restore_change = SiteSync::Versions.history_of(rel).first
+
+    states = SiteSync::VersionRestore.row_states(SiteSync::Versions.events)
+    assert_equal :restored, states[sync_change[:id]]
+    assert_equal :undo, states[restore_change[:id]]
+
+    error = assert_raises(SiteSync::VersionRestore::Error) { SiteSync::VersionRestore.changes([ sync_change[:id] ]) }
+    assert_match "changed since", error.message
+    assert_equal "mine", read(rel), "the old row didn't write anything"
+  end
+
+  test "a change a later sync replaced can't be undone from the earlier one" do
+    rel = "#{DIR}/post.md"
+    File.write(site(rel), "one")
+    first = pull(rel, "two")
+    pull(rel, "three")
+    states = SiteSync::VersionRestore.row_states(SiteSync::Versions.events)
+    first_change = SiteSync::Versions.events.find { |e| e[:id] == first }[:changes].first
+    assert_equal :changed, states[first_change[:id]]
+  end
+
+  test "a restore point is offered only when it would change something" do
+    rel = "#{DIR}/post.md"
+    File.write(site(rel), "one")
+    first = pull(rel, "two")
+    second = pull(rel, "three")
+
+    assert SiteSync::VersionRestore.point_restorable?(first)
+    refute SiteSync::VersionRestore.point_restorable?(second), "the site already is how it was after it"
+  end
 end

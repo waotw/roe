@@ -148,6 +148,21 @@ module SiteSync
       end
     end
 
+    # Every change to these paths after `after_id`, oldest first, with its
+    # event's kind: [{ id:, path:, kind: }]. Tells the history which change is
+    # the latest for a path, and what came after an earlier one.
+    def changes_after(paths, after_id)
+      return [] if paths.empty? || !File.exist?(db_path)
+
+      with_db do |db|
+        marks = ([ "?" ] * paths.size).join(", ")
+        db.execute(<<~SQL, paths + [ after_id ]).map { |id, path, kind| { id: id, path: path, kind: kind } }
+          SELECT c.id, c.path, e.kind FROM changes c JOIN events e ON e.id = c.event_id
+          WHERE c.path IN (#{marks}) AND c.id > ? ORDER BY c.id
+        SQL
+      end
+    end
+
     # Changes by id, oldest first, for undoing them. One path picked twice
     # keeps the earliest change's version: undoing both lands before both.
     def changes_by_id(ids)
