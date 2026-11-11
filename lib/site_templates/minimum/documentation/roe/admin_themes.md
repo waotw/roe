@@ -134,20 +134,13 @@ Most of these explain themselves. A few worth calling out:
 
 ### Media players
 
-Colors and backgrounds for the audio and video players. They're scoped on their own, so you can give the players a look distinct from the rest of the page.
+Colors for the player's times and a podcast's subscribe buttons. The rest of the player takes the page's own text and border colors.
 
 ```css
---player-bg: #f5f5f5;
 --player-border: #dddddd;
---player-track: #cccccc;
---player-accent: #333333;
---player-accent-hover: #000000;
 --player-btn-color: #333333;
---player-btn-play-color: #ffffff;
 --player-btn-hover-bg: rgba(0, 0, 0, 0.07);
 --player-meta-color: #888888;
---player-overlay-bg: rgba(255, 255, 255, 0.75);
---player-chapter-active-bg: rgba(0, 0, 0, 0.05);
 ```
 
 ## Going further

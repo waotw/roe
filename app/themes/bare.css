@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 1.5.9
-   Fingerprint: 86c35126
+   Version: 1.5.10
+   Fingerprint: 5eb81eaf
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -86,17 +86,10 @@
   --color-highlight-text: #ffff00;
 
   /* Player tokens */
-  --player-bg: #f5f5f5;
   --player-border: #cccccc;
-  --player-track: #cccccc;
-  --player-accent: #444444;
-  --player-accent-hover: #000000;
   --player-btn-color: #444444;
-  --player-btn-play-color: #ffffff;
   --player-btn-hover-bg: rgba(0, 0, 0, 0.07);
   --player-meta-color: #666666;
-  --player-overlay-bg: rgba(255, 255, 255, 0.75);
-  --player-chapter-active-bg: rgba(0, 0, 0, 0.05);
 }
 
 /* ============ DARK MODE ============ */
@@ -121,17 +114,10 @@
     --color-code-text: #d4d4d4;
     --color-highlight-text: #bfe3ff;
 
-    --player-bg: #2a2a2a;
     --player-border: #444444;
-    --player-track: #555555;
-    --player-accent: #e8e8e8;
-    --player-accent-hover: #ffffff;
     --player-btn-color: #e8e8e8;
-    --player-btn-play-color: #1a1a1a;
     --player-btn-hover-bg: rgba(255, 255, 255, 0.08);
     --player-meta-color: #999999;
-    --player-overlay-bg: rgba(0, 0, 0, 0.75);
-    --player-chapter-active-bg: rgba(255, 255, 255, 0.08);
   }
 }
 
@@ -2540,6 +2526,8 @@ article .content,
   opacity: 1;
 }
 .player-time {
+  font-size: 0.75rem;
+  color: var(--player-meta-color);
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
@@ -2647,8 +2635,6 @@ article .content,
     order: 2;
     flex: 1 1 0;
     height: 2rem;
-    margin: 0;
-    background: none;
   }
   .card-player .player-progress-handle::before {
     font-size: 1.1em;
@@ -2712,24 +2698,6 @@ article .content,
 }
 
 /* ============ MEDIA PLAYERS =============== */
-
-/* Progress bar and times, shared by the player card */
-
-.player-progress {
-  position: relative;
-  height: 6px;
-  background: var(--player-track);
-  cursor: pointer;
-  margin: var(--space-1) 0;
-}
-
-.player-time {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--player-meta-color);
-}
 
 /* Chapters and playlist: a podcast episode's `chapters:` inside the player
    card (click a row to jump there), and a `playlist` collection's tracks or
