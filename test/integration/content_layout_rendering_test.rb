@@ -480,6 +480,23 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "audio.player-track-audio[controls]", 0, "no browser audio bar per row"
   end
 
+  test "a playlist from one release is named after it; a mixed one isn't" do
+    ReleaseConfig.stubs(:get).with("ep").returns({ "title" => "Soft Sphinx Energy" })
+    ReleaseConfig.stubs(:get).with("other").returns({ "title" => "Other" })
+    a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
+    a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)
+    one = "```collection\nsource: posts\npost_type: music\nrelease: ep\ntemplate: playlist\n```\n"
+    page = create(:page, metadata: { "title" => "Named", "url_name" => "named", "status" => "published" }, content: one)
+    get "/#{page.url_name}"
+    assert_select "details.player-playlist summary", text: /\ATracks\s*2 - Soft Sphinx Energy\z/
+    assert_select "summary .player-playlist-release", "Soft Sphinx Energy"
+
+    a_post("music", audio: "/media/audio/c.mp3", release: "other", track_number: 1)
+    page.update!(content: "```collection\nsource: posts\npost_type: music\ntemplate: playlist\n```\n")
+    get "/#{page.url_name}"
+    assert_select "summary .player-playlist-release", 0, "tracks from two releases have no one name"
+  end
+
   test "fold: true folds a playlist collection on a page" do
     a_post("music", audio: "/media/audio/a.mp3", release: "ep", track_number: 1)
     a_post("music", audio: "/media/audio/b.mp3", release: "ep", track_number: 2)

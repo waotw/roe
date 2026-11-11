@@ -6,6 +6,6 @@ post-header:
 
 podcast-episode:
   [player]
-  [body]
-  [subscribe]
   [playlist]
+  [subscribe]
+  [body]

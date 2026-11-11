@@ -5,5 +5,5 @@ post-header:
   [image]
 
 [player]
-[body]
 [playlist]
+[body]

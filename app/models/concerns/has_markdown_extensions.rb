@@ -1963,7 +1963,22 @@ module HasMarkdownExtensions
     folded = collection_truthy?(config[:fold],
       default: is_a?(Post) && respond_to?(:post_type) && post_type.in?(%w[music podcast]))
     noun = tracks.all? { |t| t.respond_to?(:post_type) && t.post_type == "podcast" } ? "Episodes" : "Tracks"
-    %(<details class="player-playlist"#{folded ? "" : " open"}><summary>#{noun} <span class="player-playlist-count">#{tracks.size}</span></summary>\n#{list}</details>)
+    release = playlist_release_title(tracks)
+    # Plain text around the name, so a theme that doesn't know the class
+    # still reads "Tracks [2] - Soft Sphinx Energy".
+    named = release ? %( - <span class="player-playlist-release">#{ERB::Util.html_escape(release)}</span>) : ""
+    %(<details class="player-playlist"#{folded ? "" : " open"}><summary>#{noun} <span class="player-playlist-count">#{tracks.size}</span>#{named}</summary>\n#{list}</details>)
+  end
+
+  # The release's title when every track is from the same one, else nil: a
+  # list mixing releases (or with podcast episodes in it) has no one name.
+  def playlist_release_title(tracks)
+    keys = tracks.map do |t|
+      next unless t.respond_to?(:post_type) && t.post_type == "music" && t.respond_to?(:metadata)
+      t.metadata["release"].to_s.strip.presence
+    end
+    return nil if keys.empty? || keys.include?(nil) || keys.uniq.size != 1
+    ReleaseConfig.get(keys.first).to_h["title"].to_s.strip.presence
   end
 
   # The release/podcast cover for the player — the artwork fallback when a track
