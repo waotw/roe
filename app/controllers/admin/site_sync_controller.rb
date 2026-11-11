@@ -323,7 +323,42 @@ class Admin::SiteSyncController < Admin::BaseController
   # Sync screen is already dense, and because this is something you go looking
   # for after the fact rather than something you watch.
   def history
+    # Syncs since the version store began come from it, with every change
+    # restorable; earlier ones from the old log, restorable only from a
+    # snapshot.
+    @version_events = SiteSync::Versions.events(limit: 100)
     @events = SiteSync::History.recent
+    if (oldest = @version_events.last)
+      @events = @events.select { |e| e.at && e.at < oldest[:at] - 1.second }
+    end
+  end
+
+  # Undo the selected changes: each file goes back to the version its change
+  # replaced. What's there now is saved first, so this can be undone too.
+  def restore_versions
+    result = SiteSync::VersionRestore.changes(params[:change_ids])
+    flash[:notice] = restore_notice(result)
+    redirect_to admin_site_sync_history_path
+  rescue SiteSync::VersionRestore::Error, SiteSync::Versions::SaveFailed => e
+    flash[:alert] = e.message
+    redirect_to admin_site_sync_history_path
+  end
+
+  # What putting the whole site back to just after a sync would change.
+  def history_point
+    @event = SiteSync::Versions.events(limit: 1_000).find { |e| e[:id] == params[:id].to_i }
+    raise ActiveRecord::RecordNotFound unless @event
+
+    @plan = SiteSync::VersionRestore.plan_for_point(@event[:id])
+  end
+
+  def restore_history_point
+    result = SiteSync::VersionRestore.point(params[:id])
+    flash[:notice] = restore_notice(result)
+    redirect_to admin_site_sync_history_path
+  rescue SiteSync::VersionRestore::Error, SiteSync::Versions::SaveFailed => e
+    flash[:alert] = e.message
+    redirect_to admin_site_sync_history_path
   end
 
   # Take specific files back out of the snapshot a sync took before it wrote.
@@ -578,6 +613,17 @@ class Admin::SiteSyncController < Admin::BaseController
   # Write the running status synchronously before enqueueing so
   # the UI shows "running" on the immediate redirect, even if the
   # Solid Queue worker hasn't picked the job up yet.
+  def restore_notice(result)
+    parts = []
+    parts << "Restored #{result.restored.size} file#{'s' unless result.restored.size == 1}" if result.restored.any?
+    parts << "removed #{result.removed.size}" if result.removed.any?
+    parts << "#{result.skipped.size} couldn't be put back (no saved copy)" if result.skipped.any?
+    return "Nothing to restore: those files are already that version." if parts.empty?
+    return "#{parts.join(', ').upcase_first}." if result.count.zero?
+
+    "#{parts.join(', ')}. Sync to send #{result.count == 1 ? 'it' : 'them'} to live."
+  end
+
   def seed_running_status(kind)
     Rails.cache.write(
       SiteSyncTransferJob::STATUS_CACHE_KEY,

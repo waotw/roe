@@ -6,7 +6,8 @@
     <div class="font-sans">
       <h1 class="text-3xl font-semibold text-gray-900">Sync History</h1>
       <p class="mt-2 text-sm text-gray-700">
-        Every change Site Sync has made, newest first. Read-only.
+        Every change Site Sync has made, newest first. Before a sync replaces or deletes a file, the old version is kept on this computer
+        <% if (days = SiteSync::Versions.keep_days) %>for <%= days %> days<% end %>, so any change can be put back.
       </p>
     </div>
     <div class="mt-4 sm:mt-0">
@@ -15,12 +16,24 @@
     </div>
   </div>
 
-  <% if @events.empty? %>
+  <% if @version_events.any? %>
+    <div class="mt-8 space-y-4">
+      <% @version_events.each do |event| %>
+        <%= render "version_event", event: event %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @events.empty? && @version_events.empty? %>
     <p class="mt-8 text-sm text-gray-500 font-sans">
       No syncs recorded yet. This fills in as you sync.
     </p>
-  <% else %>
-    <div class="mt-8 space-y-4">
+  <% elsif @events.any? %>
+    <% if @version_events.any? %>
+      <h2 class="mt-10 text-sm font-semibold text-gray-700 font-sans">Before versions were kept</h2>
+      <p class="mt-1 text-xs text-gray-500 font-sans">Only changes from live can be put back here, from the snapshot taken before each sync.</p>
+    <% end %>
+    <div class="mt-4 space-y-4">
       <% @events.each do |event| %>
         <div class="bg-white border border-gray-300 rounded-xs overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-baseline justify-between gap-2">

@@ -40,11 +40,16 @@ class SiteSyncConflictResolutionJob < ApplicationJob
 
     pushed = plan[:push_add].any? || plan[:push_delete].any?
     pulled = plan[:pull_add].any? || plan[:pull_delete].any?
+    # Every version this replaces or deletes, saved before it's touched.
+    @versions = SiteSync::Versions::Recorder.new
 
     # Keep-mine files flow local → live.
     if pushed
       update_step(:backing_up_live)
-      SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete], on_progress: progress_proc)
+      live_backup = SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete], on_progress: progress_proc)
+      peer_files = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
+      raise SiteSync::Versions::SaveFailed, "couldn't read live's file list to keep its copies" if peer_files.nil?
+      @versions.save_live!(plan[:push_add] + plan[:push_delete], from: live_backup, peer: peer_files, deleted: plan[:push_delete])
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: { modified: [], added: plan[:push_add], deleted: plan[:push_delete] }, on_progress: progress_proc)
     end
@@ -53,6 +58,7 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     if pulled
       update_step(:backing_up_local)
       @local_snapshot = SiteSync::BackupManager.create
+      @versions.save_local!(plan[:pull_add] + plan[:pull_delete], deleted: plan[:pull_delete])
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: { modified: [], added: plan[:pull_add], deleted: plan[:pull_delete] }, on_progress: progress_proc)
     end
@@ -93,6 +99,7 @@ class SiteSyncConflictResolutionJob < ApplicationJob
       snapshot: @local_snapshot,
       at:       started_at
     )
+    @versions.finish!(kind: :resolve, outcome: :completed, at: started_at)
 
     # With a sync to follow, the status stays "running" so the page keeps
     # polling instead of reloading onto a finished resolve, and the sync
@@ -103,6 +110,7 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     SiteSync::Exchange.call_peer if SiteSync::Exchange.can_call_peer?
   rescue => e
     Rails.logger.error "[SiteSyncConflictResolutionJob] #{e.class}: #{e.message}"
+    @versions&.finish!(kind: :resolve, outcome: :failed, at: @started_at || Time.current)
     write_status(state: :failed, kind: :resolve, error: e.message, completed_at: Time.current)
     raise
   end

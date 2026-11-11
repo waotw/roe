@@ -139,6 +139,13 @@ class Admin::ConfigsController < Admin::BaseController
           placeholder: "0",
           hint: "Site Sync deletes files. If a file is deleted on your Live site and you sync the site, it will be deleted locally and vice-versa. This is a threshold for when you will be warned about file deletions. 0 means you'll be warned everytime. '5' means you'll be warned if 6 or more files will be deleted. Set to 'never' to turn off warnings."
         },
+        # COPY: label and hint for how long Site Sync keeps old versions
+        "sync_history_days" => {
+          type: :text,
+          label: "Keep old versions for (days)",
+          placeholder: "30",
+          hint: "Before a sync replaces or deletes a file, on either side, Roe keeps the old version on this computer so you can put it back from Sync history. Blank keeps 30 days. 'forever' or 0 keeps everything."
+        },
         # COPY: label, option labels and hint for the live video setting
         "sync_live_video" => {
           type: :select,

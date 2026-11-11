@@ -66,6 +66,9 @@ class SiteSyncTransferJob < ApplicationJob
     # perform_* method so the record reflects what was actually planned.
     @to_live = @to_local = { modified: [], added: [], deleted: [] }
     @local_snapshot = nil
+    # Every version this run replaces or deletes, saved before it's touched
+    # (SiteSync::Versions). Saving failing stops the run before the transfer.
+    @versions = SiteSync::Versions::Recorder.new
     update_step(:starting)
 
     case kind
@@ -159,6 +162,7 @@ class SiteSyncTransferJob < ApplicationJob
     )
 
     record_history(:completed)
+    @versions.finish!(kind: @kind, outcome: :completed, at: @started_at)
 
     # Once more, now that nothing else is going to touch /site.
     #
@@ -213,6 +217,10 @@ class SiteSyncTransferJob < ApplicationJob
     # UI an accurate picture instead of a generic "failed."
     reassessment = reassess_after_failure rescue nil
 
+    # Whatever this run saved before it failed is still worth keeping: it
+    # may be the only copy of what a half-finished transfer replaced.
+    @versions&.finish!(kind: @kind || kind, outcome: :failed, at: @started_at || Time.current)
+
     write_status(
       state:         :failed,
       kind:          kind,
@@ -250,7 +258,8 @@ class SiteSyncTransferJob < ApplicationJob
 
     files_to_back_up = diff[:added] + diff[:deleted]
     update_step(:backing_up_live)
-    SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
+    live_backup = SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
+    @versions.save_live!(files_to_back_up, from: live_backup, peer: @peer_manifest["files"], deleted: diff[:deleted])
 
     update_step(:pushing_to_live)
     SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
@@ -274,6 +283,7 @@ class SiteSyncTransferJob < ApplicationJob
     # snapshot — it's a complete restore point.
     update_step(:backing_up_local)
     @local_snapshot = SiteSync::BackupManager.create
+    @versions.save_local!(diff[:added] + diff[:deleted], deleted: diff[:deleted])
 
     update_step(:pulling_from_live)
     SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
@@ -302,7 +312,8 @@ class SiteSyncTransferJob < ApplicationJob
 
     if @pushed
       update_step(:backing_up_live)
-      SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
+      live_backup = SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
+      @versions.save_live!(push_diff[:added] + push_diff[:deleted], from: live_backup, peer: @peer_manifest["files"], deleted: push_diff[:deleted])
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: push_diff, on_progress: progress_proc)
     elsif tidy_live?
@@ -313,6 +324,7 @@ class SiteSyncTransferJob < ApplicationJob
     if @pulled
       update_step(:backing_up_local)
       @local_snapshot = SiteSync::BackupManager.create
+      @versions.save_local!(pull_diff[:added] + pull_diff[:deleted], deleted: pull_diff[:deleted])
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: pull_diff, on_progress: progress_proc)
     end
@@ -347,7 +359,8 @@ class SiteSyncTransferJob < ApplicationJob
     # pull the whole tree. On a fresh peer that's near-empty; on a retry it
     # shrinks as files converge (already-mirrored files leave the diff).
     update_step(:backing_up_live)
-    SiteSync.transport.backup_live_to_local!(files: diff[:modified] + diff[:deleted], on_progress: progress_proc)
+    live_backup = SiteSync.transport.backup_live_to_local!(files: diff[:modified] + diff[:deleted], on_progress: progress_proc)
+    @versions.save_live!(diff[:added] + diff[:modified] + diff[:deleted], from: live_backup, peer: peer["files"] || {}, deleted: diff[:deleted])
 
     update_step(:pushing_to_live_full)
     SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)

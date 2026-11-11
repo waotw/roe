@@ -1,0 +1,48 @@
+<%# Preview of putting the whole site back to just after one sync. Only the
+    files that differ are listed; nothing is written until RESTORE. %>
+<div class="px-4 sm:px-0 font-mono">
+  <div class="sm:flex sm:items-center sm:justify-between">
+    <div class="font-sans">
+      <h1 class="text-3xl font-semibold text-gray-900">Restore the site</h1>
+      <p class="mt-2 text-sm text-gray-700">
+        To how it was just after the <%= @event[:kind] %> on
+        <%= @event[:at].in_time_zone.strftime("%B %-d, %Y at %-I:%M %p") %>.
+      </p>
+    </div>
+    <div class="mt-4 sm:mt-0">
+      <%= link_to "← Back to Sync History", admin_site_sync_history_path,
+            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
+    </div>
+  </div>
+
+  <% if @plan.empty? %>
+    <p class="mt-8 text-sm text-gray-500 font-sans">Every file Site Sync has recorded is already as it was then. Nothing to restore.</p>
+  <% else %>
+    <% missing = @plan.count { |_, sha| sha && !SiteSync::Versions.object?(sha) } %>
+    <div class="mt-8 bg-white border border-gray-300 rounded-xs overflow-hidden">
+      <ul class="divide-y divide-gray-100">
+        <% @plan.sort.each do |path, sha| %>
+          <li class="px-4 py-1.5 flex items-center gap-3 text-xs">
+            <span class="w-24 shrink-0 text-gray-500">
+              <% if sha.nil? %>remove<% elsif !File.exist?(File.join(RoeSitePaths::SITE_PATH, path)) %>put back<% else %>replace<% end %>
+            </span>
+            <span class="truncate text-gray-900"><%= path %></span>
+            <% if sha && !SiteSync::Versions.object?(sha) %>
+              <span class="ml-auto shrink-0 text-gray-500">no saved copy</span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+      <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center gap-3">
+        <%= button_to "RESTORE #{@plan.size - missing} FILE#{'S' unless @plan.size - missing == 1}",
+              admin_restore_site_sync_history_point_path(@event[:id]), method: :post,
+              class: "inline-flex items-center px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 font-mono text-xs rounded-xs cursor-pointer",
+              form: { data: { turbo: false } } %>
+        <p class="text-xs text-gray-600 font-sans">
+          Files changed since are saved first, so this can be undone from Sync History. Sync afterwards to send the result to live.
+          <% if missing.positive? %><%= missing %> can't be put back: no copy was kept.<% end %>
+        </p>
+      </div>
+    </div>
+  <% end %>
+</div>

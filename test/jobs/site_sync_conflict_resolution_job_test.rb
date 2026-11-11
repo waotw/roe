@@ -12,6 +12,8 @@ class SiteSyncConflictResolutionJobTest < ActiveSupport::TestCase
     SiteSync::Exchange.stubs(:can_call_peer?).returns(false)
     ContentSync.stubs(:sync_all)
     SiteSync::BackupManager.stubs(:create)
+    # Live's file list, read to keep its copies before a push (Versions).
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => {})
     Rails.cache.delete(SiteSyncTransferJob::STATUS_CACHE_KEY)
   end
 
