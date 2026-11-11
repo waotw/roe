@@ -20,17 +20,18 @@
     </div>
     <div class="flex items-center gap-3">
       <span class="text-xs text-gray-500"><%= rows.size %> file<%= "s" if rows.size != 1 %></span>
-      <%= link_to "RESTORE SITE TO AFTER THIS", admin_site_sync_history_point_path(event[:id]),
+      <%= link_to "RESTORE SITE TO THIS SYNC", admin_site_sync_history_point_path(event[:id]),
             class: "inline-flex items-center px-2 py-1 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-900 font-mono text-xs rounded-xs" %>
     </div>
   </div>
 
-  <%= form_with url: admin_restore_site_sync_versions_path, method: :post, data: { turbo: false } do %>
+  <%= form_with url: admin_restore_site_sync_versions_path, method: :post, data: { turbo: false, controller: "check-all" } do %>
     <ul class="divide-y divide-gray-100">
       <% rows.each do |c| %>
         <li class="px-4 py-1.5 flex items-center gap-3 text-xs">
           <% if c[:available] && !c[:done] %>
-            <input type="checkbox" name="change_ids[]" value="<%= c[:id] %>" class="shrink-0">
+            <input type="checkbox" name="change_ids[]" value="<%= c[:id] %>" class="shrink-0"
+                   data-check-all-target="checkbox" data-action="change->check-all#update">
           <% else %>
             <span class="w-[13px] shrink-0"></span>
           <% end %>
@@ -52,13 +53,19 @@
       <% if outstanding.zero? %>
         <span class="text-xs text-gray-600 font-sans">Nothing here to undo.</span>
       <% else %>
+        <% if outstanding > 1 %>
+          <button type="button" data-check-all-target="toggle" data-action="check-all#toggle"
+                  class="inline-flex items-center px-3 py-1.5 border border-gray-700 bg-white hover:bg-gray-100 text-gray-900 font-mono text-xs rounded-xs cursor-pointer">
+            SELECT ALL
+          </button>
+        <% end %>
         <button type="submit"
                 class="inline-flex items-center px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 font-mono text-xs rounded-xs cursor-pointer"
                 data-confirm="Put the selected files back to the version before this change? What's there now is saved first, so you can undo this too.">
           RESTORE SELECTED
         </button>
         <p class="text-xs text-gray-600 font-sans">
-          Puts each file back the way it was before this change, on this computer. Sync to send it to live.
+          Puts each file back the way it was before this sync, on this computer. Select all to undo the whole sync. Sync to send it to live.
         </p>
       <% end %>
     </div>

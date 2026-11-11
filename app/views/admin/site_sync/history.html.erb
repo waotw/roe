@@ -2,7 +2,7 @@
     Grouped by event and split by direction, because "which way did this go?"
     is the first thing you need to know when a file isn't where you left it. %>
 <div class="px-4 sm:px-0 font-mono">
-  <div class="sm:flex sm:items-center sm:justify-between">
+  <div class="flex items-center justify-between">
     <div class="font-sans">
       <h1 class="text-3xl font-semibold text-gray-900">Sync History</h1>
       <p class="mt-2 text-sm text-gray-700">
@@ -10,9 +10,9 @@
         <% if (days = SiteSync::Versions.keep_days) %>for <%= days %> days<% end %>, so any change can be put back.
       </p>
     </div>
-    <div class="mt-4 sm:mt-0">
+    <div class="ml-4 mt-0">
       <%= link_to "← Back to Site Sync", admin_site_sync_path,
-            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
+            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs text-nowrap" %>
     </div>
   </div>
 

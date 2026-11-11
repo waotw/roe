@@ -33,7 +33,24 @@ class Admin::SiteSyncVersionHistoryTest < ActionDispatch::IntegrationTest
     assert_select "input[name='change_ids[]']", 1
     assert_match @rel, response.body
     assert_match "RESTORE SELECTED", response.body
-    assert_select "a[href=?]", admin_site_sync_history_point_path(@event)
+    assert_select "a[href=?]", admin_site_sync_history_point_path(@event), text: "RESTORE SITE TO THIS SYNC"
+  end
+
+  test "SELECT ALL is offered when a sync has more than one file to undo" do
+    get admin_site_sync_history_path
+    assert_select "[data-check-all-target='toggle']", 0, "one file needs no select-all"
+
+    other = "#{DIR}/other.md"
+    File.write(File.join(RoeSitePaths::SITE_PATH, other), "a")
+    recorder = SiteSync::Versions::Recorder.new
+    recorder.save_local!([ @rel, other ])
+    File.write(path, "b")
+    File.write(File.join(RoeSitePaths::SITE_PATH, other), "c")
+    recorder.finish!(kind: :sync, outcome: :completed)
+
+    get admin_site_sync_history_path
+    assert_select "form[data-controller='check-all'] [data-check-all-target='toggle']", text: "SELECT ALL"
+    assert_select "input[data-check-all-target='checkbox']", 3
   end
 
   test "restoring selected changes puts the old version back" do
