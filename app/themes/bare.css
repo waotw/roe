@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Bare
-   Version: 1.5.8
-   Fingerprint: 309860a8
+   Version: 1.5.9
+   Fingerprint: 86c35126
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -2582,6 +2582,133 @@ article .content,
 }
 .card-player .player-video {
   width: 100%;
+}
+
+/* ⏮ ⏭ in the transport. player.js (1.4) shows them only where this theme
+   says it styles them (--player-nav: 1); the theme then shows them on touch
+   screens. On a desktop the ⏮ ⏭ links under the player stay as they are. */
+.card-player {
+  --player-nav: 1;
+}
+.player-prev,
+.player-next {
+  display: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.player-prev::before {
+  content: "\23EE";
+}
+.player-next::before {
+  content: "\23ED";
+}
+.player-prev:disabled,
+.player-next:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Touch screens — a finger, not a mouse pointer, whatever the screen width.
+   No artwork, and every control big enough to hit: the times flank a
+   full-width bar, and ⏮ ▶ ⏭ 1× sit in a row of cells along the bottom of the
+   card. Playlist, chapter and fold rows get taller too. */
+@media (pointer: coarse) {
+  .card-player {
+    padding-bottom: 0;
+  }
+  .card-player .player-figure {
+    display: none;
+  }
+  .card-player .player-now {
+    font-size: var(--text-base, 1rem);
+    white-space: normal;
+  }
+  .card-player .player-transport {
+    flex-wrap: wrap;
+    gap: 0;
+    margin: var(--space-1) calc(-1 * var(--space-4)) 0;
+  }
+  /* The break between the bar's line and the buttons' line. */
+  .card-player .player-transport::after {
+    content: "";
+    order: 4;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .card-player .player-time-current {
+    order: 1;
+    margin: 0 var(--space-3) 0 var(--space-4);
+  }
+  .card-player .player-progress {
+    order: 2;
+    flex: 1 1 0;
+    height: 2rem;
+    margin: 0;
+    background: none;
+  }
+  .card-player .player-progress-handle::before {
+    font-size: 1.1em;
+  }
+  .card-player .player-time-duration {
+    order: 3;
+    margin: 0 var(--space-4) 0 var(--space-3);
+  }
+  .card-player .player-prev {
+    order: 5;
+  }
+  .card-player .player-toggle {
+    order: 6;
+  }
+  .card-player .player-next {
+    order: 7;
+  }
+  .card-player .player-speed {
+    order: 8;
+    opacity: 1;
+  }
+  .card-player .player-prev,
+  .card-player .player-toggle,
+  .card-player .player-next,
+  .card-player .player-speed {
+    flex: 1 1 0;
+    min-width: 4rem;
+    min-height: 3.25rem;
+    position: static;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid var(--color-border);
+    font-size: 1.25rem;
+  }
+  .card-player .player-speed {
+    font-size: var(--text-base, 1rem);
+  }
+  .card-player .player-next,
+  .card-player .player-speed,
+  .card-player[data-player-nav] .player-toggle {
+    border-left: 1px solid var(--color-border);
+  }
+  .card-player:not([data-player-nav]) .player-prev,
+  .card-player:not([data-player-nav]) .player-next {
+    display: none;
+  }
+  .card-player[data-player-nav] .player-series {
+    display: none;
+  }
+  .card-player .player-chapters {
+    padding-bottom: var(--space-1);
+  }
+  .player-track-meta,
+  li.chapter,
+  .player-chapters > summary,
+  .player-playlist > summary {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
 }
 
 /* ============ MEDIA PLAYERS =============== */

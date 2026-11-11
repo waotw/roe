@@ -2101,7 +2101,9 @@ module HasMarkdownExtensions
             </div>
             <audio class="player-native" data-player-part="media" controls preload="metadata"#{native_hidden}>#{sources_html}</audio>
             <div class="player-transport" data-player-ui hidden>
+              <button type="button" class="player-prev" data-player-part="prev" aria-label="Previous" disabled hidden></button>
               <button type="button" class="player-toggle" data-player-part="play" data-playing="false" aria-label="Play"></button>
+              <button type="button" class="player-next" data-player-part="next" aria-label="Next" disabled hidden></button>
               <span class="player-time player-time-current" data-player-part="current">0:00</span>
               <div class="player-progress" data-player-part="progress" role="slider" aria-label="Seek" tabindex="0">
                 <div class="player-progress-fill" data-player-part="fill"></div>

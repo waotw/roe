@@ -87,6 +87,15 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
 
   # ── podcast ──
 
+  test "the transport carries ⏮ ⏭, hidden and disabled until player.js shows them" do
+    post = media_post("audio", audio: "/media/audio/a.mp3")
+    get post_path(post.url_name)
+    order = css_select(".card-player .player-transport button").map { |b| b["data-player-part"] }
+    assert_equal %w[prev play next speed], order
+    assert_select ".player-transport .player-prev[hidden][disabled][aria-label=Previous]", 1
+    assert_select ".player-transport .player-next[hidden][disabled][aria-label=Next]", 1
+  end
+
   test "a podcast gets the player card, and only one when the body has its own" do
     post = media_post("podcast", audio: "/media/audio/ep.mp3", duration: "00:30:00")
     get post_path(post.url_name)

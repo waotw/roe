@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: player
-   Version: 1.3
-   Fingerprint: e3e24ddd
+   Version: 1.4
+   Fingerprint: d7e7169d
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -40,6 +40,11 @@
 //     adopts the list it opens the post in a new tab, without ?play
 //   ?play in the page's address       start this page's player on arrival,
 //     where the browser allows it
+//   [data-player-part="prev" | "next"] ⏮ ⏭ in the transport. Hidden until
+//     this file shows them, and only on a theme that styles them (it sets
+//     --player-nav: 1 on .card-player). They step through the playlist when
+//     the player has one, else open the episode or track either side (the
+//     .player-series links) with ?play. Disabled at either end.
 (function () {
   "use strict";
 
@@ -164,6 +169,7 @@
 
     this.setupChapters();
     this.setupPlaylist();
+    this.setupNav();
   };
 
   Player.prototype.on = function (name, event, fn) {
@@ -434,6 +440,68 @@
     }
   };
 
+  // ── ⏮ ⏭ ──────────────────────────────────────────────────────────────
+
+  Player.prototype.setupNav = function () {
+    var self = this;
+    var buttons = this.parts("prev").concat(this.parts("next"));
+    if (!buttons.length) return;
+    // An older theme has no look for these; showing them there would put
+    // two empty buttons in the player.
+    var styled = window.getComputedStyle(this.root).getPropertyValue("--player-nav").trim() === "1";
+    if (!styled) return;
+    buttons.forEach(function (b) {
+      b.hidden = false;
+    });
+    this.root.setAttribute("data-player-nav", "");
+    this.on("prev", "click", function () {
+      self.step(-1);
+    });
+    this.on("next", "click", function () {
+      self.step(1);
+    });
+    this.updateNav();
+  };
+
+  Player.prototype.seriesLink = function (rel) {
+    return this.root.querySelector(".player-series-" + rel);
+  };
+
+  Player.prototype.step = function (dir) {
+    if (this.tracks.length) {
+      var i = this.currentIndex < 0 ? 0 : this.currentIndex + dir;
+      if (i >= 0 && i < this.tracks.length) this.selectTrack(i, true);
+      return;
+    }
+    var link = this.seriesLink(dir < 0 ? "prev" : "next");
+    if (!link) return;
+    var url;
+    try {
+      url = new URL(link.href);
+      url.searchParams.set("play", "");
+    } catch (e) {
+      return;
+    }
+    if (window.Turbo && window.Turbo.visit) {
+      window.Turbo.visit(url.toString());
+    } else {
+      window.location.href = url.toString();
+    }
+  };
+
+  Player.prototype.updateNav = function () {
+    var n = this.tracks.length;
+    var i = this.currentIndex;
+    var hasPrev = n ? i > 0 : !!this.seriesLink("prev");
+    var hasNext = n ? i + 1 < n : !!this.seriesLink("next");
+    this.parts("prev").forEach(function (b) {
+      b.disabled = !hasPrev;
+    });
+    this.parts("next").forEach(function (b) {
+      b.disabled = !hasNext;
+    });
+  };
+
   function pathOf(src) {
     try {
       return decodeURI(new URL(src, window.location.href).pathname);
@@ -496,6 +564,8 @@
       if (j === index) t.setAttribute("aria-current", "true");
       else t.removeAttribute("aria-current");
     });
+
+    if (this.root.hasAttribute("data-player-nav")) this.updateNav();
 
     if (autoplay) {
       var p = this.media.play();
