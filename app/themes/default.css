@@ -1,7 +1,7 @@
 /* ============== THEME INFO ================
    Roe Theme: Default
-   Version: 1.6.10
-   Fingerprint: 8bfd0d95
+   Version: 1.6.11
+   Fingerprint: 2ee76918
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -2841,6 +2841,44 @@ article .content,
   cursor: default;
 }
 
+/* Before player.js takes over. The browser's own audio bar used to show for
+   a moment, then Roe's controls replaced it and the card changed height.
+   With scripting on, Roe's controls show from the start (they do nothing
+   until the script arrives, a moment later) and the browser's bar waits out
+   of sight; the ⏮ ⏭ links the script will hide are hidden already. If the
+   script hasn't arrived after 3 seconds, the browser's bar comes back over
+   them, so the page still plays. With scripting off, nothing here applies
+   and the browser's bar is the player. */
+@media (scripting: enabled) {
+  .card-player[data-player="audio"]:not(.is-enhanced) .player-main {
+    position: relative;
+  }
+  .card-player[data-player="audio"]:not(.is-enhanced) .player-transport[hidden] {
+    display: flex !important;
+    animation: player-script-late 0s 3s forwards;
+  }
+  .card-player[data-player="audio"]:not(.is-enhanced) audio.player-native {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    visibility: hidden;
+    animation: player-script-late-show 0s 3s forwards;
+  }
+  body:has([data-playlist]) .card-player[data-player="audio"]:not(.is-enhanced) .player-series {
+    display: none;
+  }
+}
+@keyframes player-script-late {
+  to {
+    visibility: hidden;
+  }
+}
+@keyframes player-script-late-show {
+  to {
+    visibility: visible;
+  }
+}
+
 /* Touch screens — a finger, not a mouse pointer, whatever the screen width.
    No artwork, and every control big enough to hit: the times flank a
    full-width bar, and ⏮ ▶ ⏭ 1× sit in a row of cells along the bottom of the
@@ -2925,6 +2963,19 @@ article .content,
   }
   .card-player[data-player-nav] .player-series {
     display: none;
+  }
+  /* Before player.js: the cells it will show, so the row doesn't reflow. */
+  @media (scripting: enabled) {
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-prev[hidden],
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-next[hidden] {
+      display: flex !important;
+    }
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-toggle {
+      border-left: 1px solid var(--color-border);
+    }
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-series {
+      display: none;
+    }
   }
   .card-player .player-chapters {
     padding-bottom: var(--space-1);
