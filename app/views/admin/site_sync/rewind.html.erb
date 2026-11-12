@@ -60,7 +60,7 @@
           <% end %>
           <% steps.each do |step| %>
             <div class="flex items-center gap-2 py-0.5 text-xs">
-              <span class="w-28 shrink-0 text-gray-500"><%= step.remove? ? "removed" : (step.change[:action] == "deleted" ? "put back" : "back to before") %></span>
+              <span class="w-28 shrink-0 text-gray-500 text-nowrap"><%= step.remove? ? "removed" : (step.change[:action] == "deleted" ? "put back" : "rewind") %></span>
               <span class="truncate text-gray-900" title="<%= step.path %>"><%= step.path %></span>
             </div>
           <% end %>

@@ -23,7 +23,13 @@ module SiteSync
   # that differ — typically a handful out of several hundred. The in-sync path
   # stays a single fingerprint comparison and costs nothing extra.
   class PeerAgreement
-    Result = Struct.new(:in_sync, :differing, :confirmed_identical, keyword_init: true) do
+    # `on_live` / `on_local`: the differing files this computer's sync record
+    # can place on one side, as { modified:, added:, deleted: }. Each side's
+    # own record can miss a change the other side's caught — a rewind puts
+    # this computer's record back but not live's — and this record is the one
+    # a sync goes by (Reconciler). Files neither record explains stay in
+    # `differing`.
+    Result = Struct.new(:in_sync, :differing, :confirmed_identical, :on_live, :on_local, keyword_init: true) do
       def mtime_only? = in_sync && confirmed_identical.to_a.any?
     end
 
@@ -61,7 +67,7 @@ module SiteSync
         sized      = shared.select { |p| local[p]["size"].to_i != peer_files[p]["size"].to_i }
 
         if structural.any? || sized.any?
-          return Result.new(in_sync: false, differing: (structural + sized).sort, confirmed_identical: [])
+          return explained(Result.new(in_sync: false, differing: (structural + sized).sort, confirmed_identical: []), local, peer_files)
         end
 
         candidates = shared.select { |p| local[p]["mtime"].to_i != peer_files[p]["mtime"].to_i }
@@ -79,7 +85,44 @@ module SiteSync
           lh.present? && ph.present? && lh == ph
         end
 
-        Result.new(in_sync: differing.empty?, differing: differing.sort, confirmed_identical: identical.sort)
+        explained(Result.new(in_sync: differing.empty?, differing: differing.sort, confirmed_identical: identical.sort), local, peer_files)
+      end
+
+      # Sort each differing file by which side changed it since the last
+      # agreed record, as the next sync will.
+      def explained(result, local, peer_files)
+        # No record yet (a first sync): nothing to place them by.
+        baseline = Ledger.recorded&.dig("files")
+        return result if baseline.nil?
+
+        on_live  = { modified: [], added: [], deleted: [] }
+        on_local = { modified: [], added: [], deleted: [] }
+        rest = []
+        result.differing.each do |path|
+          was = baseline[path]
+          live_changed  = !same?(peer_files[path], was)
+          local_changed = !same?(local[path], was)
+          if live_changed && !local_changed
+            on_live[change_kind(was, peer_files[path])] << path
+          elsif local_changed && !live_changed
+            on_local[change_kind(was, local[path])] << path
+          else
+            rest << path
+          end
+        end
+        result.on_live  = on_live  if on_live.values.any?(&:any?)
+        result.on_local = on_local if on_local.values.any?(&:any?)
+        result.differing = rest
+        result
+      end
+
+      def same?(a, b) = (a.nil? && b.nil?) || Ledger.same_state?(a, b)
+
+      def change_kind(was, now)
+        return :added if was.nil?
+        return :deleted if now.nil?
+
+        :modified
       end
     end
   end

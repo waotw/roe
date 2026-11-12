@@ -829,8 +829,9 @@
         <div class="p-4 bg-amber-50 border border-amber-300 rounded-xs mb-2">
           <h3 class="text-sm font-semibold text-amber-900 mb-3">Changes to sync</h3>
 
-          <%# ── Live changes (from the peer's drift payload) ── %>
-          <% if @peer_drift %>
+          <%# ── Live changes: live's own report, or this computer's record
+              when live's misses them (live_sync_overview) ── %>
+          <% if @peer_drift || live_changes %>
             <div class="mb-3">
               <p class="text-sm text-amber-800 mb-1">
                 ⬇️ <strong><%= SiteSync::Exchange.peer_label %></strong> has changes to pull in.

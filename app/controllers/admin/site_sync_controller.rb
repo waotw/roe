@@ -642,7 +642,17 @@ class Admin::SiteSyncController < Admin::BaseController
 
     local = @status[:state] == :local_drift ? @status[:local] : nil
     live  = @peer_drift ? (@peer_state&.dig(:drift) || {}) : nil
-    differs = (Array(@sync_conclusion.agreement&.differing) if local.nil? && live.nil? && @sync_conclusion.out_of_sync?)
+    differs = nil
+    if local.nil? && live.nil? && @sync_conclusion.out_of_sync?
+      # Neither side's own record shows a change, yet the files differ. This
+      # computer's record (the one a sync goes by) can usually say which side
+      # changed — after a rewind, live's own record still matches live.
+      agreement = @sync_conclusion.agreement
+      live  = agreement&.on_live&.merge(truncated: false)
+      local = agreement&.on_local
+      differs = Array(agreement&.differing)
+      differs = nil if differs.empty? && (live || local)
+    end
 
     paths = [ local, live ].compact.flat_map { |c| Array(c[:modified]) + Array(c[:added]) + Array(c[:deleted]) }
     paths += Array(differs)

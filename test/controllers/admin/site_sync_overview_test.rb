@@ -80,4 +80,16 @@ class Admin::SiteSyncOverviewTest < ActionDispatch::IntegrationTest
     assert_match "checking with live", overview
     assert_no_match(/>in sync/, overview)
   end
+
+  test "a file only this computer's record can place shows as a live change, not as unexplained" do
+    result = SiteSync::PeerAgreement::Result.new(in_sync: false, differing: [], confirmed_identical: [],
+                                                 on_live: { modified: [ "posts/test-post-for-sync.md" ], added: [], deleted: [] })
+    SiteSync::Conclusion.stubs(:current).returns(conclusion(:out_of_sync).tap { |c| c.agreement = result })
+    SiteSync::Ledger.stubs(:recorded).returns({ "files" => {} }) # synced before, so not a first sync
+    get admin_site_sync_path
+
+    assert_match "1 file to sync", overview
+    assert_match "has changes to pull in", response.body
+    assert_no_match "neither side", response.body
+  end
 end

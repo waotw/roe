@@ -7,7 +7,8 @@
 <% compact   = %w[rewind restore].include?(kind) %>
 <% rewound   = event[:rewound_by] %>
 <% rewound_at = rewound && times[rewound] %>
-<div class="bg-white border border-gray-300 rounded-xs overflow-hidden font-mono <%= 'opacity-60' if rewound %>" id="event_<%= event[:id] %>">
+<div class="bg-white border border-gray-300 rounded-xs overflow-hidden font-mono <%= 'opacity-60' if rewound %>" id="event_<%= event[:id] %>"
+     data-controller="history-panel">
   <div class="px-4 py-2.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
     <div class="flex flex-wrap items-center gap-2">
       <span class="text-sm font-semibold text-gray-900"><%= sync_time(event[:at]) %></span>
@@ -55,5 +56,5 @@
     </div>
   <% end %>
 
-  <%= turbo_frame_tag frame %>
+  <%= turbo_frame_tag frame, data: { history_panel_target: "frame" } %>
 </div>
