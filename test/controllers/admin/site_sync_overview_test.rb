@@ -106,4 +106,16 @@ class Admin::SiteSyncOverviewTest < ActionDispatch::IntegrationTest
     assert_match "Changed (1)", response.body
     assert_no_match(/>\s*modified\s*</, response.body)
   end
+
+  test "Roe's documentation folds into one row that opens to its files" do
+    SiteSync::Checker.stubs(:status).returns(
+      state: :local_drift, local: { modified: [ "documentation/roe/system-site_sync.md" ], added: [], deleted: [] }, recorded_at: Time.current
+    )
+    SiteSync::Conclusion.stubs(:current).returns(conclusion(:out_of_sync))
+    SiteSync::Ledger.stubs(:recorded).returns({ "files" => {} })
+    get admin_site_sync_path
+
+    assert_select "details summary", text: /Roe documentation — 1 file changed/
+    assert_select "details li[data-controller=history-panel] a", text: /documentation\/roe\/system-site_sync.md/
+  end
 end
