@@ -96,10 +96,26 @@ The Site Sync page shows:
 
 ### Sync history
 
-There is a `View sync history →` link on the [Site Sync](/admin/site_sync) page. This shows you a running log of every change a sync makes from live → local and from local → live. For changes from your local site (Live → Local), you can select files and click RESTORE SELECTED to bring them back from the backup taken just before that sync — whether the file was overwritten or deleted. Changes pushed to live are listed but can't be reversed from here yet; working on this for the next release.
+The `SYNC HISTORY` button on the [Site Sync](/admin/site_sync) page lists every sync, newest first, with what it sent from local to live and what it brought down from live to local. Before a sync replaces or deletes a file, the old version is saved on this computer for 30 days (`sync_history_days` in site.yml; `forever` keeps everything).
 
-- select the file you want to restore
-- click `RESTORE SELECTED`
+Click a file to open it:
+
+- `FILE` — the version the sync left (or deleted)
+- `DIFF` — what the sync changed
+- `COMPARE TO CURRENT` — that version against the local file now, shown when they differ
+- `HISTORY` — every saved version of the file, as a dated log
+- `DOWNLOAD` — that version, as a file
+
+To take back part of a sync, copy what you need from `FILE` or `DIFF`, or download it, change the local file, then sync.
+
+#### Rewind
+
+`REWIND` undoes the newest sync. The live and local site files return to exactly as they were before that sync, and live and local are out of sync afterwards. The next sync makes the same changes again unless you change the files first: make your changes to the live or local site, then sync.
+
+- Only the newest sync can be rewound. To go back further, rewind each newer sync in turn.
+- Before anything changes, Roe lists what will change on local and on live, and names any file changed since the sync. The versions a rewind replaces are saved too.
+- Live has to be reachable. If it isn't, nothing changes on either side.
+- A rewind changes files only. The live database (members, newsletter sends, orders), secrets and video originals are left as they are.
 
 ### Deleted files warning
 
@@ -110,7 +126,7 @@ Site sync deletes files. If a file is deleted on your live site, sync will delet
 - **Work locally, sync to live** — Do your writing and editing locally, then push
 - **Sync before deploying** — Make sure your content is synced before updating or deploying Roe
 - **Pull before major edits** — If you edit on live, sync to local often to keep things in sync
-- **Use Sync history to restore files** — If you sync and want to rollback a file, you can use the [Sync history](/admin/site_sync/history) page to restore a file to a backup made just before files are synced.
+- **Use Sync history to undo a sync** — Rewind the newest sync, or copy an older version of a file from the [Sync history](/admin/site_sync/history) page.
 
 ## Static Site Sync
 

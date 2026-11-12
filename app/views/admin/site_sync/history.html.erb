@@ -16,10 +16,19 @@
     </div>
   </div>
 
+  <%# The newest entry is a rewind: say where that leaves the two sites. %>
+  <% if @latest_rewind && (undone = @version_events.find { |e| e[:id] == @latest_rewind[:undoes] }) %>
+    <div class="mt-6 px-4 py-3 bg-blue-50 border border-gray-300 rounded-xs text-sm text-gray-900 font-sans" id="rewound-banner">
+      Rewound the <%= sync_time(undone[:at]) %> sync. Live and local are out of sync. Before you sync again, make changes to the
+      live or local site as needed, then sync.
+    </div>
+  <% end %>
+
   <% if @version_events.any? %>
+    <% times = @version_events.to_h { |e| [ e[:id], e[:at] ] } %>
     <div class="mt-8 space-y-4">
       <% @version_events.each do |event| %>
-        <%= render "version_event", event: event, row_states: @row_states, point_restorable: @point_restorable[event[:id]] %>
+        <%= render "version_event", event: event, times: times, rewindable: @rewind_candidate&.dig(:id) == event[:id] %>
       <% end %>
     </div>
   <% end %>

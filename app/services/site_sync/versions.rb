@@ -32,7 +32,7 @@ module SiteSync
   module Versions
     class SaveFailed < StandardError; end
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
     DEFAULT_DAYS   = 30
     DB_NAME        = "history.sqlite3"
     # The version a sync leaves is copied too when it's this size or under, so
@@ -40,6 +40,7 @@ module SiteSync
     # edit that hasn't synced. Larger files (audio, video) are copied only when
     # something replaces them, so a new episode isn't stored twice.
     AFTER_COPY_MAX = 10 * 1024 * 1024
+    COLUMNS = "c.id, c.event_id, e.at, c.path, c.direction, c.action, c.before_sha, c.before_size, c.after_sha, c.after_size, c.before_mtime, c.after_mtime"
 
     module_function
 
@@ -104,18 +105,20 @@ module SiteSync
 
     # One event and its changes, in one transaction. Each change is a hash:
     #   path:, direction: "to_live" | "to_local", action: "added" | "changed" | "deleted",
-    #   before_sha:, before_size:, after_sha:, after_size:
-    def record!(kind:, outcome:, at:, changes:)
+    #   before_sha:, before_size:, before_mtime:, after_sha:, after_size:, after_mtime:
+    # Modified times are whole seconds, as Site Sync compares them. `undoes`
+    # is the event a rewind took back.
+    def record!(kind:, outcome:, at:, changes:, undoes: nil)
       with_db do |db|
         event_id = nil
         db.transaction do
-          db.execute("INSERT INTO events (at, kind, outcome) VALUES (?, ?, ?)",
-                     [ at.utc.iso8601(3), kind.to_s, outcome.to_s ])
+          db.execute("INSERT INTO events (at, kind, outcome, undoes) VALUES (?, ?, ?, ?)",
+                     [ at.utc.iso8601(3), kind.to_s, outcome.to_s, undoes ])
           event_id = db.last_insert_row_id
           changes.each do |c|
-            db.execute(<<~SQL, [ event_id, c[:path], c[:direction].to_s, c[:action].to_s, c[:before_sha], c[:before_size], c[:after_sha], c[:after_size] ])
-              INSERT INTO changes (event_id, path, direction, action, before_sha, before_size, after_sha, after_size)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            db.execute(<<~SQL, [ event_id, c[:path], c[:direction].to_s, c[:action].to_s, c[:before_sha], c[:before_size], c[:after_sha], c[:after_size], c[:before_mtime], c[:after_mtime] ])
+              INSERT INTO changes (event_id, path, direction, action, before_sha, before_size, after_sha, after_size, before_mtime, after_mtime)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             SQL
           end
         end
@@ -123,26 +126,53 @@ module SiteSync
       end
     end
 
-    # Newest first: [{ id:, at:, kind:, outcome:, changes: [...] }]
+    # Newest first: [{ id:, at:, kind:, outcome:, undoes:, rewound_by:, changes: [...] }]
+    # `rewound_by` is the rewind event that took this one back, if any.
     def events(limit: 100)
       return [] unless File.exist?(db_path)
 
       with_db do |db|
-        rows = db.execute("SELECT id, at, kind, outcome FROM events ORDER BY id DESC LIMIT ?", [ limit ])
-        rows.map do |id, at, kind, outcome|
-          { id: id, at: Time.iso8601(at), kind: kind, outcome: outcome, changes: changes_for(db, id) }
-        end
+        rewinds = db.execute("SELECT undoes, id FROM events WHERE undoes IS NOT NULL").to_h
+        rows = db.execute("SELECT id, at, kind, outcome, undoes FROM events ORDER BY id DESC LIMIT ?", [ limit ])
+        rows.map { |r| event_row(db, r, rewinds) }
+      end
+    end
+
+    # One event, or nil.
+    def event(id)
+      return nil unless File.exist?(db_path)
+
+      with_db do |db|
+        row = db.execute("SELECT id, at, kind, outcome, undoes FROM events WHERE id = ?", [ id.to_i ]).first
+        next nil unless row
+
+        rewinds = db.execute("SELECT undoes, id FROM events WHERE undoes = ?", [ row[0] ]).to_h
+        event_row(db, row, rewinds)
+      end
+    end
+
+    # One change, with its event's time and kind, or nil.
+    def change(id)
+      return nil unless File.exist?(db_path)
+
+      with_db do |db|
+        row = db.execute(<<~SQL, [ id.to_i ]).first
+          SELECT #{COLUMNS}, e.kind FROM changes c JOIN events e ON e.id = c.event_id WHERE c.id = ?
+        SQL
+        row && change_row(row[0..-2]).merge(kind: row.last)
       end
     end
 
     # Every recorded change to one path, newest first, with its event's time.
+    # Each row also carries its event's kind and, for a rewind, the time of
+    # the event it took back (`undoes_at`).
     def history_of(path)
       return [] unless File.exist?(db_path)
 
       with_db do |db|
-        db.execute(<<~SQL, [ path ]).map { |r| change_row(r) }
-          SELECT c.id, c.event_id, e.at, c.path, c.direction, c.action, c.before_sha, c.before_size, c.after_sha, c.after_size
-          FROM changes c JOIN events e ON e.id = c.event_id
+        db.execute(<<~SQL, [ path ]).map { |r| change_row(r[0..-3]).merge(kind: r[-2], undoes_at: r[-1] && Time.iso8601(r[-1])) }
+          SELECT #{COLUMNS}, e.kind, u.at
+          FROM changes c JOIN events e ON e.id = c.event_id LEFT JOIN events u ON u.id = e.undoes
           WHERE c.path = ? ORDER BY c.event_id DESC, c.id DESC
         SQL
       end
@@ -171,7 +201,7 @@ module SiteSync
       with_db do |db|
         marks = ([ "?" ] * ids.size).join(", ")
         rows = db.execute(<<~SQL, ids).map { |r| change_row(r) }
-          SELECT c.id, c.event_id, e.at, c.path, c.direction, c.action, c.before_sha, c.before_size, c.after_sha, c.after_size
+          SELECT #{COLUMNS}
           FROM changes c JOIN events e ON e.id = c.event_id
           WHERE c.id IN (#{marks}) ORDER BY c.id DESC
         SQL
@@ -250,8 +280,12 @@ module SiteSync
       db&.close
     end
 
+    # Version 2 adds modified times (a rewind puts a file back with the time
+    # it had, so the next sync reads it as untouched) and `undoes`. Columns
+    # are only ever added, so an older Roe can still read the file.
     def migrate!(db)
-      return if db.get_first_value("PRAGMA user_version").to_i >= SCHEMA_VERSION
+      version = db.get_first_value("PRAGMA user_version").to_i
+      return if version >= SCHEMA_VERSION
 
       db.execute_batch(<<~SQL)
         CREATE TABLE IF NOT EXISTS events (
@@ -276,22 +310,38 @@ module SiteSync
         CREATE INDEX IF NOT EXISTS changes_before ON changes (before_sha);
         CREATE INDEX IF NOT EXISTS changes_after  ON changes (after_sha);
         CREATE INDEX IF NOT EXISTS events_at      ON events (at);
-        PRAGMA user_version = #{SCHEMA_VERSION};
       SQL
+      add_column(db, "changes", "before_mtime", "INTEGER")
+      add_column(db, "changes", "after_mtime", "INTEGER")
+      add_column(db, "events", "undoes", "INTEGER")
+      db.execute("PRAGMA user_version = #{SCHEMA_VERSION}")
+    end
+
+    def add_column(db, table, name, type)
+      return if db.execute("PRAGMA table_info(#{table})").any? { |col| col[1] == name }
+
+      db.execute("ALTER TABLE #{table} ADD COLUMN #{name} #{type}")
+    end
+
+    def event_row(db, row, rewinds)
+      id, at, kind, outcome, undoes = row
+      { id: id, at: Time.iso8601(at), kind: kind, outcome: outcome, undoes: undoes,
+        rewound_by: rewinds[id], changes: changes_for(db, id) }
     end
 
     def changes_for(db, event_id)
       db.execute(<<~SQL, [ event_id ]).map { |r| change_row(r) }
-        SELECT c.id, c.event_id, e.at, c.path, c.direction, c.action, c.before_sha, c.before_size, c.after_sha, c.after_size
+        SELECT #{COLUMNS}
         FROM changes c JOIN events e ON e.id = c.event_id
         WHERE c.event_id = ? ORDER BY c.path
       SQL
     end
 
     def change_row(r)
-      id, event_id, at, path, direction, action, before_sha, before_size, after_sha, after_size = r
+      id, event_id, at, path, direction, action, before_sha, before_size, after_sha, after_size, before_mtime, after_mtime = r
       { id: id, event_id: event_id, at: Time.iso8601(at), path: path, direction: direction, action: action,
-        before_sha: before_sha, before_size: before_size, after_sha: after_sha, after_size: after_size }
+        before_sha: before_sha, before_size: before_size, before_mtime: before_mtime,
+        after_sha: after_sha, after_size: after_size, after_mtime: after_mtime }
     end
   end
 end

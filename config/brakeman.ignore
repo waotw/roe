@@ -2719,6 +2719,29 @@
         22
       ],
       "note": "The layout name is checked against ContentLayout::NAME_RE (letters, digits, - and _ only) in set_name before any file access, so it can't leave site/layout/content/ or lib/site_templates/layouts/content/."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "53589b9fd1e059a2bc5746453dbfc0f1fd772b7f267af8e7d09ad990bb5e1cae",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/site_sync_controller.rb",
+      "line": 371,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(SiteSync::VersionPreview.source((SiteSync::Versions.change(params[:id])[:before_sha] or SiteSync::Versions.change(params[:id])[:after_sha]), SiteSync::Versions.change(params[:id])[:path]), :filename => File.basename(SiteSync::Versions.change(params[:id])[:path]), :type => Rack::Mime.mime_type(File.extname(SiteSync::Versions.change(params[:id])[:path]), \"application/octet-stream\"), :disposition => (if params[:inline].present? and SiteSync::VersionPreview.image?(SiteSync::Versions.change(params[:id])[:path]) then\n  \"inline\"\nelse\n  \"attachment\"\nend))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SiteSyncController",
+        "method": "history_version"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "The path comes from SiteSync::VersionPreview.source: a stored object named by a validated SHA-256, or the /site file whose contents match that SHA. params[:id] only picks a recorded change; no request value reaches the path."
     }
   ],
   "brakeman_version": "8.1.0"

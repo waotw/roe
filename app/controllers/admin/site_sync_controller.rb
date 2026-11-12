@@ -319,49 +319,97 @@ class Admin::SiteSyncController < Admin::BaseController
   # Bi-directional sync: reconcile with live and apply the safe changes
   # both ways in one pass. Conflicts stop it (nothing overwritten), so no
   # typed confirmation is needed — both sides are backed up first anyway.
-  # A read-only record of what past syncs moved. Its own page because the Site
-  # Sync screen is already dense, and because this is something you go looking
-  # for after the fact rather than something you watch.
+  # What past syncs did, newest first: look at any file a sync moved (the
+  # version it left, or what changed), and rewind the newest sync. Its own
+  # page because the Site Sync screen is already dense, and because this is
+  # something you go looking for after the fact rather than something you
+  # watch.
   def history
-    # Syncs since the version store began come from it, with every change
-    # restorable; earlier ones from the old log, restorable only from a
-    # snapshot.
+    # Syncs since the version store began come from it; earlier ones from
+    # the old log, restorable only from a snapshot.
     @version_events = SiteSync::Versions.events(limit: 100)
-    hashes = {}
-    @row_states = SiteSync::VersionRestore.row_states(@version_events, hashes: hashes)
-    @point_restorable = @version_events.to_h { |e| [ e[:id], SiteSync::VersionRestore.point_restorable?(e[:id], hashes: hashes) ] }
+    @rewind_candidate = SiteSync::Rewind.candidate(@version_events)
+    @latest_rewind = @version_events.first if @version_events.first&.dig(:kind) == "rewind"
     @events = SiteSync::History.recent
     if (oldest = @version_events.last)
       @events = @events.select { |e| e.at && e.at < oldest[:at] - 1.second }
     end
   end
 
-  # Undo the selected changes: each file goes back to the version its change
-  # replaced. What's there now is saved first, so this can be undone too.
-  def restore_versions
-    result = SiteSync::VersionRestore.changes(params[:change_ids])
-    flash[:notice] = restore_notice(result)
-    redirect_to admin_site_sync_history_path
-  rescue SiteSync::VersionRestore::Error, SiteSync::Versions::SaveFailed => e
-    flash[:alert] = e.message
-    redirect_to admin_site_sync_history_path
+  # One file a sync moved, opened in place: the version it left (FILE), what
+  # changed (DIFF), or that version against the file now (CURRENT).
+  def history_change
+    @change = SiteSync::Versions.change(params[:id])
+    raise ActiveRecord::RecordNotFound unless @change
+
+    @view = %w[file diff current].include?(params[:view]) ? params[:view] : nil
+    frame = params[:frame].to_s.match?(/\A[\w-]{1,64}\z/) ? params[:frame] : nil
+    render partial: "change_panel", locals: { change: @change, view: @view, frame: frame, in_log: params[:in_log].present? }
   end
 
-  # What putting the whole site back to just after a sync would change.
-  def history_point
-    @event = SiteSync::Versions.events(limit: 1_000).find { |e| e[:id] == params[:id].to_i }
+  # Every recorded version of one file, as a dated log.
+  def history_file
+    @path = params[:path].to_s
+    @changes = SiteSync::Versions.history_of(@path)
+    raise ActiveRecord::RecordNotFound if @changes.empty?
+
+    @current_sha = current_sha(@path)
+  end
+
+  # The contents of one version a change recorded: `version=before|after`.
+  # Images open in the page (the before/after preview); everything else
+  # downloads, so nothing stored is ever run in the admin.
+  def history_version
+    change = SiteSync::Versions.change(params[:id])
+    raise ActiveRecord::RecordNotFound unless change
+
+    sha = params[:version] == "before" ? change[:before_sha] : change[:after_sha]
+    abs = SiteSync::VersionPreview.source(sha, change[:path])
+    raise ActiveRecord::RecordNotFound unless abs
+
+    inline = params[:inline].present? && SiteSync::VersionPreview.image?(change[:path])
+    send_file abs, filename: File.basename(change[:path]),
+                   type: Rack::Mime.mime_type(File.extname(change[:path]), "application/octet-stream"),
+                   disposition: inline ? "inline" : "attachment"
+  end
+
+  # What rewinding a sync would do, before it's done. Needs live: the plan
+  # says what changes there, and whether live has changed since.
+  def rewind
+    @event = SiteSync::Versions.event(params[:id])
     raise ActiveRecord::RecordNotFound unless @event
 
-    @plan = SiteSync::VersionRestore.plan_for_point(@event[:id])
+    @rewindable = SiteSync::Rewind.rewindable?(@event)
+    return unless @rewindable
+
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    @unreachable = peer.nil?
+    @plan = SiteSync::Rewind.plan(@event, peer: peer["files"] || {}) if peer
   end
 
-  def restore_history_point
-    result = SiteSync::VersionRestore.point(params[:id])
-    flash[:notice] = restore_notice(result)
-    redirect_to admin_site_sync_history_path
-  rescue SiteSync::VersionRestore::Error, SiteSync::Versions::SaveFailed => e
-    flash[:alert] = e.message
-    redirect_to admin_site_sync_history_path
+  def perform_rewind
+    event = SiteSync::Versions.event(params[:id])
+    raise ActiveRecord::RecordNotFound unless event
+
+    if transfer_in_progress?
+      flash[:alert] = "A sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_history_path
+      return
+    end
+    unless SiteSync::Rewind.rewindable?(event)
+      flash[:alert] = "Only the newest sync can be rewound."
+      redirect_to admin_site_sync_history_path
+      return
+    end
+
+    Rails.cache.write(
+      SiteSyncTransferJob::STATUS_CACHE_KEY,
+      { state: :running, kind: :rewind, started_at: Time.current, event_at: event[:at] },
+      expires_in: SiteSyncTransferJob::STATUS_TTL
+    )
+    SiteSyncRewindJob.perform_later(event[:id])
+    flash[:notice] = "Rewinding the #{event[:at].in_time_zone.strftime('%B %-d, %-I:%M %p')} sync."
+    redirect_to admin_site_sync_path
   end
 
   # Take specific files back out of the snapshot a sync took before it wrote.
@@ -613,20 +661,14 @@ class Admin::SiteSyncController < Admin::BaseController
     Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)&.dig(:state) == :running
   end
 
+  def current_sha(path)
+    abs = File.join(RoeSitePaths::SITE_PATH, path)
+    File.file?(abs) ? Digest::SHA256.file(abs).hexdigest : nil
+  end
+
   # Write the running status synchronously before enqueueing so
   # the UI shows "running" on the immediate redirect, even if the
   # Solid Queue worker hasn't picked the job up yet.
-  def restore_notice(result)
-    parts = []
-    parts << "Restored #{result.restored.size} file#{'s' unless result.restored.size == 1}" if result.restored.any?
-    parts << "removed #{result.removed.size}" if result.removed.any?
-    parts << "#{result.skipped.size} couldn't be put back (no saved copy)" if result.skipped.any?
-    return "Nothing to restore: those files are already that version." if parts.empty?
-    return "#{parts.join(', ').upcase_first}." if result.count.zero?
-
-    "#{parts.join(', ')}. Sync to send #{result.count == 1 ? 'it' : 'them'} to live."
-  end
-
   def seed_running_status(kind)
     Rails.cache.write(
       SiteSyncTransferJob::STATUS_CACHE_KEY,

@@ -103,8 +103,10 @@ module SiteSync
       # to drive the cumulative file counter + progress bar in the
       # admin UI without parsing rsync itself. Mirrors FlyRsync.
 
-      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false)
-        diff ? push_selective(diff, on_progress: on_progress, tidy: tidy) : push_full(on_progress: on_progress)
+      # `root:` sends from another folder laid out like /site — a rewind's
+      # saved versions. Only with a diff, and nothing else rides along.
+      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false, root: nil)
+        diff ? push_selective(diff, on_progress: on_progress, tidy: tidy, root: root) : push_full(on_progress: on_progress)
       end
 
       def pull_live_to_local!(diff: nil, on_progress: nil)
@@ -119,7 +121,7 @@ module SiteSync
 
       # ─── Push ─────────────────────────────────────────────────────
 
-      def push_selective(diff, on_progress: nil, tidy: false)
+      def push_selective(diff, on_progress: nil, tidy: false, root: nil)
         modified = Array(diff[:modified])
         added    = Array(diff[:added])
         deleted  = Array(diff[:deleted])
@@ -127,7 +129,7 @@ module SiteSync
         files_to_send = modified + added
         if files_to_send.any?
           rsync_files_from(
-            source:      "#{RoeSitePaths::SITE_PATH}/",
+            source:      "#{root || RoeSitePaths::SITE_PATH}/",
             dest:        "#{ssh_destination}:#{remote_site_path}",
             files:       files_to_send,
             excludes:    PUSH_EXCLUDES,
@@ -141,7 +143,7 @@ module SiteSync
         # Not in the diff, so never backed up from live first or listed as a
         # deletion: every one is a file this computer has.
         # tidy: a sync with nothing else to send, run to remove those.
-        deleted += SiteSync::LiveVideo.to_purge if files_to_send.any? || deleted.any? || tidy
+        deleted += SiteSync::LiveVideo.to_purge if root.nil? && (files_to_send.any? || deleted.any? || tidy)
         remove_remote_files(deleted.uniq) if deleted.any?
       end
 

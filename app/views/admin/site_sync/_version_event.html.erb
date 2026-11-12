@@ -1,74 +1,59 @@
-<%# One sync (or restore) from the version store. Every change can be
-    undone: the file goes back to the version the change replaced, which was
-    saved before the change was made. %>
-<% labels = { "to_live" => "Local → Live", "to_local" => "Live → Local" } %>
-<% actions = { "added" => "added", "changed" => "changed", "deleted" => "deleted" } %>
-<%# Only a file's latest change can be undone (SiteSync::VersionRestore.row_states):
-    once it's restored, the restore's own entry is where to undo it. %>
-<% notes = { restored: "restored since", changed: "changed again since", in_place: "earlier version in place", no_copy: "no saved copy" } %>
-<% rows = event[:changes].map { |c| c.merge(state: row_states[c[:id]]) } %>
-<% outstanding = rows.count { |c| c[:state] == :undo } %>
-<% restore_event = event[:kind] == "restore" %>
-<div class="bg-white border border-gray-300 rounded-xs overflow-hidden">
-  <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-baseline justify-between gap-2">
-    <div>
-      <span class="text-sm font-semibold text-gray-900"><%= event[:at].in_time_zone.strftime("%B %-d, %Y at %-I:%M %p") %></span>
-      <span class="ml-2 text-xs uppercase text-gray-500"><%= event[:kind] %></span>
+<%# One event from the version store. A sync shows what it moved each way;
+    click a file to open it below the columns. A rewind or restore is a
+    smaller entry listing the files it put back. Only the newest sync that
+    hasn't been rewound gets REWIND (SiteSync::Rewind.candidate). %>
+<% frame     = "event_#{event[:id]}_panel" %>
+<% kind      = event[:kind] %>
+<% compact   = %w[rewind restore].include?(kind) %>
+<% rewound   = event[:rewound_by] %>
+<% rewound_at = rewound && times[rewound] %>
+<div class="bg-white border border-gray-300 rounded-xs overflow-hidden font-mono <%= 'opacity-60' if rewound %>" id="event_<%= event[:id] %>">
+  <div class="px-4 py-2.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-sm font-semibold text-gray-900"><%= sync_time(event[:at]) %></span>
+      <span class="text-xs uppercase text-gray-500"><%= kind %></span>
+      <% if rewound %>
+        <span class="inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">REWOUND<%= " #{sync_time(rewound_at).upcase}" if rewound_at %></span>
+      <% end %>
       <% if event[:outcome] == "failed" %>
-        <span class="ml-2 inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Stopped partway</span>
+        <span class="inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Stopped partway</span>
       <% end %>
     </div>
     <div class="flex items-center gap-3">
-      <span class="text-xs text-gray-500"><%= rows.size %> file<%= "s" if rows.size != 1 %></span>
-      <% if point_restorable %>
-        <%= link_to "RESTORE SITE TO THIS SYNC", admin_site_sync_history_point_path(event[:id]),
-              class: "inline-flex items-center px-2 py-1 border border-gray-700 bg-gray-100 hover:bg-gray-200 text-gray-900 font-mono text-xs rounded-xs" %>
-      <% else %>
-        <span class="inline-flex items-center px-2 py-1 border border-gray-300 bg-gray-50 text-gray-400 font-mono text-xs rounded-xs cursor-not-allowed"
-              title="The site already matches how it was after this <%= event[:kind] %>.">RESTORE SITE TO THIS SYNC</span>
+      <span class="text-xs text-gray-500"><%= event[:changes].size %> file<%= "s" if event[:changes].size != 1 %></span>
+      <% if rewindable %>
+        <%= link_to "REWIND", admin_site_sync_rewind_path(event[:id]), class: history_button_class %>
       <% end %>
     </div>
   </div>
 
-  <%= form_with url: admin_restore_site_sync_versions_path, method: :post, data: { turbo: false, controller: "check-all" } do %>
-    <ul class="divide-y divide-gray-100">
-      <% rows.each do |c| %>
-        <li class="px-4 py-1.5 flex items-center gap-3 text-xs">
-          <% if c[:state] == :undo %>
-            <input type="checkbox" name="change_ids[]" value="<%= c[:id] %>" class="shrink-0"
-                   data-check-all-target="checkbox" data-action="change->check-all#update">
-          <% else %>
-            <span class="w-[13px] shrink-0"></span>
-          <% end %>
-          <span class="w-24 shrink-0 text-gray-500"><%= restore_event ? "Restored" : labels[c[:direction]] %></span>
-          <span class="w-16 shrink-0 text-gray-700"><%= actions[c[:action]] %></span>
-          <span class="truncate text-gray-900" title="<%= c[:path] %>"><%= c[:path] %></span>
-          <span class="ml-auto shrink-0 text-gray-500">
-            <%= notes[c[:state]] %>
-          </span>
-        </li>
+  <% if compact %>
+    <% if kind == "rewind" && (undone = times[event[:undoes]]) %>
+      <p class="px-4 pt-2 text-xs text-gray-600 font-sans">Rewound the <%= sync_time(undone) %> sync.</p>
+    <% end %>
+    <div class="py-1.5">
+      <% event[:changes].each do |c| %>
+        <div class="flex items-center">
+          <span class="pl-4 w-16 shrink-0 text-[10px] uppercase text-gray-400"><%= change_side(c) %></span>
+          <div class="flex-1 min-w-0"><%= render "change_link", change: c, frame: frame %></div>
+        </div>
       <% end %>
-    </ul>
-
-    <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex flex-wrap items-center gap-3">
-      <% if outstanding.zero? %>
-        <span class="text-xs text-gray-600 font-sans">Nothing here to undo.</span>
-      <% else %>
-        <% if outstanding > 1 %>
-          <button type="button" data-check-all-target="toggle" data-action="check-all#toggle"
-                  class="inline-flex items-center px-3 py-1.5 border border-gray-700 bg-white hover:bg-gray-100 text-gray-900 font-mono text-xs rounded-xs cursor-pointer">
-            SELECT ALL
-          </button>
-        <% end %>
-        <button type="submit"
-                class="inline-flex items-center px-3 py-1.5 border border-gray-700 bg-blue-100 hover:bg-blue-200 text-gray-900 font-mono text-xs rounded-xs cursor-pointer"
-                data-confirm="Put the selected files back to the version before this change? What's there now is saved first, so you can undo this too.">
-          <%= restore_event ? "UNDO SELECTED" : "RESTORE SELECTED" %>
-        </button>
-        <p class="text-xs text-gray-600 font-sans">
-          Restores files to the state before the sync. Select and restore all to undo the whole sync.
-        </p>
+    </div>
+  <% else %>
+    <% to_live  = event[:changes].select { |c| c[:direction] == "to_live" } %>
+    <% to_local = event[:changes].select { |c| c[:direction] == "to_local" } %>
+    <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
+      <% [ [ "↑ LOCAL TO LIVE", to_live, "Nothing sent." ], [ "↓ LIVE TO LOCAL", to_local, "Nothing came down." ] ].each do |title, rows, empty| %>
+        <div class="pb-2">
+          <p class="px-4 pt-2 pb-1 text-xs font-bold text-gray-500"><%= title %> · <%= rows.size %></p>
+          <% if rows.empty? %>
+            <p class="px-4 py-1 text-xs text-gray-400 font-sans"><%= empty %></p>
+          <% end %>
+          <% rows.each do |c| %><%= render "change_link", change: c, frame: frame %><% end %>
+        </div>
       <% end %>
     </div>
   <% end %>
+
+  <%= turbo_frame_tag frame %>
 </div>

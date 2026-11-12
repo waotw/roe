@@ -1,0 +1,48 @@
+<%# Every recorded version of one file, newest first, as a dated log. Click
+    a line to open that version: FILE, DIFF (the change made then), and
+    COMPARE TO CURRENT when it isn't the version on local now. Look-only. %>
+<div class="px-4 sm:px-0 font-mono">
+  <div class="flex items-center justify-between">
+    <h1 class="text-3xl font-semibold text-gray-900 font-sans">File History</h1>
+    <%= link_to "← Back to Sync History", admin_site_sync_history_path,
+          class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs text-nowrap" %>
+  </div>
+
+  <div class="mt-6 bg-white border border-gray-300 rounded-xs px-4 py-3 flex flex-wrap items-baseline justify-between gap-2">
+    <span class="text-sm font-bold text-gray-900 break-all"><%= @path %></span>
+    <span class="text-xs text-gray-500">
+      <%= @changes.size %> change<%= "s" if @changes.size != 1 %><% if (days = SiteSync::Versions.keep_days) %> · kept <%= days %> days<% end %>
+    </span>
+  </div>
+
+  <div class="mt-4 bg-white border border-gray-300 rounded-xs overflow-hidden">
+    <div class="px-4 py-2 border-b border-gray-200 flex items-center gap-3 text-[10px] font-bold text-gray-500">
+      <span class="w-3"></span>
+      <span class="w-40 shrink-0">DATE</span>
+      <span class="flex-1">WHAT HAPPENED</span>
+      <span class="w-28 shrink-0 text-right">WHERE</span>
+    </div>
+    <% now_marked = false %>
+    <% @changes.each do |c| %>
+      <%# NOW: the newest line whose version is the local file today. A rewind
+          on live leaves a version local doesn't hold, so it never is. %>
+      <% is_now = !now_marked && @current_sha.present? && c[:after_sha] == @current_sha &&
+                  !(c[:kind] == "rewind" && c[:direction] == "to_live") %>
+      <% now_marked ||= is_now %>
+      <details class="border-b border-gray-100 last:border-b-0 group">
+        <summary class="px-4 py-2 flex items-center gap-3 text-xs cursor-pointer hover:bg-blue-50 list-none">
+          <span class="w-3 text-gray-400 group-open:rotate-90 transition-transform">▸</span>
+          <span class="w-40 shrink-0 text-gray-700"><%= sync_time(c[:at]) %></span>
+          <span class="flex-1 font-sans text-sm text-gray-900">
+            <%= change_summary(c) %>
+            <% if is_now %><span class="ml-2 inline-flex bg-green-50 px-1.5 py-0.5 text-[10px] font-bold font-mono text-green-700">NOW</span><% end %>
+          </span>
+          <span class="w-28 shrink-0 text-right text-gray-500"><%= change_where(c) %></span>
+        </summary>
+        <%= turbo_frame_tag "change_#{c[:id]}", src: admin_site_sync_history_change_path(c[:id], frame: "change_#{c[:id]}", in_log: 1), loading: :lazy do %>
+          <p class="px-4 py-2 text-xs text-gray-400 font-sans">Loading…</p>
+        <% end %>
+      </details>
+    <% end %>
+  </div>
+</div>

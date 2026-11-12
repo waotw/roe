@@ -35,7 +35,11 @@ class SiteSyncTransferJob < ApplicationJob
     realigning_mtimes:   "Aligning file timestamps…",
     reconciling_content: "Updating the database to match new files…",
     notifying_peer:      "Notifying peer to refresh its ledger…",
-    backing_up_database: "Backing up live database (encrypted)…"
+    backing_up_database: "Backing up live database (encrypted)…",
+    # SiteSyncRewindJob, which shares this status.
+    saving_versions:     "Saving the current versions…",
+    rewinding_live:      "Rewinding files on live…",
+    rewinding_local:     "Rewinding files on local…"
   }.freeze
 
   # Raised when the three-way reconcile finds files changed on BOTH sides

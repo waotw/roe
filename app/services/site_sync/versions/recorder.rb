@@ -27,8 +27,9 @@ module SiteSync
         Array(paths).uniq.each do |rel|
           abs = local_path(rel)
           before_sha, before_size = File.file?(abs) ? Versions.save_file(abs) : [ nil, nil ]
+          before_mtime = before_sha && File.mtime(abs).to_i
           action = deleted.include?(rel) ? "deleted" : (before_sha ? "changed" : "added")
-          note(rel, "to_local", action, before_sha, before_size)
+          note(rel, "to_local", action, before_sha, before_size, before_mtime)
         end
       end
 
@@ -51,22 +52,31 @@ module SiteSync
               [ nil, peer.dig(rel, "size") ]
             end
           action = deleted.include?(rel) ? "deleted" : (peer.key?(rel) ? "changed" : "added")
-          note(rel, "to_live", action, before_sha, before_size)
+          note(rel, "to_live", action, before_sha, before_size, peer.dig(rel, "mtime")&.to_i)
         end
+      end
+
+      # The version a path was left at when that isn't the local file — a
+      # rewind puts live back to a version local doesn't hold.
+      def left_at(rel, sha:, size:, mtime:)
+        @changes[rel]&.merge!(after: { after_sha: sha, after_size: size, after_mtime: mtime })
       end
 
       # Write the run as one event, with each path's new version taken from
       # local disk — after a sync both sides hold it. Never raises: the
       # transfer has happened, and failing to record it mustn't fail it.
-      def finish!(kind:, outcome:, at: Time.current)
+      def finish!(kind:, outcome:, at: Time.current, undoes: nil)
         return nil if @changes.empty?
 
         changes = @changes.values.map do |c|
+          next c.except(:after).merge(c[:after]) if c[:after]
+
           abs = local_path(c[:path])
-          after_sha, after_size = c[:action] != "deleted" && File.file?(abs) ? Versions.keep_after(abs) : [ nil, nil ]
-          c.merge(after_sha: after_sha, after_size: after_size)
+          present = c[:action] != "deleted" && File.file?(abs)
+          after_sha, after_size = present ? Versions.keep_after(abs) : [ nil, nil ]
+          c.merge(after_sha: after_sha, after_size: after_size, after_mtime: present ? File.mtime(abs).to_i : nil)
         end
-        event_id = Versions.record!(kind: kind, outcome: outcome, at: at, changes: changes)
+        event_id = Versions.record!(kind: kind, outcome: outcome, at: at, changes: changes, undoes: undoes)
         Versions.trim!
         event_id
       rescue StandardError => e
@@ -76,8 +86,9 @@ module SiteSync
 
       private
 
-      def note(rel, direction, action, before_sha, before_size)
-        @changes[rel] = { path: rel, direction: direction, action: action, before_sha: before_sha, before_size: before_size }
+      def note(rel, direction, action, before_sha, before_size, before_mtime)
+        @changes[rel] = { path: rel, direction: direction, action: action,
+                          before_sha: before_sha, before_size: before_size, before_mtime: before_mtime }
       end
 
       def local_path(rel) = File.join(RoeSitePaths::SITE_PATH, rel)
