@@ -90,9 +90,11 @@ Click `APPLY CHOICES & SYNC` (or `RESOLVE ALL BY MOST-RECENT & SYNC`) and Roe ap
 The Site Sync page shows:
 
 - **Last contact** — When the live site was last reached
-- **Local changes** — Files modified locally since last sync
-- **Live changes** — Files modified on live since last sync
+- **Local changes** — Files changed locally since last sync
+- **Live changes** — Files changed on live since last sync
 - **SYNC WITH LIVE button** — Available when connection is healthy
+
+Click a file under `Show local changes` or `Show live changes` to see what the next sync will do to it: `DIFF` shows the changes it will make to the other side's copy, `FILE` the version it will send. Click the file again to close it.
 
 ### Sync history
 

@@ -551,7 +551,7 @@
                 </summary>
                 <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
                   <% [
-                  [ "Modified", reassessment[:pending_modified] ],
+                  [ "Changed", reassessment[:pending_modified] ],
                   [ "Added",    reassessment[:pending_added] ],
                   [ "Deleted",  reassessment[:pending_deleted] ]
                 ].each do |label, list| %>
@@ -842,7 +842,7 @@
                     truncated one keeps its "first N per group" note below. %>
                 <% live_display = { modified: collapse_sync_paths(live_changes[:modified]), added: collapse_sync_paths(live_changes[:added]), deleted: collapse_sync_paths(live_changes[:deleted]) } %>
                 <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
-                  <% if live_display[:modified].any? %><li><strong><%= live_display[:modified].size %></strong> modified</li><% end %>
+                  <% if live_display[:modified].any? %><li><strong><%= live_display[:modified].size %></strong> changed</li><% end %>
                   <% if live_display[:added].any? %><li><strong><%= live_display[:added].size %></strong> added</li><% end %>
                   <% if live_display[:deleted].any? %><li><strong><%= live_display[:deleted].size %></strong> deleted</li><% end %>
                 </ul>
@@ -851,15 +851,7 @@
                     Show live changes<% if live_changes[:truncated] %> <span class="font-normal text-amber-700">(first <%= SiteSync::Exchange::DRIFT_LIST_CAP %> per group)</span><% end %>
                   </summary>
                   <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                    <% [ [ "Modified", live_display[:modified] ], [ "Added", live_display[:added] ], [ "Deleted", live_display[:deleted] ] ].each do |label, list| %>
-                      <% next if list.blank? %>
-                      <div>
-                        <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
-                        <ul class="text-xs font-mono text-amber-800 space-y-1">
-                          <% list.each do |path| %><li><%= path %></li><% end %>
-                        </ul>
-                      </div>
-                    <% end %>
+                    <%= render "pending_list", changes: live_changes, side: "live" %>
                   </div>
                 </details>
               <% end %>
@@ -874,22 +866,14 @@
               </p>
               <% local_display = { modified: collapse_sync_paths(local_changes[:modified]), added: collapse_sync_paths(local_changes[:added]), deleted: collapse_sync_paths(local_changes[:deleted]) } %>
               <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
-                <% if local_display[:modified].any? %><li><strong><%= local_display[:modified].size %></strong> modified</li><% end %>
+                <% if local_display[:modified].any? %><li><strong><%= local_display[:modified].size %></strong> changed</li><% end %>
                 <% if local_display[:added].any? %><li><strong><%= local_display[:added].size %></strong> added</li><% end %>
                 <% if local_display[:deleted].any? %><li><strong><%= local_display[:deleted].size %></strong> deleted</li><% end %>
               </ul>
               <details class="mt-1">
                 <summary class="text-xs font-semibold text-amber-900 cursor-pointer hover:text-amber-700">Show local changes</summary>
                 <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                  <% [ [ "Modified", local_display[:modified] ], [ "Added", local_display[:added] ], [ "Deleted", local_display[:deleted] ] ].each do |label, list| %>
-                    <% next if list.empty? %>
-                    <div>
-                      <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
-                      <ul class="text-xs font-mono text-amber-800 space-y-1">
-                        <% list.each do |path| %><li><%= path %></li><% end %>
-                      </ul>
-                    </div>
-                  <% end %>
+                  <%= render "pending_list", changes: local_changes, side: "local" %>
                 </div>
               </details>
             </div>

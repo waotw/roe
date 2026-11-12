@@ -1,0 +1,29 @@
+<%# The files one side changed, grouped by what happened. Each real file
+    opens in place, under its row: the change the next sync will make
+    (pending_change). Roe-managed groups (image sizes and the like) stay as
+    one line. `side` is "local" or "live". %>
+<% raw = { "changed" => Array(changes[:modified]), "added" => Array(changes[:added]), "deleted" => Array(changes[:deleted]) } %>
+<% raw.each do |action, paths| %>
+  <% list = collapse_sync_paths(paths) %>
+  <% next if list.empty? %>
+  <div>
+    <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= action.capitalize %> (<%= list.size %>)</h4>
+    <ul class="text-xs font-mono text-amber-800 space-y-1">
+      <% list.each do |path| %>
+        <% if paths.include?(path) %>
+          <% frame = "pending_#{side}_#{Digest::SHA1.hexdigest(path)[0, 12]}" %>
+          <li data-controller="history-panel">
+            <%= link_to admin_site_sync_pending_change_path(path: path, side: side, change: action, frame: frame),
+                  data: { turbo_frame: frame, history_panel_target: "link", action: "history-panel#toggle" },
+                  aria: { expanded: false }, class: "inline-flex items-center gap-1.5 hover:text-amber-950 hover:underline" do %>
+              <span class="transition-transform" data-arrow>▸</span><span><%= path %></span>
+            <% end %>
+            <%= turbo_frame_tag frame, data: { history_panel_target: "frame" } %>
+          </li>
+        <% else %>
+          <li class="pl-4"><%= path %></li>
+        <% end %>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

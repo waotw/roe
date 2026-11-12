@@ -92,4 +92,18 @@ class Admin::SiteSyncOverviewTest < ActionDispatch::IntegrationTest
     assert_match "has changes to pull in", response.body
     assert_no_match "neither side", response.body
   end
+
+  test "each pending file opens in place, and changes read as changed" do
+    result = SiteSync::PeerAgreement::Result.new(in_sync: false, differing: [], confirmed_identical: [],
+                                                 on_live: { modified: [ "posts/a.md" ], added: [], deleted: [] })
+    SiteSync::Conclusion.stubs(:current).returns(conclusion(:out_of_sync).tap { |c| c.agreement = result })
+    SiteSync::Ledger.stubs(:recorded).returns({ "files" => {} })
+    get admin_site_sync_path
+
+    assert_select "li[data-controller=history-panel] a[href=?]",
+                  admin_site_sync_pending_change_path(path: "posts/a.md", side: "live", change: "changed",
+                                                      frame: "pending_live_#{Digest::SHA1.hexdigest('posts/a.md')[0, 12]}")
+    assert_match "Changed (1)", response.body
+    assert_no_match(/>\s*modified\s*</, response.body)
+  end
 end

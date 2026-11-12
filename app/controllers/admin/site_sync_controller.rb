@@ -373,6 +373,45 @@ class Admin::SiteSyncController < Admin::BaseController
                    disposition: inline ? "inline" : "attachment"
   end
 
+  # A file the next sync will move, opened on the Site Sync page before the
+  # sync: FILE, or DIFF of live now against local now. `side` is where it
+  # changed. Live's copy is fetched for the look and never written to /site.
+  def pending_change
+    path = pending_path!
+    side = params[:side] == "live" ? "live" : "local"
+    action = %w[added changed deleted].include?(params[:change]) ? params[:change] : "changed"
+    view = %w[file diff].include?(params[:view]) ? params[:view] : nil
+    frame = params[:frame].to_s.match?(/\A[\w-]{1,64}\z/) ? params[:frame] : "pending_panel"
+    live_size = SiteSync::Exchange.fetch_peer_file_states([ path ]).dig(path, "size")
+
+    SiteSync::PendingPreview.with_live_copy(path, size: live_size) do |live_abs|
+      render partial: "pending_panel",
+             locals: { path: path, side: side, action: action, view: view, frame: frame, live_abs: live_abs }
+    end
+  end
+
+  # One side's copy of a pending file: `which=local|live`. Images open in
+  # the page; everything else downloads.
+  def pending_version
+    path = pending_path!
+    inline = params[:inline].present? && SiteSync::VersionPreview.image?(path)
+    options = { filename: File.basename(path), disposition: inline ? "inline" : "attachment",
+                type: Rack::Mime.mime_type(File.extname(path), "application/octet-stream") }
+
+    if params[:which] == "live"
+      live_size = SiteSync::Exchange.fetch_peer_file_states([ path ]).dig(path, "size")
+      body = SiteSync::PendingPreview.with_live_copy(path, size: live_size) { |abs| abs && File.binread(abs) }
+      raise ActiveRecord::RecordNotFound unless body
+
+      send_data body, **options
+    else
+      abs = SiteSync::PendingPreview.local_copy(path)
+      raise ActiveRecord::RecordNotFound unless abs
+
+      send_file abs, **options
+    end
+  end
+
   # What rewinding a sync would do, before it's done. Needs live: the plan
   # says what changes there, and whether live has changed since.
   def rewind
@@ -669,6 +708,13 @@ class Admin::SiteSyncController < Admin::BaseController
 
   def transfer_in_progress?
     Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)&.dig(:state) == :running
+  end
+
+  def pending_path!
+    path = params[:path].to_s
+    raise ActiveRecord::RecordNotFound unless SiteSync::PendingPreview.trackable?(path)
+
+    path
   end
 
   def current_sha(path)

@@ -85,6 +85,8 @@ Rails.application.routes.draw do
     get  "site_sync/history/changes/:id/version", to: "site_sync#history_version", as: "site_sync_history_version"
     get  "site_sync/history/file", to: "site_sync#history_file", as: "site_sync_history_file"
     get  "site_sync/history/rewind/:id", to: "site_sync#rewind", as: "site_sync_rewind"
+    get  "site_sync/pending", to: "site_sync#pending_change", as: "site_sync_pending_change"
+    get  "site_sync/pending/version", to: "site_sync#pending_version", as: "site_sync_pending_version"
     post "site_sync/history/rewind/:id", to: "site_sync#perform_rewind"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
