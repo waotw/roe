@@ -207,6 +207,9 @@ class SiteSyncTransferConflictTest < ActiveSupport::TestCase
     transport.stubs(:pull_live_to_local!).with { |**| File.write(File.join(RoeSitePaths::SITE_PATH, pulled), "live's new words"); true }
     SiteSync.stubs(:transport).returns(transport)
     SiteSyncTransferJob.any_instance.stubs(:tidy_live?).returns(false)
+    # The version store holds what the pull replaced; a full snapshot of
+    # /site is the Site Backups tab's job, not every sync's.
+    SiteSync::BackupManager.expects(:create).never
 
     SiteSyncTransferJob.perform_now(:sync)
 

@@ -45,7 +45,7 @@ module SiteSync
           copy = from && File.join(from, rel)
           before_sha, before_size =
             if copy && File.file?(copy)
-              Versions.save_file(copy)
+              Versions.link_file(copy)
             elsif peer.key?(rel) && !BackupPolicy.video_web_version?(rel)
               raise SaveFailed, "live's copy of #{rel} wasn't backed up, so it can't be kept before the push"
             else
@@ -54,6 +54,7 @@ module SiteSync
           action = deleted.include?(rel) ? "deleted" : (peer.key?(rel) ? "changed" : "added")
           note(rel, "to_live", action, before_sha, before_size, peer.dig(rel, "mtime")&.to_i)
         end
+        discard_live_backup(from)
       end
 
       # The version a path was left at when that isn't the local file — a
@@ -92,6 +93,29 @@ module SiteSync
       end
 
       def local_path(rel) = File.join(RoeSitePaths::SITE_PATH, rel)
+
+      # Once live's copies are in the store, the pre-push backup folder they
+      # came in is a second name for the same files: remove it, so the old
+      # versions live in one place and backups/live/content/ doesn't grow
+      # with every push. Only a folder under that root, and `latest` moves to
+      # the newest one left (`rake site:backup` and the rsync transports
+      # link against it). Best effort: a folder left behind costs nothing,
+      # since its files are hard-linked with the store's.
+      def discard_live_backup(dir)
+        root = File.expand_path(SiteSync::BackupPaths.live_content)
+        dir = dir && File.expand_path(dir)
+        return unless dir && File.dirname(dir) == root && File.basename(dir).match?(/\A20\d{2}-/) && File.directory?(dir)
+
+        FileUtils.rm_rf(dir)
+        latest = File.join(root, "latest")
+        return unless File.symlink?(latest) && !File.exist?(latest)
+
+        FileUtils.rm_f(latest)
+        newest = Dir.glob(File.join(root, "20*")).select { |d| File.directory?(d) && !File.symlink?(d) }.max
+        FileUtils.ln_s(File.basename(newest), latest) if newest
+      rescue StandardError => e
+        Rails.logger.warn "[SiteSync::Versions] couldn't remove #{dir}: #{e.class} #{e.message}"
+      end
     end
   end
 end

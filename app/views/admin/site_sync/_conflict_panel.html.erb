@@ -1,0 +1,75 @@
+<%# A file the sync paused on, opened from the conflict list: LOCAL and LIVE
+    are the two versions to choose between, DIFF what differs. One of them is
+    missing when the file was deleted on that side. Live's copy is fetched on
+    demand (PendingPreview) and never written to /site. %>
+<% local_abs    = SiteSync::PendingPreview.local_copy(path) %>
+<% both         = local_abs && live_abs %>
+<% image        = SiteSync::VersionPreview.image?(path) %>
+<% view         = nil if view == "diff" && !both %>
+<% view         = view.presence || (both ? "diff" : (local_abs ? "local" : "live")) %>
+<% shown        = { "local" => local_abs, "live" => live_abs }[view] %>
+<% link_args    = ->(v) { admin_site_sync_pending_change_path(path: path, change: "conflict", view: v, frame: frame) } %>
+<% tab_class    = ->(on) { "px-2 py-1 font-mono text-xs #{on ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}" } %>
+<%= turbo_frame_tag frame do %>
+  <div class="mt-2 bg-gray-50 border border-gray-200 px-3 py-2.5 space-y-2 font-mono" data-change-panel="conflict">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-semibold text-gray-900 truncate mr-auto" title="<%= path %>"><%= path %></span>
+      <% unless image %>
+        <span class="inline-flex border border-gray-400 rounded-xs overflow-hidden">
+          <%= link_to "LOCAL", link_args.("local"), class: tab_class.(view == "local") %>
+          <%= link_to "LIVE", link_args.("live"), class: tab_class.(view == "live") %>
+          <% if both %>
+            <%= link_to "DIFF", link_args.("diff"), class: tab_class.(view == "diff") %>
+          <% end %>
+        </span>
+      <% end %>
+      <% if SiteSync::Versions.history_of(path).any? %>
+        <%= link_to "HISTORY", admin_site_sync_history_file_path(path: path), class: history_button_class, data: { turbo_frame: "_top" } %>
+      <% end %>
+      <% if shown && view != "diff" %>
+        <%= link_to "DOWNLOAD", admin_site_sync_pending_version_path(path: path, which: view), class: history_button_class, data: { turbo: false } %>
+      <% end %>
+    </div>
+
+    <% if image %>
+      <div class="grid grid-cols-2 gap-3">
+        <% [ [ "LOCAL", "local", local_abs ], [ "LIVE", "live", live_abs ] ].each do |label, which, abs| %>
+          <div class="space-y-1">
+            <p class="text-[10px] font-bold text-gray-500"><%= label %></p>
+            <% if abs %>
+              <img src="<%= admin_site_sync_pending_version_path(path: path, which: which, inline: 1) %>" alt="" class="max-h-64 border border-gray-200 bg-white">
+              <p class="text-[10px] text-gray-500"><%= number_to_human_size(File.size(abs)) %></p>
+            <% else %>
+              <p class="text-xs text-gray-500 font-sans">Deleted on <%= which %>, or couldn't be fetched.</p>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% elsif view == "diff" %>
+      <% from_text = SiteSync::VersionPreview.text_of(live_abs) %>
+      <% to_text   = SiteSync::VersionPreview.text_of(local_abs) %>
+      <% if from_text.nil? || to_text.nil? %>
+        <p class="text-xs text-gray-600 font-sans">This file can't be shown here. Use LOCAL or LIVE to download each version.</p>
+      <% else %>
+        <p class="text-xs text-gray-600 font-sans">DIFF: red lines are only in the live version, green lines only in the local version.</p>
+        <%= render "diff_lines", from_text: from_text, to_text: to_text %>
+      <% end %>
+    <% elsif shown.nil? %>
+      <p class="text-xs text-gray-600 font-sans">
+        <% if view == "live" %>
+          No live version: it was deleted on live, it's over <%= number_to_human_size(SiteSync::PendingPreview::FETCH_MAX) %>, or the live site didn't answer.
+        <% else %>
+          No local version: it was deleted on local.
+        <% end %>
+      </p>
+    <% else %>
+      <% shown_text = SiteSync::VersionPreview.text_of(shown) %>
+      <% if shown_text.nil? %>
+        <p class="text-xs text-gray-600 font-sans">This file can't be shown here (<%= number_to_human_size(File.size(shown)) %>). Use DOWNLOAD to open it.</p>
+      <% else %>
+        <p class="text-xs text-gray-600 font-sans"><%= view.upcase %>: the <%= view %> version.</p>
+        <%= render "file_lines", text: shown_text %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

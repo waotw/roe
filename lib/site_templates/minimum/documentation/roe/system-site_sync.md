@@ -81,7 +81,9 @@ The first push may take several minutes depending on how much media you have. Su
 
 ### How Site Sync handles conflicts
 
-You might have edited the same post or page on the live site and the local site. If this happens, you will be asked to confirm which file should be kept. By default, Roe will prioritize the file that was modified more recently.
+You might have edited the same post or page on the live site and the local site. If this happens, you will be asked to confirm which file should be kept. By default, Roe will prioritize the file that was changed more recently.
+
+Click a file to compare the two versions before you choose: `LOCAL` and `LIVE` show each version, `DIFF` what differs between them. Click the file again to close it.
 
 Click `APPLY CHOICES & SYNC` (or `RESOLVE ALL BY MOST-RECENT & SYNC`) and Roe applies your choices, then syncs everything else in the same run. If that sync finds new conflicts, it stops and asks again. `CANCEL` changes nothing.
 
@@ -119,9 +121,11 @@ To take back part of a sync, copy what you need from `FILE` or `DIFF`, or downlo
 - Live has to be reachable. If it isn't, nothing changes on either side.
 - A rewind changes files only. The live database (members, newsletter sends, orders), secrets and video originals are left as they are.
 
-### Deleted files warning
+### Deleted files
 
-Site sync deletes files. If a file is deleted on your live site, sync will delete locally and vice-versa. To prevent accidentally deleting files, Roe has a warning in place which allows you to confirm all deletions. You can set a threshold for this in Settings → [site.yml](/admin/configs/site/edit) in the `Site Sync` section or turn it off entirely with `never`.
+Site Sync deletes files. If a file is deleted on your live site, sync deletes it locally, and the other way round. Every deleted file is saved first, so `REWIND` or Sync history can bring it back.
+
+A sync that would delete more than 20 files stops and asks first. That many deletions usually means something has gone wrong. Change the number with `Confirm deletions over` in Settings → [site.yml](/admin/configs/site/edit), in the `Site Sync` section: `0` asks before every deletion, `never` never asks.
 
 ### Best Practices
 
@@ -159,17 +163,18 @@ Once settings are in place, `TEST CONNECTION` and once green, `PUSH`. This will 
 
 ## Site Backups
 
-Site Sync does 3 things every time you `SYNC WITH LIVE`, before it changes anything:
+Every time you `SYNC WITH LIVE`, before it changes anything, Site Sync:
 
-1. A full local backup
-2. A partial live backup
-3. A full backup of the live database (encrypted)
+1. Saves every file it will replace or delete, on local and on live, in [Sync history](#sync-history)
+2. Downloads a full backup of the live database (encrypted)
+
+A full backup of your local site is separate: make one with `Create backup`.
 
 Video web versions (the 720p and 1080p copies and the poster) are left out of backups. Roe makes them again from the original video.
 
 ### Full local backup
 
-Site Sync creates an entire backup of your local site when you sync. It also will backup before you restore a file in Sync History or restore from a previous backup. Local backups are kept in `backups/local/`.
+`Create backup` on Site Sync → Site Backups → Local makes a complete copy of your local site. Roe also makes one before it restores a backup. Local backups are kept in `backups/local/`; the last 15 are kept.
 
 The backup system is smart:
 
@@ -177,11 +182,9 @@ The backup system is smart:
 - subsequent backups only track what changed since the previous backup
 - this keeps the size of each backup to a much more reasonable size
 
-### Partial live backup
+### Live files a sync replaces
 
-Site Sync creates a backup of any content that was changed on the live site and has been updated or modified by the sync. This allows you to restore or reverse changes made to the live site, such as an accidental deletion. Roe keeps up to 15 live backups, in `backups/live/content/`.
-
-Large files such as videos are backed up too. They come down in pieces, so a big file can take a few minutes.
+Before a sync changes or deletes files on live, it downloads live's copies and saves them in Sync history, so a sync can be rewound and any old version opened or downloaded. Large files such as videos are saved too. They come down in pieces, so a big file can take a few minutes.
 
 ### Full encrypted backup of live database
 

@@ -28,7 +28,7 @@ class SiteSyncTransferJob < ApplicationJob
     backing_up_live:     "Backing up live (only the files about to change)…",
     pushing_to_live:     "Pushing changed files to live…",
     pushing_to_live_full: "Pushing to live (full tree)…",
-    backing_up_local:    "Backing up local…",
+    backing_up_local:    "Saving local versions about to change…",
     pulling_from_live:   "Pulling changed files from live…",
     pulling_from_live_full: "Pulling from live (full tree)…",
     refreshing_baseline: "Refreshing sync baseline…",
@@ -69,7 +69,6 @@ class SiteSyncTransferJob < ApplicationJob
     # What moved, in each direction, for the history log. Set by each
     # perform_* method so the record reflects what was actually planned.
     @to_live = @to_local = { modified: [], added: [], deleted: [] }
-    @local_snapshot = nil
     # Every version this run replaces or deletes, saved before it's touched
     # (SiteSync::Versions). Saving failing stops the run before the transfer.
     @versions = SiteSync::Versions::Recorder.new
@@ -283,10 +282,10 @@ class SiteSyncTransferJob < ApplicationJob
       return
     end
 
-    # Local backup is fast (no network), so always do the full
-    # snapshot — it's a complete restore point.
+    # The local versions the pull replaces or deletes go into the version
+    # store. No full snapshot of /site: that's the Site Backups tab's job
+    # (BACK UP NOW), not every sync's.
     update_step(:backing_up_local)
-    @local_snapshot = SiteSync::BackupManager.create
     @versions.save_local!(diff[:added] + diff[:deleted], deleted: diff[:deleted])
 
     update_step(:pulling_from_live)
@@ -327,7 +326,6 @@ class SiteSyncTransferJob < ApplicationJob
 
     if @pulled
       update_step(:backing_up_local)
-      @local_snapshot = SiteSync::BackupManager.create
       @versions.save_local!(pull_diff[:added] + pull_diff[:deleted], deleted: pull_diff[:deleted])
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: pull_diff, on_progress: progress_proc)
@@ -501,7 +499,6 @@ class SiteSyncTransferJob < ApplicationJob
       outcome:  outcome,
       to_live:  @to_live,
       to_local: @to_local,
-      snapshot: @local_snapshot,
       error:    error,
       at:       @started_at || Time.current
     )

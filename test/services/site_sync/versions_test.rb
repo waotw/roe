@@ -97,6 +97,45 @@ class SiteSync::VersionsTest < ActiveSupport::TestCase
     FileUtils.rm_rf(backup)
   end
 
+  # One copy on disk: the store links live's copy in, and the pre-push backup
+  # folder it came in is removed once it's saved.
+  test "live's copy is linked into the store, not copied, and its backup folder goes" do
+    rel = write("#{DIR}/page.md", "local's new words")
+    root = File.join(SiteSync::Versions.root, "..", "live-content-#{SecureRandom.hex(4)}")
+    SiteSync::BackupPaths.stubs(:live_content).returns(root)
+    older, backup = File.join(root, "2026-01-01-000000"), File.join(root, "2026-01-02-000000")
+    FileUtils.mkdir_p([ older, File.join(backup, DIR) ])
+    File.write(File.join(backup, rel), "live's old words")
+    File.symlink(File.basename(backup), File.join(root, "latest"))
+    backed_up = File.stat(File.join(backup, rel))
+
+    recorder = SiteSync::Versions::Recorder.new
+    recorder.save_live!([ rel ], from: backup, peer: { rel => { "size" => 16 } })
+    recorder.finish!(kind: :push, outcome: :completed)
+
+    sha = SiteSync::Versions.history_of(rel).first[:before_sha]
+    object = File.stat(SiteSync::Versions.object_path(sha))
+    assert_equal [ backed_up.dev, backed_up.ino ], [ object.dev, object.ino ], "the same file on disk, not a copy"
+    assert_equal "live's old words", stored(sha)
+    assert_not File.exist?(backup)
+    assert File.directory?(older), "only the folder this push made is removed"
+    assert_equal File.basename(older), File.readlink(File.join(root, "latest"))
+  ensure
+    FileUtils.rm_rf(root)
+  end
+
+  test "a backup folder outside backups/live/content is left alone" do
+    rel = write("#{DIR}/page.md", "new")
+    backup = Dir.mktmpdir
+    FileUtils.mkdir_p(File.join(backup, DIR))
+    File.write(File.join(backup, rel), "old")
+
+    SiteSync::Versions::Recorder.new.save_live!([ rel ], from: backup, peer: { rel => { "size" => 3 } })
+    assert File.exist?(File.join(backup, rel))
+  ensure
+    FileUtils.rm_rf(backup)
+  end
+
   # Rule 2: no saved copy, no deletion. The sync stops instead.
   test "a live file the backup didn't bring down stops the push" do
     rel = "#{DIR}/missing.md"

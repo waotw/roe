@@ -26,15 +26,18 @@ module SiteSync
     # deletions has misread something, and nobody deletes thirty files by hand
     # without noticing.
     #
-    # 0 by default: confirm everything. That's the safe end of the dial, and
-    # it's where a new install should start — after a sync destroyed 9 episodes
-    # and 23 audio files on 2026-08-26 by inferring a deletion that never
-    # happened, the case for a cautious default makes itself.
+    # 20 by default: only a bulk deletion asks. Every file a sync deletes, on
+    # either side, is saved in the version store first (Versions::Recorder
+    # stops the sync when it can't save one), so a routine deletion can be
+    # put back with REWIND or downloaded from Sync History. The guard stays
+    # for the case it was built for: on 2026-08-26 a wrong baseline inferred
+    # deletions that never happened and destroyed 9 episodes and 23 audio
+    # files. A sync proposing that many deletions has misread something.
     #
-    #   0   → confirm every deletion (default)
-    #   20  → confirm only bulk deletions
+    #   0   → confirm every deletion
+    #   20  → confirm only bulk deletions (default)
     #   nil → never confirm, propagate deletions silently
-    DEFAULT_CONFIRM_DELETIONS_OVER = 0
+    DEFAULT_CONFIRM_DELETIONS_OVER = 20
 
     EDIT_EDIT   = :edit_edit     # both sides edited, content differs
     EDIT_DELETE = :edit_delete   # edited locally, deleted on the peer

@@ -14,5 +14,5 @@ theme:
   active: default
 update_channel: stable
 sync_transport: http
-sync_confirm_deletions_over: 0
+sync_confirm_deletions_over: 20
 static_generation_enabled: false

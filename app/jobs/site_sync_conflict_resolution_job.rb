@@ -57,7 +57,6 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     # Keep-live files flow live → local.
     if pulled
       update_step(:backing_up_local)
-      @local_snapshot = SiteSync::BackupManager.create
       @versions.save_local!(plan[:pull_add] + plan[:pull_delete], deleted: plan[:pull_delete])
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: { modified: [], added: plan[:pull_add], deleted: plan[:pull_delete] }, on_progress: progress_proc)
@@ -96,7 +95,6 @@ class SiteSyncConflictResolutionJob < ApplicationJob
       outcome:  :completed,
       to_live:  { added: plan[:push_add], deleted: plan[:push_delete] },
       to_local: { added: plan[:pull_add], deleted: plan[:pull_delete] },
-      snapshot: @local_snapshot,
       at:       started_at
     )
     @versions.finish!(kind: :resolve, outcome: :completed, at: started_at)

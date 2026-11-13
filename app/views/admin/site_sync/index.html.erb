@@ -359,9 +359,10 @@
               <div class="space-y-2 mb-5">
                 <% deletions.each do |c| %>
                   <% deleted_on = c["peer"].nil? ? "live" : "local" %>
-                  <div class="flex items-center justify-between gap-3 bg-white border border-red-300 rounded-xs px-3 py-2">
+                  <div class="bg-white border border-red-300 rounded-xs px-3 py-2" data-controller="history-panel">
+                  <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
+                      <%= render "conflict_file_link", path: c["path"] %>
                       <p class="text-[11px] text-red-700">This file was deleted on <%= deleted_on %></p>
                     </div>
                     <%# Keep defaults to the side that still has the file, so
@@ -377,37 +378,42 @@
                       </label>
                     </div>
                   </div>
+                  <%= turbo_frame_tag conflict_frame_id(c["path"]), data: { history_panel_target: "frame" } %>
+                  </div>
                 <% end %>
               </div>
             <% end %>
 
             <% if edits.any? %>
               <p class="text-sm text-amber-800 mb-3">
-                These files changed on <strong>both</strong> this machine and live since the last sync,
-                so nothing was overwritten. Pick which version wins for each, then apply.
+                These files changed on <strong>both</strong> local and live since the last sync,
+                so nothing was overwritten. Click a file to compare the two versions, pick which one wins, then apply.
               </p>
 
               <div class="space-y-2 mb-4">
                 <% edits.each do |c| %>
-                  <% type_label = { "edit_edit" => "edited on both sides",
-                                    "edit_delete" => "edited here, deleted on live",
-                                    "delete_edit" => "deleted here, edited on live" }[c["type"]] || c["type"] %>
-                  <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-xs px-3 py-2">
+                  <% type_label = { "edit_edit" => "changed on both sides",
+                                    "edit_delete" => "changed on local, deleted on live",
+                                    "delete_edit" => "deleted on local, changed on live" }[c["type"]] || c["type"] %>
+                  <div class="bg-white border border-amber-200 rounded-xs px-3 py-2" data-controller="history-panel">
+                  <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
+                      <%= render "conflict_file_link", path: c["path"] %>
                       <p class="text-[11px] text-gray-500">
                         <%= type_label %><%
-                          %><% if c["newer"] == "local" %> · yours is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
+                          %><% if c["newer"] == "local" %> · local is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
                       </p>
                     </div>
                     <div class="flex gap-3 shrink-0 text-xs">
                       <label class="flex items-center gap-1 cursor-pointer">
-                        <input type="radio" name="resolutions[<%= c["path"] %>]" value="local" <%= "checked" if c["newer"] != "live" %>> Keep mine
+                        <input type="radio" name="resolutions[<%= c["path"] %>]" value="local" <%= "checked" if c["newer"] != "live" %>> Keep local
                       </label>
                       <label class="flex items-center gap-1 cursor-pointer">
                         <input type="radio" name="resolutions[<%= c["path"] %>]" value="live" <%= "checked" if c["newer"] == "live" %>> Keep live
                       </label>
                     </div>
+                  </div>
+                  <%= turbo_frame_tag conflict_frame_id(c["path"]), data: { history_panel_target: "frame" } %>
                   </div>
                 <% end %>
               </div>
@@ -655,7 +661,7 @@
             <div class="mt-6 pt-4 border-t border-amber-200">
               <h3 class="text-sm font-semibold text-amber-900 mb-2">Sync with live</h3>
               <p class="text-sm text-amber-800 mb-3">
-                Syncs changes both ways. Any file changed on <em>both</em> sides pauses for you to resolve — nothing is overwritten — and both sides are backed up first.
+                Syncs changes both ways. Any file changed on <em>both</em> sides pauses for you to resolve — nothing is overwritten — and every file a sync replaces or deletes is saved first, so it can be rewound.
               </p>
               <%= button_to "SYNC WITH LIVE",
                             admin_sync_site_path,
@@ -1207,6 +1213,7 @@
             Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded"><%= roe_folder_path("backups", "local") %>/</code>
             <ul class="list-disc ml-6">
               <li>Each backup is a complete, browsable copy of the <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder</li>
+              <li>Made when you click Create backup. Site Sync doesn't make one: what a sync changes is in Sync history.</li>
               <li>Files unchanged between backups share disk space</li>
               <li>Last <%= SiteSync::BackupManager::BACKUP_RETENTION %> are kept.</li>
             </ul>

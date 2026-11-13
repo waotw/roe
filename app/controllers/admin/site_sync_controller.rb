@@ -379,14 +379,21 @@ class Admin::SiteSyncController < Admin::BaseController
   def pending_change
     path = pending_path!
     side = params[:side] == "live" ? "live" : "local"
-    action = %w[added changed deleted].include?(params[:change]) ? params[:change] : "changed"
-    view = %w[file diff].include?(params[:view]) ? params[:view] : nil
+    action = %w[added changed deleted conflict].include?(params[:change]) ? params[:change] : "changed"
     frame = params[:frame].to_s.match?(/\A[\w-]{1,64}\z/) ? params[:frame] : "pending_panel"
     live_size = SiteSync::Exchange.fetch_peer_file_states([ path ]).dig(path, "size")
 
     SiteSync::PendingPreview.with_live_copy(path, size: live_size) do |live_abs|
-      render partial: "pending_panel",
-             locals: { path: path, side: side, action: action, view: view, frame: frame, live_abs: live_abs }
+      if action == "conflict"
+        # A file changed on both sides (or changed on one, deleted on the
+        # other): the two versions to choose between, side by side.
+        view = %w[local live diff].include?(params[:view]) ? params[:view] : nil
+        render partial: "conflict_panel", locals: { path: path, view: view, frame: frame, live_abs: live_abs }
+      else
+        view = %w[file diff].include?(params[:view]) ? params[:view] : nil
+        render partial: "pending_panel",
+               locals: { path: path, side: side, action: action, view: view, frame: frame, live_abs: live_abs }
+      end
     end
   end
 

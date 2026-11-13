@@ -62,6 +62,34 @@ class Admin::SiteSyncPendingChangeTest < ActionDispatch::IntegrationTest
     assert_match "FILE: the local version the next sync sends to live.", response.body
   end
 
+  test "a conflict opens on the diff between the two versions" do
+    live_has("title\nlive line\nend\n")
+    get admin_site_sync_pending_change_path(path: @rel, change: "conflict", frame: "conflict_x")
+
+    assert_select "turbo-frame#conflict_x [data-change-panel=conflict]"
+    assert_match "DIFF: red lines are only in the live version, green lines only in the local version.", response.body
+    assert_select ".bg-red-50", text: /live line/
+    assert_select ".bg-green-50", text: /local line/
+  end
+
+  test "a conflict's LIVE tab shows the live version" do
+    live_has("title\nlive line\nend\n")
+    get admin_site_sync_pending_change_path(path: @rel, change: "conflict", view: "live")
+
+    assert_match "LIVE: the live version.", response.body
+    assert_match "live line", response.body
+    assert_no_match "local line", response.body
+  end
+
+  test "a file deleted on live opens on the local version, with no DIFF" do
+    SiteSync::Exchange.stubs(:fetch_peer_file_states).returns({})
+    SiteSync::Exchange.stubs(:download_files).returns(nil)
+    get admin_site_sync_pending_change_path(path: @rel, change: "conflict", view: "diff")
+
+    assert_match "LOCAL: the local version.", response.body
+    assert_no_match ">DIFF<", response.body
+  end
+
   test "paths outside what Site Sync tracks are refused" do
     get admin_site_sync_pending_change_path(path: "../secrets.txt", side: "local")
     assert_response :not_found

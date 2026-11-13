@@ -90,6 +90,38 @@ module SiteSync
       raise SaveFailed, "couldn't save #{abs}: #{e.class} #{e.message}"
     end
 
+    # Store a file that never changes again — live's copy in the pre-push
+    # backup (backups/live/content/) — by hard-linking it in instead of
+    # copying, so its contents are on disk once. Falls back to a copy when a
+    # link can't be made (another disk, a filesystem without hard links).
+    # Never use this for a file in site/: an edit there would change the
+    # stored version with it.
+    def link_file(abs)
+      tmp_dir = File.join(objects_root, ".tmp")
+      FileUtils.mkdir_p(tmp_dir)
+      tmp = File.join(tmp_dir, "#{Process.pid}-#{SecureRandom.hex(8)}")
+      begin
+        File.link(abs, tmp)
+      rescue SystemCallError, NotImplementedError
+        return save_file(abs)
+      end
+      sha  = Digest::SHA256.file(tmp).hexdigest
+      size = File.size(tmp)
+      dest = object_path(sha)
+      if File.file?(dest)
+        File.delete(tmp)
+      else
+        FileUtils.mkdir_p(File.dirname(dest))
+        File.rename(tmp, dest)
+      end
+      [ sha, size ]
+    rescue SaveFailed
+      raise
+    rescue StandardError => e
+      FileUtils.rm_f(tmp) if tmp
+      raise SaveFailed, "couldn't save #{abs}: #{e.class} #{e.message}"
+    end
+
     # The fingerprint of a file without storing it — for the version that
     # stays on disk.
     def fingerprint(abs)
