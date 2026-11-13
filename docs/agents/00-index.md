@@ -11,8 +11,10 @@ an agent — would otherwise have to rediscover. The conventions are summarised 
 | [conventions.md](conventions.md) | What not to do without asking, and why. **Read this first.** |
 | [authoring-map.md](authoring-map.md) | Which copy of a file is the source of truth, plus traps that have each cost an afternoon. |
 | [backups-secrets-and-data.md](backups-secrets-and-data.md) | Backup and restore architecture, encryption keys, where secrets live, member data. |
+| [site-sync.md](site-sync.md) | Site Sync since 0.5.0: the version store, Sync History, REWIND, conflicts, the deletion guard, and what backups are for now. |
+| [players-and-layouts.md](players-and-layouts.md) | How players, playlists and content layouts behave, and why. |
 | [roadmap.md](roadmap.md) | Status and direction for the larger pieces of work. |
-| [specs-parked.md](specs-parked.md) | Two full designs agreed but deliberately not built. |
+| [specs-parked.md](specs-parked.md) | Designs agreed but deliberately not built, including Sync History per-file restore. |
 
 ## How to use these
 
@@ -45,5 +47,12 @@ while converting these notes:
   are authenticated by an unguessable path token (a `webhook_token` column, not
   an `encrypts` attribute) — a deliberate choice over Snipcart's secret-key
   validation; see [backups-secrets-and-data.md](backups-secrets-and-data.md).
+
+Checked again on 2026-11-13 for 0.5.0:
+
+- **Site Sync keeps every version a sync replaces** (`backups/versions/`), and
+  syncs no longer take a local snapshot. See [site-sync.md](site-sync.md).
+- **Resolving conflicts finishes the sync** in the same run; the roadmap's old
+  "run the sync again afterwards" follow-up is done.
 
 Nothing in `conventions.md` has expired. Those still stand.

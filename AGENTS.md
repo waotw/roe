@@ -65,7 +65,7 @@ Roe uses a **versioned directory structure** to support seamless updates:
     ...
   staging/                        # Transient — only present mid-update
   static_site/                    # Generated static site output
-  site_backups/                   # Automatic backups
+  backups/                        # local/ snapshots, live/ database + content, versions/ (Sync History)
   roe.sh                          # Server management script
   VERSION                         # Current version info
 ```
@@ -247,7 +247,7 @@ Updates the developer's local Roe install to a new tagged release from the forge
 Orchestrated by `RoeUpdater::UpdateOrchestrator`, run inside `PerformUpdateJob`. Components:
 
 - **VersionChecker**: Reads root `/VERSION` for the installed version; queries the forge mirrors via `git ls-remote --tags` (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.1.0`); bare-numbered tags are ignored. Suffixed tags (`-nightly.N`, `-rc.N`) are pre-releases — shown only to dev installs / the `nightly` channel, and ordered via `Gem::Version`. Tag & release scheme: `docs/21-development-workflow.md`.
-- **BackupManager**: Snapshots dev + prod SQLite to `site_backups/` with a timestamp stamped onto the `UpdateStatus` so rollback restores the right one.
+- **BackupManager**: Snapshots dev + prod SQLite to `site/db/<env>/backup/<timestamp>/` (last 5 kept) with a timestamp stamped onto the `UpdateStatus` so rollback restores the right one. An update takes no snapshot of `site/` content: it only changes databases (migrations), mirrors `site/documentation/roe/`, and moves settings keys at boot.
 - **Downloader**: `git clone --branch <tag>` into `staging/`.
 - **MigrationTester**: Rsyncs migrations from `staging/` into a throwaway copy of `current/` and dry-runs them against a cloned dev DB.
 - **SwitchManager**: Renames `current/` → `current.backup/`, `staging/` → `current/`. Rollback uses a rename-to-quarantine pattern (`current/` → `current.broken-<ts>`) so the swap is atomic and immune to asset-writer races.
@@ -288,6 +288,8 @@ Deploys the current codebase from local to a live server via Kamal or Fly.io.
 Markdown files in `site/` are the source of truth. `ContentSync` parses front-matter and body and upserts `Post`, `Page`, `Documentation`, `Medium`, `Product`, and `*Config` rows. `ContentWatcher` (dev) re-syncs on file changes. JSON metadata is stored as a text column and queried via SQLite `json_extract`.
 
 **One answer for sync state**: `SiteSync::Conclusion` — `in_sync` / `out_of_sync` / `unknown`, carrying `as_of`. Every surface (banner, nav dot, imports panel, Site Sync page) reads it, so they can't contradict each other. `unknown` matters: peer data is cached and may predate the last local change, and reporting that as drift produced a warning no amount of syncing cleared.
+
+**Site Sync history**: every version a sync, rewind or conflict resolution replaces or deletes is saved first in `SiteSync::Versions` (`backups/versions/`), and a sync stops if it can't save one. That store backs Sync History, REWIND and the deletion guard's relaxed default. Decisions and traps: [`docs/agents/site-sync.md`](docs/agents/site-sync.md).
 
 ### Site configuration & settings
 Global config files live in `site/system/global/`; each has a dedicated `SiteConfig` accessor that reads its file directly (no cross-file lookup):
