@@ -66,7 +66,7 @@
       <% shown_text = shown_abs && SiteSync::VersionPreview.text_of(shown_abs) %>
       <% if shown_abs && shown_text.nil? %>
         <p class="text-xs text-gray-600 font-sans">
-          This file can't be shown here (<%= number_to_human_size(File.size(shown_abs)) %>). Use DOWNLOAD to open it.
+          This file can't be shown here (<%= number_to_human_size(File.size(shown_abs)) %>).  DOWNLOAD to open it.
         </p>
       <% elsif view == "file" %>
         <p class="text-xs text-gray-600 font-sans">
@@ -76,11 +76,11 @@
       <% else %>
         <% if view == "current" %>
           <% from_text, to_text = shown_text, (current_sha ? SiteSync::VersionPreview.text_of(current_abs) : "") %>
-          <p class="text-xs text-gray-600 font-sans">COMPARE TO CURRENT: this version → the local file now<%= " (deleted)" unless current_sha %>.</p>
+          <p class="text-xs text-gray-600 font-sans">Difference between this older version → the version of the file you have right now on the local site<%= " (deleted)" unless current_sha %>.</p>
         <% else %>
           <% before_text = change[:before_sha] ? (before_abs && SiteSync::VersionPreview.text_of(before_abs)) : "" %>
           <% from_text, to_text = before_text, (deleted ? "" : shown_text) %>
-          <p class="text-xs text-gray-600 font-sans">DIFF: these are the changes made to the <%= side %> version of this file.</p>
+          <p class="text-xs text-gray-600 font-sans">DIFF: these are the changes made from this sync to the <%= side %> version of this file.</p>
         <% end %>
         <%= render "diff_lines", from_text: from_text, to_text: to_text %>
       <% end %>

@@ -62,14 +62,14 @@
       <% elsif view == "file" %>
         <p class="text-xs text-gray-600 font-sans">
           <% if deleted %>
-            FILE: the <%= target %> version the next sync deletes.
+            FILE: the version <%= target %>  will delete on the next sync.
           <% else %>
-            FILE: the <%= side %> version the next sync sends to <%= target %>.
+            FILE: the version <%= side %> sends to <%= target %> on the next sync.
           <% end %>
         </p>
         <%= render "file_lines", text: shown_text %>
       <% else %>
-        <p class="text-xs text-gray-600 font-sans">DIFF: these are the changes the next sync makes to the <%= target %> version of this file.</p>
+        <p class="text-xs text-gray-600 font-sans">DIFF: the next site sync will make these changes to the <%= target %> version of this file.</p>
         <% from_text = outgoing ? SiteSync::VersionPreview.text_of(outgoing) : "" %>
         <% to_text   = incoming ? SiteSync::VersionPreview.text_of(incoming) : "" %>
         <%= render "diff_lines", from_text: from_text, to_text: to_text,

@@ -386,8 +386,7 @@
 
             <% if edits.any? %>
               <p class="text-sm text-amber-800 mb-3">
-                These files changed on <strong>both</strong> local and live since the last sync,
-                so nothing was overwritten. Click a file to compare the two versions, pick which one wins, then apply.
+                These files changed on <strong>both</strong> local and live since the last sync. Click a file to compare the two versions, pick which one you'd like to keep, then apply.
               </p>
 
               <div class="space-y-2 mb-4">
@@ -659,9 +658,9 @@
 
           <% if SiteSync::Exchange.can_call_peer? %>
             <div class="mt-6 pt-4 border-t border-amber-200">
-              <h3 class="text-sm font-semibold text-amber-900 mb-2">Sync with live</h3>
+              <h3 class="text-sm font-semibold text-amber-900 mb-2">Sync with live site</h3>
               <p class="text-sm text-amber-800 mb-3">
-                Syncs changes both ways. Any file changed on <em>both</em> sides pauses for you to resolve — nothing is overwritten — and every file a sync replaces or deletes is saved first, so it can be rewound.
+                Any file changed on <em>both</em> live and local pauses the sync so you can resolve. All changes are saved before sync and can be rewound in SYNC HISTORY.
               </p>
               <%= button_to "SYNC WITH LIVE",
                             admin_sync_site_path,
@@ -1213,7 +1212,6 @@
             Backups are stored in <code class="text-xs bg-gray-100 px-1 rounded"><%= roe_folder_path("backups", "local") %>/</code>
             <ul class="list-disc ml-6">
               <li>Each backup is a complete, browsable copy of the <code class="text-xs bg-gray-100 px-1 rounded">/site</code> folder</li>
-              <li>Made when you click Create backup. Site Sync doesn't make one: what a sync changes is in Sync history.</li>
               <li>Files unchanged between backups share disk space</li>
               <li>Last <%= SiteSync::BackupManager::BACKUP_RETENTION %> are kept.</li>
             </ul>

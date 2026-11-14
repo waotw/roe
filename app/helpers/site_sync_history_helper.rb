@@ -32,7 +32,7 @@ module SiteSyncHistoryHelper
   def change_where(change)
     return change_side(change) if %w[rewind restore].include?(change[:kind])
 
-    change[:direction] == "to_live" ? "local → live" : "live → local"
+    change[:direction] == "to_live" ? "↑ local to live" : "↓ live to local"
   end
 
   def history_button_class(primary: false)

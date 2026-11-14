@@ -40,7 +40,6 @@
   <% elsif @events.any? %>
     <% if @version_events.any? %>
       <h2 class="mt-10 text-sm font-semibold text-gray-700 font-sans">Before versions were kept</h2>
-      <p class="mt-1 text-xs text-gray-500 font-sans">Only changes from live can be put back here, from the snapshot taken before each sync.</p>
     <% end %>
     <div class="mt-4 space-y-4">
       <% @events.each do |event| %>
@@ -110,7 +109,7 @@
                       ALL CHANGES RESTORED
                     </span>
                     <p class="text-xs text-gray-600 font-sans">
-                      Every file changed by this sync has been restored to it's pre-sync state.
+                      Every file changed by this sync has been restored to its pre-sync state.
                     </p>
                   <% else %>
                     <button type="submit"

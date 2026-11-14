@@ -16,11 +16,11 @@
 
     <% if !@rewindable %>
       <p class="px-5 py-4 text-sm text-gray-700 font-sans">
-        Only the newest sync can be rewound. To go back further, rewind each newer sync first.
+        Only the newest sync can be rewound. To go back further, rewind the most recent unrewound sync, one at a time.
       </p>
     <% elsif @unreachable %>
       <p class="px-5 py-4 text-sm text-gray-700 font-sans">
-        Couldn't reach the live site. A rewind changes files on live too, so it can't start until live is reachable.
+        Couldn't reach the live site. A rewind changes files on live and local, so it can't start until live is reachable.
       </p>
     <% else %>
       <p class="px-5 pt-3 text-sm text-gray-700 font-sans">
@@ -38,9 +38,9 @@
           </ul>
           <p class="mt-1">
             <% if @plan.changed_since.size == 1 %>
-              Rewinding replaces that change. It stays in the file's history.
+              Rewinding replaces that change. It will be available in the file's history.
             <% else %>
-              Rewinding replaces those changes. They stay in each file's history.
+              Rewinding replaces those changes. They will be available in each file's history.
             <% end %>
           </p>
         </div>
@@ -69,7 +69,7 @@
 
       <% if @plan.remade.any? %>
         <p class="px-5 pt-3 text-xs text-gray-500 font-sans">
-          Left as they are: <%= @plan.remade.size %> video web version<%= "s" if @plan.remade.size != 1 %>, which Roe makes again from the original.
+          Left as they are: <%= @plan.remade.size %> video web version<%= "s" if @plan.remade.size != 1 %>. Roe can make these again from the original.
         </p>
       <% end %>
     <% end %>

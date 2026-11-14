@@ -137,14 +137,14 @@ class Admin::ConfigsController < Admin::BaseController
           type: :text,
           label: "Confirm deletions over",
           placeholder: "20",
-          hint: "Site Sync deletes files: a file deleted on live is deleted locally when you sync, and the other way round. Every deleted file is saved first, so REWIND or Sync history can bring it back. A sync that would delete more files than this asks first. Blank asks over 20. 0 asks every time. 'never' never asks."
+          hint: "Site Sync deletes files: a file deleted on live is deleted locally, and vice-versa. Every deleted file is saved first, so REWIND or Sync history can bring it back. You will get a warning if a sync will delete more files than the amount above. Blank warns over 20. 0 warns every time. 'never' turns off this warning entirely."
         },
         # COPY: label and hint for how long Site Sync keeps old versions
         "sync_history_days" => {
           type: :text,
           label: "Keep old versions for (days)",
           placeholder: "30",
-          hint: "Before a sync replaces or deletes a file, on either side, Roe keeps the old version on this computer so you can put it back from Sync history. Blank keeps 30 days. 'forever' or 0 keeps everything."
+          hint: "Before a sync replaces or deletes a file, on either side, Roe keeps the old version on this computer so you can reverse any changes via Sync History. Blank keeps 30 days. 'forever' or 0 keeps everything, forever."
         },
         # COPY: label, option labels and hint for the live video setting
         "sync_live_video" => {
