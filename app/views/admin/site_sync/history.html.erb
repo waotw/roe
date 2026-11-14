@@ -96,8 +96,8 @@
               <%= hidden_field_tag :snapshot, event.snapshot_name %>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
-                <%= render "direction", title: "Local → Live", direction: event.to_live, restorable: false, states: {} %>
-                <%= render "direction", title: "Live → Local", direction: event.to_local, restorable: restorable, states: states %>
+                <%= render "direction", title: "↑ LOCAL TO LIVE", direction: event.to_live, restorable: false, states: {} %>
+                <%= render "direction", title: "↓ LIVE TO LOCAL", direction: event.to_local, restorable: restorable, states: states %>
               </div>
 
               <% if restorable %>
@@ -120,8 +120,8 @@
                     <p class="text-xs text-gray-600 font-sans">
                       <%= outstanding %> file<%= "s" if outstanding != 1 %> still
                       <%= outstanding == 1 ? "differs" : "differ" %> from the version before this
-                      sync. Only <strong>Live → Local</strong> can be restored — the snapshot is
-                      of this machine.
+                      sync. Only <strong>LIVE TO LOCAL</strong> can be restored — the snapshot is
+                      of the local site.
                     </p>
                   <% end %>
                 </div>

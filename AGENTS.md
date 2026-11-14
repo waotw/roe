@@ -289,7 +289,7 @@ Markdown files in `site/` are the source of truth. `ContentSync` parses front-ma
 
 **One answer for sync state**: `SiteSync::Conclusion` — `in_sync` / `out_of_sync` / `unknown`, carrying `as_of`. Every surface (banner, nav dot, imports panel, Site Sync page) reads it, so they can't contradict each other. `unknown` matters: peer data is cached and may predate the last local change, and reporting that as drift produced a warning no amount of syncing cleared.
 
-**Site Sync history**: every version a sync, rewind or conflict resolution replaces or deletes is saved first in `SiteSync::Versions` (`backups/versions/`), and a sync stops if it can't save one. That store backs Sync History, REWIND and the deletion guard's relaxed default. Decisions and traps: [`docs/agents/site-sync.md`](docs/agents/site-sync.md).
+**Sync History**: every version a sync, rewind or conflict resolution replaces or deletes is saved first in `SiteSync::Versions` (`backups/versions/`), and a sync stops if it can't save one. That store backs Sync History, REWIND and the deletion guard's relaxed default. Decisions and traps: [`docs/agents/site-sync.md`](docs/agents/site-sync.md).
 
 ### Site configuration & settings
 Global config files live in `site/system/global/`; each has a dedicated `SiteConfig` accessor that reads its file directly (no cross-file lookup):

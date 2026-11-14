@@ -61,7 +61,7 @@ class Admin::SiteSyncVersionHistoryTest < ActionDispatch::IntegrationTest
     get admin_site_sync_history_change_path(@change[:id], frame: "event_#{@event}_panel")
     assert_response :success
     assert_select "turbo-frame#event_#{@event}_panel"
-    assert_match "DIFF: these are the changes made to the local version of this file.", response.body
+    assert_match(/DIFF:[^<]*the local version/, response.body)
     assert_select ".bg-red-50", text: /local line/
     assert_select ".bg-green-50", text: /live line/
     assert_select "a[href=?]", admin_site_sync_history_file_path(path: @rel), text: "HISTORY"

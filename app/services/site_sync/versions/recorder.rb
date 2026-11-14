@@ -47,7 +47,7 @@ module SiteSync
             if copy && File.file?(copy)
               Versions.link_file(copy)
             elsif peer.key?(rel) && !BackupPolicy.video_web_version?(rel)
-              raise SaveFailed, "live's copy of #{rel} wasn't backed up, so it can't be kept before the push"
+              raise SaveFailed, "The live version of #{rel} didn't download, so it couldn't be saved. Nothing was sent to live."
             else
               [ nil, peer.dig(rel, "size") ]
             end

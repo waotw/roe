@@ -25,7 +25,7 @@ class SiteSyncTransferJob < ApplicationJob
   STEPS = {
     starting:            "Starting…",
     computing_diff:      "Computing what changed…",
-    backing_up_live:     "Backing up live (only the files about to change)…",
+    backing_up_live:     "Saving live versions about to change…",
     pushing_to_live:     "Pushing changed files to live…",
     pushing_to_live_full: "Pushing to live (full tree)…",
     backing_up_local:    "Saving local versions about to change…",

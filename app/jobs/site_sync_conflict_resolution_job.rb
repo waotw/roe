@@ -48,7 +48,7 @@ class SiteSyncConflictResolutionJob < ApplicationJob
       update_step(:backing_up_live)
       live_backup = SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete], on_progress: progress_proc)
       peer_files = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
-      raise SiteSync::Versions::SaveFailed, "couldn't read live's file list to keep its copies" if peer_files.nil?
+      raise SiteSync::Versions::SaveFailed, "Couldn't get the file list from live, so the live versions couldn't be saved. Nothing was sent to live." if peer_files.nil?
       @versions.save_live!(plan[:push_add] + plan[:push_delete], from: live_backup, peer: peer_files, deleted: plan[:push_delete])
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: { modified: [], added: plan[:push_add], deleted: plan[:push_delete] }, on_progress: progress_proc)

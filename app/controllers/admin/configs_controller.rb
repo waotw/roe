@@ -137,7 +137,7 @@ class Admin::ConfigsController < Admin::BaseController
           type: :text,
           label: "Confirm deletions over",
           placeholder: "20",
-          hint: "Site Sync deletes files: a file deleted on live is deleted locally, and vice-versa. Every deleted file is saved first, so REWIND or Sync history can bring it back. You will get a warning if a sync will delete more files than the amount above. Blank warns over 20. 0 warns every time. 'never' turns off this warning entirely."
+          hint: "Site Sync deletes files: a file deleted on live is deleted locally, and vice-versa. Every deleted file is saved first, so REWIND or Sync History can bring it back. You will get a warning if a sync will delete more files than the amount above. Blank warns over 20. 0 warns every time. 'never' turns off this warning entirely."
         },
         # COPY: label and hint for how long Site Sync keeps old versions
         "sync_history_days" => {

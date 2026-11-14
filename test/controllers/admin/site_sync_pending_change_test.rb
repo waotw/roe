@@ -33,7 +33,7 @@ class Admin::SiteSyncPendingChangeTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "turbo-frame#pending_x"
-    assert_match "DIFF: these are the changes the next sync makes to the live version of this file.", response.body
+    assert_match(/DIFF:[^<]*the live version/, response.body)
     assert_select ".bg-red-50", text: /live line/
     assert_select ".bg-green-50", text: /local line/
   end
@@ -42,7 +42,7 @@ class Admin::SiteSyncPendingChangeTest < ActionDispatch::IntegrationTest
     live_has("title\nlive line\nend\n")
     get admin_site_sync_pending_change_path(path: @rel, side: "live", view: "file")
 
-    assert_match "FILE: the live version the next sync sends to local.", response.body
+    assert_match(/FILE:[^<]*live sends to local/, response.body)
     assert_match "live line", response.body
   end
 
@@ -59,7 +59,7 @@ class Admin::SiteSyncPendingChangeTest < ActionDispatch::IntegrationTest
     SiteSync::Exchange.expects(:download_files).returns(nil)
     get admin_site_sync_pending_change_path(path: @rel, side: "local", change: "added")
 
-    assert_match "FILE: the local version the next sync sends to live.", response.body
+    assert_match(/FILE:[^<]*local sends to live/, response.body)
   end
 
   test "a conflict opens on the diff between the two versions" do

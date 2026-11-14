@@ -231,6 +231,9 @@ Rules for all Site Sync copy:
 
 - **"changed", never "modified"**, across the Site Sync page, Sync History
   and docs. One word per idea. (Data keys stay `:modified`.)
+- **"Sync History"**, capitalised, everywhere it's named (pages, hints,
+  docs). A file's own log is "History" (the button) or "File History" (its
+  page title).
 - **"local" and "live"** — never "yours", "mine", "this machine", or
   possessives like "live's" in the interface. "Keep local", "local is newer".
 - REWIND's confirm and finished copy was written by the maintainer; lines

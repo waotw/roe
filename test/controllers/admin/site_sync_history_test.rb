@@ -34,8 +34,8 @@ class Admin::SiteSyncHistoryTest < ActionDispatch::IntegrationTest
     get admin_site_sync_history_path
 
     assert_response :success
-    assert_match "Local → Live", response.body
-    assert_match "Live → Local", response.body
+    assert_match "LOCAL TO LIVE", response.body
+    assert_match "LIVE TO LOCAL", response.body
     assert_match "posts/pushed.md", response.body
     assert_match "posts/pulled.md", response.body
     assert_match "posts/removed.md", response.body

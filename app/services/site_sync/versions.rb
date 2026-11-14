@@ -87,7 +87,7 @@ module SiteSync
       [ sha, size ]
     rescue StandardError => e
       FileUtils.rm_f(tmp) if tmp
-      raise SaveFailed, "couldn't save #{abs}: #{e.class} #{e.message}"
+      raise SaveFailed, "Couldn't save a copy of #{abs} (#{e.class}: #{e.message}), so nothing was changed."
     end
 
     # Store a file that never changes again — live's copy in the pre-push
@@ -119,7 +119,7 @@ module SiteSync
       raise
     rescue StandardError => e
       FileUtils.rm_f(tmp) if tmp
-      raise SaveFailed, "couldn't save #{abs}: #{e.class} #{e.message}"
+      raise SaveFailed, "Couldn't save a copy of #{abs} (#{e.class}: #{e.message}), so nothing was changed."
     end
 
     # The fingerprint of a file without storing it — for the version that

@@ -81,58 +81,58 @@ The first push may take several minutes depending on how much media you have. Su
 
 ### How Site Sync handles conflicts
 
-You might have edited the same post or page on the live site and the local site. If this happens, you will be asked to confirm which file should be kept. By default, Roe will prioritize the file that was changed more recently.
+You might have edited the same post or page on the live site and the local site. If this happens, you will be asked to confirm which file should be kept. By default, Roe will prioritize the newest version of the file.
 
-Click a file to compare the two versions before you choose: `LOCAL` and `LIVE` show each version, `DIFF` what differs between them. Click the file again to close it.
+Click a file to compare the two versions before you choose: `LOCAL` and `LIVE` show each version, `DIFF` shows the difference between them. Click the file again to close it.
 
-Click `APPLY CHOICES & SYNC` (or `RESOLVE ALL BY MOST-RECENT & SYNC`) and Roe applies your choices, then syncs everything else in the same run. If that sync finds new conflicts, it stops and asks again. `CANCEL` changes nothing.
+Click `APPLY CHOICES & SYNC` (or `RESOLVE ALL BY MOST-RECENT & SYNC`). If that sync finds new conflicts, it stops and asks again. `CANCEL` stops the sync and changes nothing.
 
 ### Sync Status
 
 The Site Sync page shows:
 
 - **Last contact** — When the live site was last reached
-- **Local changes** — Files changed locally since last sync
-- **Live changes** — Files changed on live since last sync
+- **Local changes** — Files changed on the local site since last sync
+- **Live changes** — Files changed on the live site since last sync
 - **SYNC WITH LIVE button** — Available when connection is healthy
 
-Click a file under `Show local changes` or `Show live changes` to see what the next sync will do to it: `DIFF` shows the changes it will make to the other side's copy, `FILE` the version it will send. Click the file again to close it.
+Click a file under `Show local changes` or `Show live changes` to see how the next sync will affect it: `DIFF` shows the changes it will make on the other side, `FILE` the version it will send. Click the file again to close it.
 
-### Sync history
+### Sync History
 
-The `SYNC HISTORY` button on the [Site Sync](/admin/site_sync) page lists every sync, newest first, with what it sent from local to live and what it brought down from live to local. Before a sync replaces or deletes a file, the old version is saved on this computer for 30 days (`sync_history_days` in site.yml; `forever` keeps everything).
+The `SYNC HISTORY` button on the [Site Sync](/admin/site_sync) page lists every sync, newest first, with every change that was made. Before a sync replaces or deletes a file, the old version is saved on this computer for 30 days (`sync_history_days` in site.yml; `forever` keeps everything).
 
 Click a file to open it:
 
-- `FILE` — the version the sync left (or deleted)
+- `FILE` — the version of the file before the sync changed or deleted it
 - `DIFF` — what the sync changed
 - `COMPARE TO CURRENT` — that version against the local file now, shown when they differ
-- `HISTORY` — every saved version of the file, as a dated log
-- `DOWNLOAD` — that version, as a file
+- `HISTORY` — every saved version of the file
+- `DOWNLOAD` — that version
 
-To take back part of a sync, copy what you need from `FILE` or `DIFF`, or download it, change the local file, then sync.
+To UNDO part of a sync, you need to manually copy what you need from `FILE` or `DIFF`, or download it, change the local file, then sync.
 
 #### Rewind
 
-`REWIND` undoes the newest sync. The live and local site files return to exactly as they were before that sync, and live and local are out of sync afterwards. The next sync makes the same changes again unless you change the files first: make your changes to the live or local site, then sync.
+`REWIND` undoes the most recent sync. The live and local site files return to exactly as they were before that sync. Live and local will be out of sync afterwards. The next sync makes the same changes again unless you change the files first: make your changes to the live or local site, then sync.
 
-- Only the newest sync can be rewound. To go back further, rewind each newer sync in turn.
-- Before anything changes, Roe lists what will change on local and on live, and names any file changed since the sync. The versions a rewind replaces are saved too.
+- Only the most recent (unrewound) sync can be rewound. To go back further, rewind each newer sync in turn.
+- Before anything changes, Roe lists what will change on local and on live, and names any file changed since the sync. Each file will be saved before a rewind.
 - Live has to be reachable. If it isn't, nothing changes on either side.
-- A rewind changes files only. The live database (members, newsletter sends, orders), secrets and video originals are left as they are.
+- A rewind changes files only. The live database (members, newsletter sends, orders), secrets and original video files are left as they are.
 
 ### Deleted files
 
-Site Sync deletes files. If a file is deleted on your live site, sync deletes it locally, and the other way round. Every deleted file is saved first, so `REWIND` or Sync history can bring it back.
+Site Sync deletes files. If a file is deleted on your live site, sync deletes it locally, and vice-versa. Every deleted file is saved first, so `REWIND` or Sync History can bring it back.
 
-A sync that would delete more than 20 files stops and asks first. That many deletions usually means something has gone wrong. Change the number with `Confirm deletions over` in Settings → [site.yml](/admin/configs/site/edit), in the `Site Sync` section: `0` asks before every deletion, `never` never asks.
+A sync that would delete more than 20 files stops and asks first. Change the number with `Confirm deletions over` in Settings → [site.yml](/admin/configs/site/edit), in the `Site Sync` section: `0` asks before every deletion, `never` never asks.
 
 ### Best Practices
 
 - **Work locally, sync to live** — Do your writing and editing locally, then push
 - **Sync before deploying** — Make sure your content is synced before updating or deploying Roe
 - **Pull before major edits** — If you edit on live, sync to local often to keep things in sync
-- **Use Sync history to undo a sync** — Rewind the newest sync, or copy an older version of a file from the [Sync history](/admin/site_sync/history) page.
+- **Use Sync History to undo a sync** — Rewind the newest sync, or copy an older version of a file from the [Sync History](/admin/site_sync/history) page.
 
 ## Static Site Sync
 
@@ -165,12 +165,12 @@ Once settings are in place, `TEST CONNECTION` and once green, `PUSH`. This will 
 
 Every time you `SYNC WITH LIVE`, before it changes anything, Site Sync:
 
-1. Saves every file it will replace or delete, on local and on live, in [Sync history](#sync-history)
+1. Saves every file it will replace or delete, on local and on live, in [Sync History](#sync-history)
 2. Downloads a full backup of the live database (encrypted)
 
-A full backup of your local site is separate: make one with `Create backup`.
+A full backup of your local site is separate: make one with `CREATE BACKUP` here: [Site Backups](/admin/site_sync?tab=backups)
 
-Video web versions (the 720p and 1080p copies and the poster) are left out of backups. Roe makes them again from the original video.
+To keep things managable, optimized video files (the 720p and 1080p copies and the poster) are left out of backups. Roe can make them again from the original video files.
 
 ### Full local backup
 
@@ -182,9 +182,9 @@ The backup system is smart:
 - subsequent backups only track what changed since the previous backup
 - this keeps the size of each backup to a much more reasonable size
 
-### Live files a sync replaces
+### Live files affected by sync
 
-Before a sync changes or deletes files on live, it downloads live's copies and saves them in Sync history, so a sync can be rewound and any old version opened or downloaded. Large files such as videos are saved too. They come down in pieces, so a big file can take a few minutes.
+Before a sync changes or deletes files on live, it downloads the live site copies and saves them in Sync History, so a sync can be rewound and any old version opened or downloaded. Large files such as videos are saved too. They come down in pieces, so a big file can take a few minutes.
 
 ### Full encrypted backup of live database
 
