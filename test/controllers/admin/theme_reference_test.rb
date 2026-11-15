@@ -11,6 +11,7 @@ class Admin::ThemeReferenceTest < ActionDispatch::IntegrationTest
       get admin_theme_reference_path(entry.slug)
       assert_response :success, entry.slug
       assert_select "#theme-reference-bar a[aria-current=page]", text: entry.title
+      assert_select "#theme-reference-bar a[href=?]", admin_themes_path
       assert_select "header.site-nav"
       assert_select "article.page"
       assert_equal "noindex, nofollow", response.headers["X-Robots-Tag"]

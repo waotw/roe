@@ -28,11 +28,25 @@ title: A Short Film
 
 ## Player and podcast playlist
 
+```card
+type: player
+```
+
+```collection
+template: playlist
+source: posts
+post_type: podcast
+tags: theme-reference-podcast
+order: episode_number
+```
+
 If a player doesn't have a collection or playlist, it will play the first playlist after it in the markdown file. If there isn't one, it will play the first playlist on the page.
 
 ```card
 type: player
 ```
+
+This is no playlist directly below the above player but it will load this one:
 
 ```collection
 template: playlist
@@ -47,6 +61,7 @@ order: episode_number
 ```card
 type: player
 ```
+
 ```collection
 template: playlist
 source: posts

@@ -9,7 +9,9 @@
   <style>
     #theme-reference-bar, #theme-reference-bar * { all: revert; box-sizing: border-box; }
     #theme-reference-bar {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+      display: grid; align-items: center; gap: 4px 12px;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: "start nav end";
       padding: 6px 12px; background: #111827; color: #e5e7eb;
       font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
       text-transform: uppercase; letter-spacing: 0.02em;
@@ -19,17 +21,31 @@
       padding-top: var(--theme-reference-bar-height, 32px);
       scroll-padding-top: var(--theme-reference-bar-height, 32px);
     }
-    <%# The site's search and account icons are fixed to the top of the window
-        too; move them down out from under the bar. `translate` rather than
-        `top` or `transform`, so whatever the theme sets on those still applies. %>
-    .site-actions { translate: 0 var(--theme-reference-bar-height, 32px); }
+    <%# The site's search and account icons, and the search panel they open,
+        sit at the top of the window too; move them down out from under the
+        bar. A margin, so the theme's own `top` still applies. Not `translate`
+        or `transform`: on .site-actions either one makes the search panel
+        inside it (position: fixed) place itself against .site-actions instead
+        of the window, and it lands in the wrong place. %>
+    .site-actions, .site-search-overlay { margin-top: var(--theme-reference-bar-height, 32px); }
     #theme-reference-bar a { color: #e5e7eb; text-decoration: none; }
-    #theme-reference-bar .trb-label { color: #9ca3af; font-weight: bold; }
-    #theme-reference-bar nav { display: flex; flex-wrap: wrap; gap: 2px; }
+    <%# One row when everything fits. When the tabs don't, two: back, label,
+        theme menu and EDIT CSS on top, the tabs under them, starting 8px left
+        so their text lines up with the back button's. The script below
+        switches between the two. %>
+    #theme-reference-bar.is-stacked {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: "start end" "nav nav";
+    }
+    #theme-reference-bar .trb-start { grid-area: start; display: flex; align-items: center; gap: 12px; }
+    #theme-reference-bar .trb-label { color: #9ca3af; font-weight: bold; white-space: nowrap; }
+    #theme-reference-bar nav { grid-area: nav; display: flex; gap: 2px; overflow: hidden; }
+    #theme-reference-bar.is-stacked nav { flex-wrap: wrap; margin-left: -8px; }
+    #theme-reference-bar nav a { white-space: nowrap; }
     #theme-reference-bar nav a { padding: 3px 8px; }
     #theme-reference-bar nav a:hover { background: #374151; }
     #theme-reference-bar nav a[aria-current="page"] { background: #fff; color: #111827; }
-    #theme-reference-bar .trb-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    #theme-reference-bar .trb-end { grid-area: end; justify-self: end; display: flex; align-items: center; gap: 8px; }
     #theme-reference-bar details { position: relative; }
     #theme-reference-bar summary {
       list-style: none; cursor: pointer; padding: 3px 8px;
@@ -45,19 +61,17 @@
     #theme-reference-bar details li a:hover { background: #f3f4f6; }
     #theme-reference-bar details li a[aria-current="true"] { background: #dbeafe; color: #1e3a8a; }
     #theme-reference-bar .trb-button {
-      padding: 3px 8px; background: #bfdbfe; color: #111827; border: 1px solid #1f2937;
+      padding: 3px 8px; background: #bfdbfe; color: #111827; border: 1px solid #1f2937; white-space: nowrap;
     }
+    #theme-reference-bar .trb-back { padding: 3px 8px; background: #e5e7eb; color: #111827; border: 1px solid #1f2937; white-space: nowrap; }
+    #theme-reference-bar summary { white-space: nowrap; }
   </style>
   <div id="theme-reference-bar">
-    <%# COPY: bar label %>
-    <span class="trb-label">Theme reference</span>
-    <nav aria-label="Theme reference pages">
-      <% ThemeReference::PAGES.each do |entry| %>
-        <%= link_to entry.title,
-              admin_theme_reference_path(entry.slug, preview_theme: params[:preview_theme].presence),
-              "aria-current": (entry == @reference_page ? "page" : nil) %>
-      <% end %>
-    </nav>
+    <div class="trb-start">
+      <%# COPY: back button and bar label %>
+      <%= link_to "← Themes", admin_themes_path, class: "trb-back" %>
+      <span class="trb-label">Theme reference</span>
+    </div>
     <div class="trb-end">
       <% active = SiteConfig.get("theme.active") || "default" %>
       <details>
@@ -76,6 +90,13 @@
       <%# COPY: button %>
       <%= link_to "Edit CSS", edit_admin_theme_path(@reference_theme), class: "trb-button" %>
     </div>
+    <nav aria-label="Theme reference pages">
+      <% ThemeReference::PAGES.each do |entry| %>
+        <%= link_to entry.title,
+              admin_theme_reference_path(entry.slug, preview_theme: params[:preview_theme].presence),
+              "aria-current": (entry == @reference_page ? "page" : nil) %>
+      <% end %>
+    </nav>
   </div>
   <%# Forms and buy buttons look real but do nothing here: a sign-up would
       sign someone up, and Add to Cart would fill the real cart. Links to the
@@ -84,9 +105,31 @@
   <script nonce="<%= safe_csp_nonce %>">
     (() => {
       const bar = document.getElementById("theme-reference-bar");
-      const fit = () => { document.documentElement.style.setProperty("--theme-reference-bar-height", `${bar.offsetHeight}px`); };
+      const nav = bar.querySelector("nav");
+      const menu = bar.querySelector("details");
+      let width = 0;
+      const fit = () => {
+        // Try one row; stack when the tabs don't fit in it.
+        if (bar.clientWidth !== width) {
+          width = bar.clientWidth;
+          bar.classList.remove("is-stacked");
+          bar.classList.toggle("is-stacked", nav.scrollWidth > nav.clientWidth);
+        }
+        document.documentElement.style.setProperty("--theme-reference-bar-height", `${bar.offsetHeight}px`);
+      };
       new ResizeObserver(fit).observe(bar);
       fit();
+
+      // The theme menu closes on a click anywhere outside it, or on Escape.
+      document.addEventListener("click", (event) => {
+        if (menu.open && !menu.contains(event.target)) menu.open = false;
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && menu.open) {
+          menu.open = false;
+          menu.querySelector("summary").focus();
+        }
+      });
     })();
     window.addEventListener("submit", (event) => {
       if (event.target.closest("main")) event.preventDefault();
