@@ -661,17 +661,64 @@ body {
   color: #78350f;
 }
 
+/* Sections · code · splitter · preview. The code and the preview share the
+   width left after the sections list, half and half until the splitter is
+   dragged: theme_preview_controller sets --te-code and --te-preview, each
+   a share in fr. */
 .te-body {
+  --te-code: 1fr;
+  --te-preview: 1fr;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(320px, 42%);
+  grid-template-columns: auto minmax(240px, var(--te-code)) 6px minmax(280px, var(--te-preview));
 }
 
 .te-body[data-preview="closed"] {
   grid-template-columns: auto minmax(0, 1fr);
 }
 
-.te-body[data-preview="closed"] .te-preview {
+.te-body[data-preview="closed"] .te-preview,
+.te-body[data-preview="closed"] .te-splitter {
   display: none;
+}
+
+.te-splitter {
+  position: relative;
+  cursor: col-resize;
+  background: #f3f4f6;
+  border-left: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+  touch-action: none;
+}
+
+/* A short grip in the middle, so it reads as something to drag. */
+.te-splitter::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 2px;
+  height: 32px;
+  margin-top: -16px;
+  border-left: 1px dotted #9ca3af;
+  border-right: 1px dotted #9ca3af;
+}
+
+.te-splitter:hover,
+.te-splitter:focus-visible,
+.te-body.te-resizing .te-splitter {
+  background: #bfdbfe;
+  outline: none;
+}
+
+/* While dragging, the preview mustn't take the pointer: an iframe swallows
+   the moves and the drag would stop at its edge. */
+.te-body.te-resizing iframe {
+  pointer-events: none;
+}
+
+.te-body.te-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* PREVIEW only matters on narrow windows; wide ones always show it. */

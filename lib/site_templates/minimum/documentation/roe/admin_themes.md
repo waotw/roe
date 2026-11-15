@@ -22,7 +22,7 @@ A theme controls how your site looks — its colors, fonts, spacing, and layout.
 
 ## The theme editor
 
-Admin → Themes → `EDIT CSS` opens the editor: the sections of the theme on the left, its CSS in the middle and your site on the right.
+Admin → Themes → `EDIT CSS` opens the editor: the sections of the theme on the left, its CSS in the middle and your site on the right. The code and the preview start half and half; drag the bar between them to give either more room, and double-click it to go back to half and half. The editor remembers where you left it.
 
 **Preview.** The preview shows your changes as you type, before you save. It opens on the page you last looked at, or the first reference page. Links in it work, so you can go to any page of your site. The menu above it jumps to a reference page, the home page or a path you type. The width menu beside it sets the preview's width: the whole pane, a laptop, tablet or phone, or one of the widths where your theme's layout changes, read from its `@media` rules. A width wider than the pane is shown smaller, laid out at the full width. In a narrow window the preview is hidden until you click `PREVIEW`.
 

@@ -19,13 +19,22 @@ import { Controller } from "@hotwired/stimulus";
 // element, which is how INSPECT finds the page.
 export default class extends Controller {
   static targets = [
-    "body", "pane", "pathButton", "menu", "frame", "frameWrap",
-    "widthButton", "widthMenu", "previewToggle",
+    "body",
+    "pane",
+    "pathButton",
+    "menu",
+    "frame",
+    "frameWrap",
+    "widthButton",
+    "widthMenu",
+    "previewToggle",
+    "splitter",
   ];
   static values = { theme: String, reference: Array };
 
   static PATH = "roe.themeEditor.path";
   static WIDTH = "roe.themeEditor.width";
+  static SPLIT = "roe.themeEditor.split";
 
   // COPY: common preview widths
   static COMMON = [
@@ -43,11 +52,21 @@ export default class extends Controller {
     this.element.addEventListener("css-editor:ready", this.onReady);
     if (this.element.cssEditor) this.onReady();
 
+    // A menu closes on a press anywhere outside it. Captured, so a press the
+    // editor or a button handles itself still counts. A press inside the
+    // preview never reaches this page: loaded() listens there too, and the
+    // window losing focus to the preview covers the rest.
     this.onOutside = (e) => {
-      if (!e.target.closest(".te-page-menu:not(.te-width-menu)")) this.closeMenu();
-      if (!e.target.closest(".te-width-menu")) this.closeWidthMenu();
+      if (!e.target.closest?.(".te-page-menu:not(.te-width-menu)"))
+        this.closeMenu();
+      if (!e.target.closest?.(".te-width-menu")) this.closeWidthMenu();
     };
-    document.addEventListener("click", this.onOutside);
+    this.onBlur = () => this.closeMenus();
+    document.addEventListener("pointerdown", this.onOutside, true);
+    window.addEventListener("blur", this.onBlur);
+
+    const split = parseFloat(localStorage.getItem(this.constructor.SPLIT));
+    this.setSplit(split > 0 && split < 1 ? split : 0.5, { save: false });
 
     this.narrow = window.matchMedia("(max-width: 1099px)");
     this.onNarrow = () => this.layout();
@@ -58,13 +77,18 @@ export default class extends Controller {
     const saved = localStorage.getItem(this.constructor.WIDTH);
     this.setWidth(/^\d+$/.test(saved || "") ? Number(saved) : "full");
     this.layout();
-    this.load(localStorage.getItem(this.constructor.PATH) || this.referenceValue[0]?.path || "/");
+    this.load(
+      localStorage.getItem(this.constructor.PATH) ||
+        this.referenceValue[0]?.path ||
+        "/",
+    );
   }
 
   disconnect() {
     this.element.removeEventListener("css-editor:change", this.onChange);
     this.element.removeEventListener("css-editor:ready", this.onReady);
-    document.removeEventListener("click", this.onOutside);
+    document.removeEventListener("pointerdown", this.onOutside, true);
+    window.removeEventListener("blur", this.onBlur);
     this.narrow.removeEventListener("change", this.onNarrow);
     this.resizer?.disconnect();
     clearTimeout(this.cssTimer);
@@ -108,13 +132,27 @@ export default class extends Controller {
     localStorage.setItem(this.constructor.PATH, this.path);
     this.pathButtonTarget.textContent = `${this.path} ▾`;
 
+    // A press in the preview closes the page and width menus.
+    doc.addEventListener("pointerdown", () => this.closeMenus(), true);
+
     // A link followed in the preview keeps the editor's parameters.
     doc.addEventListener("click", (e) => {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey
+      )
+        return;
       const a = e.target.closest?.("a[href]");
       if (!a || (a.target && a.target !== "_self")) return;
       const url = new URL(a.href, win.location.href);
-      if (url.origin !== window.location.origin || url.searchParams.has("preview_theme")) return;
+      if (
+        url.origin !== window.location.origin ||
+        url.searchParams.has("preview_theme")
+      )
+        return;
       if (url.pathname === win.location.pathname && url.hash) return; // a jump within the page
       e.preventDefault();
       this.load(url.pathname + url.search + url.hash);
@@ -192,7 +230,8 @@ export default class extends Controller {
     heading("This page");
     item(this.path || "/", this.path || "/", true);
     heading("Theme reference");
-    for (const page of this.referenceValue) item(page.title, page.path, page.path === this.path);
+    for (const page of this.referenceValue)
+      item(page.title, page.path, page.path === this.path);
     heading("Site");
     item("Home  /", "/", this.path === "/");
 
@@ -222,7 +261,8 @@ export default class extends Controller {
   // ── Width and showing the preview ───────────────────────────────────────
 
   async toggleWidthMenu() {
-    if (!this.widthMenuTarget.classList.contains("hidden")) return this.closeWidthMenu();
+    if (!this.widthMenuTarget.classList.contains("hidden"))
+      return this.closeWidthMenu();
     this.closeMenu();
     const { breakpoints } = await import("theme_editor/css_rules");
     const menu = this.widthMenuTarget;
@@ -254,12 +294,79 @@ export default class extends Controller {
     };
     item("Full width", "full", "the whole pane");
     heading("Common");
-    for (const c of this.constructor.COMMON) item(`${c.label}  ${c.width}px`, c.width);
+    for (const c of this.constructor.COMMON)
+      item(`${c.label}  ${c.width}px`, c.width);
     const points = breakpoints(this.css ?? "");
-    heading(points.length ? "Where this theme changes" : "This theme has no width breakpoints");
-    for (const p of points) item(`${p.width}px`, p.width, `${p.queries} @media`);
+    heading(
+      points.length
+        ? "Breakpoints in this theme"
+        : "This theme has no width breakpoints",
+    );
+    for (const p of points)
+      item(`${p.width}px`, p.width, `${p.queries} @media`);
     menu.classList.remove("hidden");
     this.widthButtonTarget.setAttribute("aria-expanded", "true");
+  }
+
+  closeMenus() {
+    this.closeMenu();
+    this.closeWidthMenu();
+  }
+
+  // ── The splitter between the code and the preview ───────────────────────
+
+  // The code's share of the width the two split, 0.2–0.8. Remembered.
+  setSplit(split, { save = true } = {}) {
+    this.split = Math.min(0.8, Math.max(0.2, split));
+    this.bodyTarget.style.setProperty("--te-code", `${this.split.toFixed(4)}fr`);
+    this.bodyTarget.style.setProperty("--te-preview", `${(1 - this.split).toFixed(4)}fr`);
+    this.splitterTarget.setAttribute("aria-valuenow", Math.round(this.split * 100));
+    if (save) localStorage.setItem(this.constructor.SPLIT, this.split.toFixed(4));
+  }
+
+  startResize(e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    this.closeMenus();
+    const splitter = this.splitterTarget;
+    const code = splitter.previousElementSibling.getBoundingClientRect();
+    const pane = this.paneTarget.getBoundingClientRect();
+    const total = pane.right - code.left - splitter.offsetWidth;
+    const startX = e.clientX;
+    const startCode = code.width;
+    try {
+      splitter.setPointerCapture(e.pointerId);
+    } catch {
+      // A pointer the browser doesn't know (a synthetic event): the moves
+      // still reach the splitter while the pointer is over it.
+    }
+    this.bodyTarget.classList.add("te-resizing");
+
+    const move = (ev) =>
+      this.setSplit((startCode + ev.clientX - startX) / total, { save: false });
+    const end = () => {
+      splitter.removeEventListener("pointermove", move);
+      splitter.removeEventListener("pointerup", end);
+      splitter.removeEventListener("pointercancel", end);
+      this.bodyTarget.classList.remove("te-resizing");
+      this.setSplit(this.split);
+    };
+    splitter.addEventListener("pointermove", move);
+    splitter.addEventListener("pointerup", end);
+    splitter.addEventListener("pointercancel", end);
+  }
+
+  resetSplit() {
+    this.setSplit(0.5);
+  }
+
+  splitterKey(e) {
+    const step = e.shiftKey ? 0.1 : 0.02;
+    if (e.key === "ArrowLeft") this.setSplit(this.split - step);
+    else if (e.key === "ArrowRight") this.setSplit(this.split + step);
+    else if (e.key === "Home" || e.key === "Enter") this.setSplit(0.5);
+    else return;
+    e.preventDefault();
   }
 
   closeWidthMenu() {
@@ -280,7 +387,12 @@ export default class extends Controller {
     const frame = this.frameTarget;
     const label = this.widthButtonTarget;
     if (this.width === "full" || !this.width) {
-      Object.assign(frame.style, { width: "", height: "", transform: "", marginLeft: "" });
+      Object.assign(frame.style, {
+        width: "",
+        height: "",
+        transform: "",
+        marginLeft: "",
+      });
       label.textContent = "Full width ▾";
       return;
     }
@@ -297,7 +409,10 @@ export default class extends Controller {
 
   togglePreview() {
     const open = this.bodyTarget.dataset.preview !== "open";
-    localStorage.setItem(this.constructor.NARROW_OPEN, open ? "open" : "closed");
+    localStorage.setItem(
+      this.constructor.NARROW_OPEN,
+      open ? "open" : "closed",
+    );
     this.layout();
   }
 
@@ -305,7 +420,8 @@ export default class extends Controller {
   // PREVIEW, and remember the choice.
   layout() {
     const narrow = this.narrow.matches;
-    const open = !narrow || localStorage.getItem(this.constructor.NARROW_OPEN) === "open";
+    const open =
+      !narrow || localStorage.getItem(this.constructor.NARROW_OPEN) === "open";
     this.bodyTarget.dataset.preview = open ? "open" : "closed";
     this.bodyTarget.dataset.narrow = narrow;
     this.previewToggleTarget.setAttribute("aria-pressed", open);

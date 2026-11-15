@@ -26,7 +26,7 @@ controller grows past its own:
 |---|---|
 | `css_editor` | The editor, background save, the unsaved-text draft, SAVE AS…, find |
 | `theme_sections` | The SECTIONS list and its open / hidden / peek states |
-| `theme_preview` | The iframe, the live CSS, the page menu, the width menu, PREVIEW |
+| `theme_preview` | The iframe, the live CSS, the page menu, the width menu, PREVIEW, the splitter |
 | `theme_inspector` | INSPECT: picking in the iframe, the results panel, the highlights |
 
 They talk through events on the element: `css-editor:ready`,
@@ -82,6 +82,16 @@ scratch setup).
   `max-width` queries (`breakpoints()`), read from the editor's text. A width
   wider than the pane is laid out at that width and scaled down with a
   transform, so `@media` rules see the real width.
+- **Splitter:** the code and the preview share the width after the
+  sections list as `--te-code` and `--te-preview`, in `fr` (`fr` can't go
+  inside `calc()`, so it's two variables, not one ratio). The code's share
+  is kept between 0.2 and 0.8, starts at 0.5, and is remembered in
+  `localStorage`. While dragging, the iframe gets `pointer-events: none`,
+  or it swallows the moves once the pointer crosses into it.
+- **Menus close on any press outside them:** `pointerdown`, captured on the
+  document, so presses CodeMirror handles itself count too. Presses inside
+  the preview never reach the parent document, so `loaded()` adds a listener
+  in the iframe, and a `blur` on the window covers the rest.
 - **Draft:** the Markdown editor's pattern. Unsaved text goes to
   `localStorage` (`roe:theme-draft:<name>`) a second after typing stops and
   on `beforeunload`, with a fingerprint of the file it started from. It's

@@ -111,6 +111,12 @@
       <% end %>
     </section>
 
+    <%# Drag to give the code or the preview more room; double-click for half
+        and half. Arrow keys move it when it has focus. %>
+    <div class="te-splitter" role="separator" aria-orientation="vertical" aria-label="Resize the code and the preview"
+         tabindex="0" data-theme-preview-target="splitter"
+         data-action="pointerdown->theme-preview#startResize dblclick->theme-preview#resetSplit keydown->theme-preview#splitterKey"></div>
+
     <section class="te-preview" data-theme-preview-target="pane">
       <div class="te-preview-bar">
         <div class="te-page-menu">
