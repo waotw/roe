@@ -31,6 +31,9 @@ Write the migration, draft the commit message — then hand it over.
    Sync carries `site/` to a live site that may still run the previous release,
    and a rename becomes a missing file there. Add a new location; leave the old
    one until the release after next.
+9. **Never remove or rename a site class that has shipped.** Custom themes
+   target the public markup. New classes follow the naming pattern in
+   [`conventions.md`](docs/agents/conventions.md) §9.
 
 Reasoning, architecture decisions, known traps, and parked designs are in
 [`docs/agents/`](docs/agents/00-index.md).
@@ -452,10 +455,10 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Tailwind CSS (via `tailwindcss-rails`) for the application UI
   - The dev watcher runs `tailwindcss:watch[always]` (in `roe.sh` and `Procfile.dev`). The `[always]` is **required**: plain `tailwindcss:watch` binds to a TTY and exits immediately when backgrounded, silently stopping all CSS rebuilds. If new utility classes aren't taking effect, check the watcher is alive (`pgrep -fl tailwindcss:watch`) before anything else.
 - Public site uses a theme system with dynamic CSS generation served from `/theme/:filename.css`
-- **Naming Convention**: All CSS classes use semantic naming (not BEM):
-  - Collections: `.collection-item`, `.item-body`, `.item-image`, `.item-title`
-  - Media Players: `.player`, `.player-header`, `.player-controls`, `.video-controls`
-  - Post Headers: `.post-header-top`, `.feed-link`, `.header-image`
+- **Naming**: public site classes are semantic, `<area>-<thing>` with single dashes
+  (`.collection-item`, `.player-track-title`, `.post-header-top`); states are `is-*`.
+  Shipped classes never change. Rules and inventory: `docs/agents/conventions.md` §9 and
+  `docs/agents/site-classes.md`.
 - System fonts and images are served from `/system/...`
 - **Config image fields** (logo, favicon, social image, podcast artwork) accept either a bare filename (resolved to `/system/images/<name>`, i.e. `site/system/assets/images/`) or an absolute `/media/...` path uploaded via the main Media browser. Resolve config image values through the `config_image_path` helper so both forms work
 

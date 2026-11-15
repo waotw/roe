@@ -49,6 +49,18 @@ class ContentLayout
     playlist podcast_title release_title buy_button price excerpt tags
   ] + SERIES_PARTS).freeze
 
+  # What follows `<kind>-` in the classes the parts draw: `post-image`,
+  # `page-tags`, `product-excerpt`. A metadata field is `<kind>-field
+  # <kind>-field-<name>`, so every field class starts `<kind>-field`. Pages
+  # also carry `page-<url_name>` (since 0.4.1), so a page named after one of
+  # these would pick up that part's theme rules: Page#name_class leaves it
+  # out. test/models/content_layout_part_classes_test.rb keeps this list
+  # matching what the parts draw.
+  PART_CLASS_NAMES = %w[
+    title subtitle date author image excerpt tags tag tag-link content
+    artist creator release-date cover artwork synopsis description field
+  ].freeze
+
   NAME_RE = /\A[a-z0-9][a-z0-9_-]*\z/
   CLASS_RE = /\A[A-Za-z_][A-Za-z0-9_-]*\z/
   EXT = ".txt"

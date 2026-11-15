@@ -218,7 +218,7 @@ class ContentLayout
       when "release_date"  then %(<time class="#{k}-date #{k}-release-date">November 9, 2026</time>)
       when "cover", "artwork" then %(<img class="#{k}-image #{k}-#{part}">)
       when "synopsis", "description" then %(<p class="#{k}-excerpt #{k}-#{part}">#{part.capitalize}</p>)
-      when "podcast_link"  then %(<p class="#{k}-field #{k}-podcast-link"><a>example.com</a></p>)
+      when "podcast_link"  then %(<p class="#{k}-field #{k}-field-podcast-link"><a>example.com</a></p>)
       when "buy_button"    then %(<button class="snipcart-add-item">Add to cart</button>)
       when "price"         then %(<p class="product-price">$10.00</p>)
       when "excerpt"       then %(<p class="#{k}-excerpt">Excerpt</p>)
@@ -229,7 +229,7 @@ class ContentLayout
         when "product" then "…the product's writing…"
         else %(<div class="#{k}-content">…the #{noun}'s writing…</div>)
         end
-      else %(<p class="#{k}-field #{k}-#{part.dasherize}">#{part}</p>)
+      else %(<p class="#{k}-field #{k}-field-#{part.dasherize}">#{part}</p>)
       end
     end
 

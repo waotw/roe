@@ -21,6 +21,19 @@ class Page < ApplicationRecord
     slug.to_s == "home" ? "/" : "/#{slug}"
   end
 
+  # The page's own class on its <article>, `page-<url_name>` (themes target
+  # it: `article.page-store`). Left out when the name is also a layout part's
+  # (`page-image`, `page-tags`, `page-field-…`): the article would match that
+  # part's theme rules and the whole page would be styled as the part.
+  def name_class
+    "page-#{url_name}" unless name_class_clash?
+  end
+
+  def name_class_clash?
+    name = url_name.to_s
+    ContentLayout::PART_CLASS_NAMES.include?(name) || name.start_with?("field-")
+  end
+
   def self.create_or_update_from_file(file_path)
     # Resolve symlinks (notably /rails/site → /data/site on prod) so
     # this lookup matches records created via other paths into this

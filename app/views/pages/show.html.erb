@@ -5,8 +5,9 @@
     its class — a theme targeting .page-store stopped matching when the page was
     retitled "Bookshop". page-type-<type> is declared rather than derived, so it
     survives a rename. Both are emitted: the name-based one is what existing
-    themes already target. %>
-<article class="page page-<%= @page.url_name %><%= " page-type-#{@page.page_type}" if @page.page_type %><%= ' member-page' if @page.member_page? %>">
+    themes already target. A name that's also a layout part's (image, tags…)
+    gets no name class: see Page#name_class. %>
+<article class="<%= [ "page", @page.name_class, ("page-type-#{@page.page_type}" if @page.page_type), ("member-page" if @page.member_page?) ].compact.join(" ") %>">
   <%# .content wraps the whole layout, as on posts, products and docs. %>
   <div class="content">
     <%# Pass member context if available (for form error display) %>

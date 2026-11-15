@@ -153,7 +153,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
   test "a metadata field without a part of its own shows its value" do
     site_layout("article", "[location]\n[body]\n")
     get post_path(a_post(location: "Chicago").url_name)
-    assert_select "p.post-field.post-location", "Chicago"
+    assert_select "p.post-field.post-field-location", "Chicago"
   end
 
   test "layout: in the metadata picks another layout" do
@@ -332,7 +332,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "img.page-image.page-artwork[src*='/system/images/show.jpg']"
     assert_select "span.page-author.page-creator", "Ben"
     assert_select "p.page-excerpt.page-description", "A show."
-    assert_select "p.page-podcast-link a[href='https://example.com/']", "example.com"
+    assert_select "p.page-field.page-field-podcast-link a[href='https://example.com/']", "example.com"
   end
 
   test "release and podcast boxes draw nothing on a page connected to neither" do
@@ -348,7 +348,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     site_layout("podcast-page", "[podcast link]\n[body]\n")
     page = create(:page, metadata: { "title" => "Show", "url_name" => "show-js", "status" => "published", "podcast" => "show" }, content: "x")
     get "/#{page.url_name}"
-    assert_select ".page-podcast-link", 0
+    assert_select ".page-field-podcast-link", 0
   end
 
   test "a product shows its title, image and button from the layout" do

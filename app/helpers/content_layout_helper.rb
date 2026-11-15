@@ -131,6 +131,6 @@ module ContentLayoutHelper
     value = value.join(", ") if value.is_a?(Array)
     return nil if value.blank? || value.is_a?(Hash)
 
-    content_tag(:p, value.to_s, class: "#{kind}-field #{kind}-#{name.dasherize}")
+    content_tag(:p, value.to_s, class: "#{kind}-field #{kind}-field-#{name.dasherize}")
   end
 end

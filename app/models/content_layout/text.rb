@@ -169,7 +169,7 @@ class ContentLayout
       value = value.join(", ") if value.is_a?(Array)
       return "" if value.blank? || value.is_a?(Hash)
 
-      %(<p class="post-field post-#{name.dasherize}">#{h(value.to_s)}</p>)
+      %(<p class="post-field post-field-#{name.dasherize}">#{h(value.to_s)}</p>)
     end
 
     def absolute(path)

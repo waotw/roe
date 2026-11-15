@@ -1,7 +1,7 @@
 /* ==== THEME INFO ====
    Roe Theme: Default
-   Version: 1.6.15
-   Fingerprint: b05fb15e
+   Version: 1.6.16
+   Fingerprint: cbfe4e27
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -1331,13 +1331,6 @@ p.collection-more a:hover {
   margin-bottom: var(--space-6);
 }
 
-.collection-heading {
-  font-size: var(--text-2xl);
-  margin-bottom: var(--space-4);
-  color: var(--color-heading);
-  font-weight: 700;
-}
-
 .collection h2 {
   font-size: var(--text-3xl);
   /*margin: var(--space-2) 0 var(--space-4) 0;*/
@@ -2336,12 +2329,6 @@ figcaption {
   color: var(--color-muted);
 }
 
-.card.post-link-medium .card-body {
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--color-text);
-}
-
 /* ---- Card: product link, medium ---- */
 
 .product-link-medium .card-header {
@@ -2554,15 +2541,6 @@ figcaption {
   height: auto;
   margin: 0 0 0 0;
   display: block;
-}
-
-a.aside-link-inline {
-  text-decoration: underline;
-  color: var(--color-muted);
-}
-
-.card-aside .aside-link-inline:hover {
-  color: var(--color-text);
 }
 
 .card-aside .aside-link {
@@ -3798,16 +3776,6 @@ article.post-podcast {
   margin-top: var(--space-2);
 }
 
-.member-page .alert--success {
-  border-color: var(--color-link);
-  background-color: rgba(0, 0, 238, 0.04);
-}
-
-.member-page .alert--success h1,
-.member-page .alert--success h2 {
-  color: var(--color-link);
-}
-
 .member-page .alert--warning {
   border-color: var(--color-heading);
   background-color: var(--color-bg-dim);
@@ -3854,22 +3822,6 @@ article.post-podcast {
 
 .member-page .form-errors li {
   margin-bottom: var(--space-1);
-}
-
-.member-page .password-display {
-  padding: var(--space-4);
-  margin: var(--space-3) 0;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg-dim);
-  font-family: var(--font-mono);
-  font-size: var(--text-lg);
-  word-break: break-all;
-}
-
-.member-page .password-note {
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  margin-top: var(--space-3);
 }
 
 /* ---- Members: donations ---- */

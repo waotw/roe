@@ -5,7 +5,9 @@
     Each reuses the classes of the part it's like, plus its own, so a theme
     that styles authors, dates, images and excerpts styles these too:
     [artist] and [creator] are authors, [release date] a date, [cover] and
-    [artwork] images, [synopsis] and [description] excerpts. %>
+    [artwork] images, [synopsis] and [description] excerpts. The rest
+    ([genre], [label], [copyright], [category], [podcast link]) are fields:
+    <kind>-field <kind>-field-<name>, like any metadata field. %>
 <% series = context[:series] || {} %>
 <% release = series[:release] || {} %>
 <% podcast = series[:podcast_settings] || {} %>
@@ -42,7 +44,7 @@
 <% when "podcast_link" %>
   <% url = show && text.(podcast["link"]) %>
   <% if url&.match?(%r{\Ahttps?://}i) %>
-    <p class="<%= css.("field", "podcast-link") %>"><a href="<%= url %>" rel="noopener"><%= url.sub(%r{\Ahttps?://}i, "").chomp("/") %></a></p>
+    <p class="<%= css.("field", "field-podcast-link") %>"><a href="<%= url %>" rel="noopener"><%= url.sub(%r{\Ahttps?://}i, "").chomp("/") %></a></p>
   <% end %>
 <% else %>
   <%# genre, label (a release's), category (a podcast's), copyright (either). %>
@@ -53,6 +55,6 @@
        when "copyright"      then (music && text.(release["copyright"])) || (show && text.(podcast["copyright"]))
        end %>
   <% if value %>
-    <p class="<%= css.("field", name.dasherize) %>"><%= value %></p>
+    <p class="<%= css.("field", "field-#{name.dasherize}") %>"><%= value %></p>
   <% end %>
 <% end %>

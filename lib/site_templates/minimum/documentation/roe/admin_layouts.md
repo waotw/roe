@@ -173,6 +173,10 @@ They work on music tracks, podcast episodes, and pages with `release:` or `podca
 
 These boxes use the same CSS classes as the box they're like, plus their own. `[artist]` and `[creator]` are styled like `[author]` (`post-author post-artist`), `[release date]` like `[date]`, `[cover]` and `[artwork]` like `[image]`. Target `.post-artist` to style the artist differently.
 
+A box that isn't one of Roe's shows that field from the frontmatter, as a paragraph with the classes `post-field post-field-<name>` (`page-field-…` on a page). `[location]` shows `location:` as `<p class="post-field post-field-location">`. The release and podcast details without a box of their own (`[genre]`, `[label]`, `[copyright]`, `[category]`, `[podcast link]`) are fields too.
+
+Each page's `<article>` also has the class `page-<name>`, from the page's name: `page-about`, `page-store`. A page named like one of the boxes, such as `image`, `tags` or `content`, doesn't get one, because the page would then be styled like that box. The page editor tells you when this happens.
+
 ### Create a content layout
 
 You can add your own layouts. On the Admin → Layouts page, type the name and click `NEW LAYOUT`. Then add `layout: <layout_name>` to the frontmatter of the page or post and it will use this layout instead of the default.
