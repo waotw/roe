@@ -14,6 +14,7 @@ an agent — would otherwise have to rediscover. The conventions are summarised 
 | [site-sync.md](site-sync.md) | Site Sync since 0.5.0: the version store, Sync History, REWIND, conflicts, the deletion guard, and what backups are for now. |
 | [players-and-layouts.md](players-and-layouts.md) | How players, playlists and content layouts behave, and why. |
 | [theme-reference.md](theme-reference.md) | The admin theme reference pages: where they live, the rolled-back sample content, features shown as on. |
+| [theme-editor.md](theme-editor.md) | The theme editor: CodeMirror 6, the in-page preview, SECTIONS, INSPECT, SAVE AS…. |
 | [roadmap.md](roadmap.md) | Status and direction for the larger pieces of work. |
 | [specs-parked.md](specs-parked.md) | Designs agreed but deliberately not built, including Sync History per-file restore. |
 

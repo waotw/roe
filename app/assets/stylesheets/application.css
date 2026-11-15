@@ -631,3 +631,474 @@ body {
   color: #92400e;
   font-size: 0.8rem;
 }
+
+
+/* ======== THEME EDITOR ========
+   admin/themes/edit: sections list · code · preview, in a grid that fills
+   the window under the title and toolbar rows. Built by the css-editor,
+   theme-sections, theme-preview and theme-inspector controllers; the class
+   names start with te-. */
+
+.te-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(320px, 42%);
+}
+
+.te-body[data-preview="closed"] {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.te-body[data-preview="closed"] .te-preview {
+  display: none;
+}
+
+/* PREVIEW only matters on narrow windows; wide ones always show it. */
+#theme-editor:has(.te-body[data-narrow="false"]) .te-preview-toggle {
+  display: none;
+}
+
+#theme-editor button[aria-pressed="true"] {
+  background: #111827;
+  border-color: #111827;
+  color: #fff;
+}
+
+/* ── Sections ─────────────────────────────────────────────────────────── */
+
+.te-sections {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  width: 195px;
+  border-right: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.te-sections[data-state="hidden"],
+.te-sections[data-state="peek"] {
+  width: 20px;
+}
+
+.te-sections[data-state="peek"] {
+  z-index: 20;
+}
+
+.te-sections-strip {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 20px;
+  padding-top: 0.5rem;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.te-sections[data-state="hidden"] .te-sections-strip,
+.te-sections[data-state="peek"] .te-sections-strip {
+  display: flex;
+}
+
+.te-sections-strip-label {
+  writing-mode: vertical-rl;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+}
+
+.te-sections-list {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 0.5rem 0 1rem;
+}
+
+.te-sections[data-state="hidden"] .te-sections-list {
+  display: none;
+}
+
+/* Out over the code, not beside it: the code doesn't move. */
+.te-sections[data-state="peek"] .te-sections-list {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 20px;
+  width: 195px;
+  background: #f9fafb;
+  border-right: 1px solid #d1d5db;
+  box-shadow: 4px 0 12px rgb(0 0 0 / 0.12);
+}
+
+.te-sections-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem 0.5rem 0.5rem;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.te-sections-list ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.te-sections-list li button {
+  display: block;
+  width: 100%;
+  padding: 0.15rem 0.5rem;
+  text-align: left;
+  color: #111827;
+  cursor: pointer;
+}
+
+.te-sections-list .te-subsection {
+  padding-left: 1.25rem;
+  color: #4b5563;
+}
+
+.te-sections-list li button:hover {
+  background: #eef2ff;
+}
+
+.te-sections-list li button[aria-current="true"] {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.te-sections-empty {
+  padding: 0 0.5rem;
+  color: #6b7280;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* ── Code ─────────────────────────────────────────────────────────────── */
+
+.te-code {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.te-code-form {
+  flex: 1;
+  min-height: 0;
+}
+
+.te-code-editor {
+  height: 100%;
+}
+
+/* Rules INSPECT found: the one PREV / NEXT is on, the others, and those in
+   an @media block this preview doesn't meet. */
+.te-editor .te-rule-current {
+  background: #fde68a;
+}
+
+.te-editor .te-rule-match {
+  background: #fef9c3;
+}
+
+.te-editor .te-rule-dim {
+  background: #f3f4f6;
+}
+
+.te-editor .cm-panels {
+  background: #f9fafb;
+  border-bottom: 1px solid #d1d5db;
+  font-size: 0.75rem;
+}
+
+.te-editor .cm-panels input,
+.te-editor .cm-panels button {
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+.te-editor .cm-searchMatch {
+  background: #bfdbfe;
+}
+
+.te-editor .cm-searchMatch-selected {
+  background: #60a5fa;
+}
+
+/* ── INSPECT ──────────────────────────────────────────────────────────── */
+
+.te-inspect {
+  flex: none;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #111827;
+}
+
+.te-inspect-label {
+  margin-right: 0.5rem;
+  color: #b45309;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.te-inspect-hint {
+  margin: 0;
+  color: #4b5563;
+}
+
+.te-inspect-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.te-crumb {
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.te-crumb[aria-current="true"] {
+  color: #111827;
+  font-weight: 700;
+  cursor: default;
+}
+
+.te-crumb-sep,
+.te-crumb-more {
+  color: #9ca3af;
+}
+
+.te-inspect-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+
+.te-small-button {
+  padding: 0 0.4rem;
+  border: 1px solid #1f2937;
+  background: #e5e7eb;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.te-small-button:hover {
+  background: #d1d5db;
+}
+
+.te-inspect-note {
+  color: #6b7280;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.te-inspect-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.te-inspect-rules button {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.1rem 0.4rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.te-inspect-rules button:hover {
+  background: #fef3c7;
+}
+
+.te-inspect-rules [data-current] button {
+  background: #fde68a;
+}
+
+.te-inspect-rules [data-inactive] button {
+  color: #9ca3af;
+}
+
+.te-line {
+  flex: none;
+  width: 2.5rem;
+  color: #9ca3af;
+}
+
+.te-selector {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.te-note {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6b7280;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.te-inspect-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  margin-top: 0.35rem;
+}
+
+.te-inspect-row .te-line {
+  width: auto;
+}
+
+.te-link {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.te-var {
+  padding: 0 0.35rem;
+  background: #dbeafe;
+  color: #1e40af;
+  cursor: pointer;
+}
+
+.te-var:hover {
+  background: #bfdbfe;
+}
+
+/* ── Preview ──────────────────────────────────────────────────────────── */
+
+.te-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid #e5e7eb;
+}
+
+.te-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.te-page-menu {
+  position: relative;
+  min-width: 0;
+}
+
+.te-page-button {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+
+.te-page-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  width: 280px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 0.35rem 0;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.15);
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.te-page-heading {
+  padding: 0.4rem 0.6rem 0.1rem;
+  color: #6b7280;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.te-page-item {
+  display: block;
+  width: 100%;
+  padding: 0.15rem 0.6rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.te-page-item:hover {
+  background: #f3f4f6;
+}
+
+.te-page-item[aria-current="true"] {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.te-page-path {
+  padding: 0.35rem 0.6rem 0.15rem;
+}
+
+.te-page-path input {
+  width: 100%;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid #d1d5db;
+  font: inherit;
+}
+
+.te-preview-frame {
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+}
+
+.te-preview-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.te-preview-frame[data-width="phone"] {
+  background: #e5e7eb;
+}
+
+.te-preview-frame[data-width="phone"] iframe {
+  width: 390px;
+  max-width: 100%;
+  margin: 0 auto;
+  box-shadow: 0 0 0 1px #d1d5db;
+}
+
+/* ── SAVE AS… ─────────────────────────────────────────────────────────── */
+
+.te-dialog {
+  width: min(28rem, 92vw);
+  padding: 1.25rem;
+  border: 1px solid #9ca3af;
+  margin: auto;
+}
+
+.te-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}

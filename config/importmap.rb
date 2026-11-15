@@ -31,3 +31,10 @@ pin "@lezer/highlight", to: "@lezer--highlight.js", preload: false # @1.2.5
 pin "@codemirror/commands", to: "@codemirror--commands.js", preload: false # @6.11.1
 pin "@codemirror/language", to: "@codemirror--language.js", preload: false # @6.13.1
 pin "@codemirror/streamparser", to: "@codemirror--streamparser.js", preload: false # @6.0.0
+
+# The theme editor (app/javascript/theme_editor): CodeMirror's CSS language
+# and the parser the INSPECT button reads rules with. Same preload: false.
+pin_all_from "app/javascript/theme_editor", under: "theme_editor", preload: false
+pin "@codemirror/lang-css", to: "@codemirror--lang-css.js", preload: false # @6.3.1
+pin "@lezer/css", to: "@lezer--css.js", preload: false # @1.3.9
+pin "@lezer/lr", to: "@lezer--lr.js", preload: false # @1.4.12

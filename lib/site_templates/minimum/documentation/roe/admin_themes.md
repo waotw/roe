@@ -16,26 +16,31 @@ A theme controls how your site looks — its colors, fonts, spacing, and layout.
 
 **Editing.** Every theme is just a file. Edit it live in Roe (Admin → Themes → `EDIT CSS`), or open the file in any text editor and save. Your edits stick when you switch between themes.
 
-**Reverting.** Changed a built-in theme and want the original back? Open `EDIT CSS` and click the revert button. Roe restores the bundled version.
+**Reverting.** Changed a built-in theme and want the original back? Open `EDIT CSS` and click `RESET TO ORIGINAL`. Roe restores the bundled version.
 
 **Updates.** When Roe updates, its built-in themes may improve. Roe tracks each theme's version separately from your copy, so when a newer version exists, you'll see an update option. Roe never overwrites your active theme on its own — you decide when, or whether, to apply an update.
 
-## Preview your changes as you edit
+## The theme editor
 
-When you edit a theme's CSS in Roe, you don't have to save to see the result. Roe applies your changes to a live preview as you type.
+Admin → Themes → `EDIT CSS` opens the editor: the sections of the theme on the left, its CSS in the middle and your site on the right.
 
-To set it up:
+**Preview.** The preview shows your changes as you type, before you save. It opens on the page you last looked at, or the first reference page. Links in it work, so you can go to any page of your site. The menu above it jumps to a reference page, the home page or a path you type. `WIDE` and `PHONE` set its width. In a narrow window the preview is hidden until you click `PREVIEW`.
 
-1. Open Admin → Themes and click `EDIT CSS` on the theme you want to change.
-2. Click `Preview`.
-   Roe opens your site in a new browser tab.
-3. Arrange the editor and the preview side by side.
-4. Edit the CSS.
-   The preview updates as you type — no save needed.
-5. Save when you're happy with it.
-   The preview reloads with your saved file.
+**Sections.** The list on the left has one entry per section heading in the CSS (see [Sections](#sections)), plus the subsections of the section you're in. Click one to go to it. `HIDE ‹` folds the list into a strip on the left edge; hover the strip to see the list, and click it or `KEEP OPEN` to bring it back for good.
 
-For best results, size the two windows so the editor sits on one side and the preview on the other. That way every change lands in front of you, and you can tune a color or a spacing value until it looks right.
+**INSPECT.** Click `INSPECT`, then click anything in the preview. The editor lists every rule in the theme that styles it, in the order they appear in the file, and highlights them in the CSS. `PREV` and `NEXT` step through them.
+
+- A rule that applies only on hover or focus, or to `::before` and `::after`, is labelled.
+- A rule inside an `@media` block that doesn't match the preview right now, such as a phone-only rule in a wide preview, is greyed out.
+- Click a variable, such as `--font-mono → THEME VARIABLES, line 38`, to go to where it's set. Change it there to change it everywhere it's used.
+- **Inherited from** lists the text settings, such as color and font, that the element takes from the elements around it.
+- The path at the top shows where the element sits on the page. Click a step to inspect that element instead.
+
+`INSPECT` stays on until you click `INSPECTING` or press Escape.
+
+**Saving.** `SAVE`, or ⌘S / Ctrl+S, saves without leaving the page. Undo keeps working after you save. `FIND & REPLACE`, or ⌘F / Ctrl+F, searches the CSS.
+
+**SAVE AS…** saves what's in the editor as a new theme, next to the one you're editing, and opens it. Give it a name, such as Default Dark, and Roe writes `default-dark.css`. The theme you started from stays as it was last saved. The new theme is yours: Roe never updates it. It isn't used on your site until you click `ACTIVATE` on the Themes page.
 
 ## See every element a theme styles
 

@@ -294,6 +294,7 @@ Rails.application.routes.draw do
         patch :update
         post :activate
         post :reset
+        post :save_as
       end
       # The site scripts Roe ships live on the Themes page too — same
       # shipped-file story, no editor. :id is the script's basename.

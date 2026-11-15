@@ -24,6 +24,16 @@ class Admin::ThemeReferenceTest < ActionDispatch::IntegrationTest
     assert_select "#theme-reference-bar a[aria-current=page]", text: "Text"
   end
 
+  # The theme editor's preview has its own page menu, so the bar is left out
+  # there; the script that stops sample links and forms still runs.
+  test "in the theme editor's preview the bar is left out" do
+    get admin_theme_reference_path("forms", in_editor: 1)
+
+    assert_response :success
+    assert_select "#theme-reference-bar", 0
+    assert_includes response.body, "event.preventDefault(); event.stopImmediatePropagation();"
+  end
+
   test "every page renders in every theme Roe ships, without a block warning" do
     themes = Dir.glob(Rails.root.join("app/themes/*.css")).map { |path| File.basename(path, ".css") }
     Admin::ThemeReferenceController.any_instance.stubs(:installed_themes).returns(themes)

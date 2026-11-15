@@ -1,148 +1,96 @@
 import { Controller } from "@hotwired/stimulus";
 
+// The theme editor's code: CodeMirror 6 (theme_editor/editor.js) standing in
+// for the form's textarea, background saves, SAVE AS… and find & replace.
+//
+// The other theme editor controllers on this element use the editor through
+// `this.element.cssEditor` (set once it's ready) and two events:
+//
+//   css-editor:ready   { view }   the editor exists
+//   css-editor:change  { text }   after every edit
+//
+// If the editor can't load, the textarea stays visible and the form still
+// saves it: the fallback is a plain editor, not a blank page.
 export default class extends Controller {
-  static targets = ["textarea", "unsavedIndicator", "editorContainer", "saveStatus"];
-  static values = {
-    themeName: String,
-    previewId: String,
-    highlight: String,
-  };
+  static targets = [
+    "textarea", "unsavedIndicator", "editorContainer", "saveStatus",
+    "saveAsDialog", "saveAsName", "saveAsFile", "saveAsError",
+  ];
+  static values = { themeName: String, highlight: String, saveAsUrl: String };
 
-  connect() {
-    console.log("CSS Editor connected");
-    this.hasUnsavedChanges = false;
+  async connect() {
     this.originalContent = this.textareaTarget.value;
-    this.previewUpdateTimer = null;
+    this.hasUnsavedChanges = false;
+    this.onBeforeUnload = (e) => {
+      if (!this.hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", this.onBeforeUnload);
 
-    // Channel to the live preview tab (same id the preview-receiver uses).
-    // When the preview opens it pings "preview-ready" so we can sync the
-    // current CSS at once, rather than waiting for the next keystroke.
-    if (typeof BroadcastChannel !== "undefined") {
-      this.previewChannel = new BroadcastChannel(`preview-${this.previewIdValue}`);
-      this.previewChannel.onmessage = (event) => {
-        if (event.data && event.data.action === "preview-ready") this.pushPreviewCss();
-      };
+    let editor;
+    try {
+      editor = await import("theme_editor/editor");
+    } catch (error) {
+      console.error("The theme editor couldn't load; using the plain text box.", error);
+      return;
     }
-
-    // Wait for CodeMirror to be available, then initialize
-    this.waitForCodeMirror().then(() => {
-      this.initCodeMirror();
+    if (!this.element.isConnected) return;
+    this.editorModule = editor;
+    this.view = editor.createEditor({
+      parent: this.editorContainerTarget,
+      textarea: this.textareaTarget,
+      onChange: (text) => {
+        this.refreshUnsavedIndicator();
+        this.dispatch("change", { detail: { text } });
+      },
+      onSave: () => this.save(),
     });
-
-    // Set up keyboard shortcuts
-    document.addEventListener("keydown", this.handleKeyboard.bind(this));
-
-    // Set up beforeunload warning
-    window.addEventListener("beforeunload", this.handleBeforeUnload.bind(this));
-
-    // Listen for save trigger to refresh preview
-    this.checkForSaveTrigger();
-  }
-
-  waitForCodeMirror() {
-    return new Promise((resolve) => {
-      if (window.CodeMirror) {
-        resolve();
-      } else {
-        // Check every 50ms for up to 5 seconds
-        let attempts = 0;
-        const checkInterval = setInterval(() => {
-          attempts++;
-          if (window.CodeMirror) {
-            clearInterval(checkInterval);
-            resolve();
-          } else if (attempts > 100) {
-            clearInterval(checkInterval);
-            console.error("CodeMirror failed to load after 5 seconds");
-            // Show the textarea as fallback
-            this.textareaTarget.style.display = "block";
-          }
-        }, 50);
-      }
-    });
-  }
-
-  initCodeMirror() {
-    console.log("Initializing CodeMirror...");
-    
-    // Hide the original textarea but keep it for form submission
-    this.textareaTarget.style.display = "none";
-
-    // Add explicit styling to container
-    this.editorContainerTarget.style.border = "1px solid #d1d5db";
-    this.editorContainerTarget.style.fontSize = "14px";
-
-    // Initialize CodeMirror 5
-    this.editor = window.CodeMirror(this.editorContainerTarget, {
-      value: this.originalContent,
-      mode: "css",
-      theme: "eclipse",
-      lineNumbers: true,
-      indentUnit: 2,
-      tabSize: 2,
-      lineWrapping: true,
-      extraKeys: {
-        "Cmd-S": () => this.save(),
-        "Ctrl-S": () => this.save(),
-      }
-    });
-    
-    console.log("CodeMirror initialized with theme:", this.editor.getOption("theme"));
-    console.log("Editor wrapper classes:", this.editor.getWrapperElement().className);
-
-    // Sync changes to textarea
-    this.editor.on('change', () => {
-      this.textareaTarget.value = this.editor.getValue();
-      this.refreshUnsavedIndicator();
-
-      // Push the edit to the live preview tab (debounced), before save.
-      this.schedulePreviewUpdate();
-    });
-
-    // Set height
-    this.editor.setSize(null, "70vh");
+    this.element.cssEditor = {
+      view: this.view,
+      text: () => this.view.state.doc.toString(),
+      reveal: (from, to, options) => editor.revealRange(this.view, from, to, options),
+      setInspectRanges: (ranges) => this.view.dispatch({ effects: editor.setInspectRanges.of(ranges) }),
+    };
+    this.dispatch("ready", { detail: { view: this.view } });
 
     if (this.highlightValue) this.highlightReference(this.highlightValue);
   }
 
-  // Arriving from a media file's "Used in" link (?highlight=/media/...): put
-  // the cursor on where the file is used, selected, and scroll to it. A
-  // mention in a comment is skipped — the Media page doesn't count those as
-  // uses, so landing on one would point at the wrong place.
+  disconnect() {
+    window.removeEventListener("beforeunload", this.onBeforeUnload);
+    if (this.view) {
+      this.textareaTarget.hidden = false;
+      this.view.destroy();
+    }
+    delete this.element.cssEditor;
+  }
+
+  text() {
+    return this.view ? this.view.state.doc.toString() : this.textareaTarget.value;
+  }
+
+  // Arriving from a media file's "Used in" link (?highlight=/media/...):
+  // select where the file is used and scroll to it. A mention inside a
+  // comment is skipped — the Media page doesn't count those as uses.
   highlightReference(path) {
-    const text = this.editor.getValue();
+    const text = this.text();
     const code = text.replace(/\/\*[\s\S]*?\*\//g, (comment) => " ".repeat(comment.length));
     let at = code.indexOf(path);
     if (at === -1) at = text.indexOf(path);
     if (at === -1) return;
-
-    const from = this.editor.posFromIndex(at);
-    const to = this.editor.posFromIndex(at + path.length);
-    this.editor.focus();
-    this.editor.setSelection(from, to);
-    this.editor.scrollIntoView({ from, to }, Math.round(this.editor.getScrollInfo().clientHeight / 3));
-    this.editorContainerTarget.scrollIntoView({ block: "center" });
+    this.editorModule.revealRange(this.view, at, at + path.length, { select: true });
+    this.view.focus();
   }
 
-  handleKeyboard(e) {
-    // Cmd/Ctrl+S to save
-    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-      e.preventDefault();
-      this.save();
-    }
-  }
-
-  handleBeforeUnload(e) {
-    if (this.hasUnsavedChanges) {
-      e.preventDefault();
-      e.returnValue = "";
-      return "";
-    }
+  find() {
+    if (!this.view) return;
+    this.editorModule.openFind(this.view);
   }
 
   // Saves in the background: the page doesn't reload, so the cursor, the
-  // scroll position and undo history all stay where they were. A Save
-  // pressed while one is still going runs once that one finishes.
+  // scroll position and undo all stay as they were. A Save pressed while one
+  // is still going runs once that one finishes.
   async save(e) {
     if (e) e.preventDefault();
     if (this.saving) {
@@ -150,7 +98,7 @@ export default class extends Controller {
       return;
     }
 
-    const content = this.editor ? this.editor.getValue() : this.textareaTarget.value;
+    const content = this.text();
     this.textareaTarget.value = content;
     const form = document.getElementById("theme-form");
 
@@ -167,18 +115,19 @@ export default class extends Controller {
         ? await response.json()
         : null;
 
+      // COPY: save messages
       if (response.ok && result?.saved) {
         this.originalContent = content;
         this.refreshUnsavedIndicator();
         this.showSaveStatus("✓ Saved", "text-green-700", 2000);
-        this.broadcastRefresh();
+        this.dispatch("saved");
       } else if (result?.error) {
         this.showSaveStatus(`Not saved: ${result.error}`, "text-red-700");
       } else {
         // Not JSON back: usually the sign-in page, after the session ran out.
         this.showSaveStatus("Not saved — you may have been signed out. Sign in in another tab, then save again.", "text-red-700");
       }
-    } catch (error) {
+    } catch {
       this.showSaveStatus("Not saved — Roe couldn't be reached. Your changes are still here; save again.", "text-red-700");
     } finally {
       this.saving = false;
@@ -190,9 +139,69 @@ export default class extends Controller {
     }
   }
 
+  // ── SAVE AS… ────────────────────────────────────────────────────────────
+
+  openSaveAs() {
+    this.saveAsErrorTarget.textContent = "";
+    this.saveAsNameChanged();
+    this.saveAsDialogTarget.showModal();
+    this.saveAsNameTarget.select();
+  }
+
+  closeSaveAs() {
+    this.saveAsDialogTarget.close();
+  }
+
+  // Shows the file name the typed name becomes, the way the server makes it.
+  saveAsNameChanged() {
+    const slug = this.saveAsNameTarget.value
+      .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    this.saveAsFileTarget.textContent = slug ? `site/theme/${slug}.css` : "";
+  }
+
+  async saveAs(e) {
+    e.preventDefault();
+    const body = new FormData();
+    body.append("name", this.saveAsNameTarget.value);
+    body.append("content", this.text());
+    try {
+      const response = await fetch(this.saveAsUrlValue, {
+        method: "POST",
+        body,
+        headers: {
+          Accept: "application/json",
+          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content,
+        },
+        credentials: "same-origin",
+      });
+      const result = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : null;
+      if (response.ok && result?.saved) {
+        // The text went into the new file; leaving this one isn't losing it.
+        this.hasUnsavedChanges = false;
+        window.location.href = result.url;
+      } else {
+        // COPY: SAVE AS… failed
+        this.saveAsErrorTarget.textContent = result?.error || "Not saved — you may have been signed out.";
+      }
+    } catch {
+      this.saveAsErrorTarget.textContent = "Not saved — Roe couldn't be reached.";
+    }
+  }
+
+  // ── Leaving ─────────────────────────────────────────────────────────────
+
+  confirmLeave(e) {
+    // COPY: leaving with unsaved changes
+    if (this.hasUnsavedChanges && !confirm("You have unsaved changes. Leave without saving?")) {
+      e.preventDefault();
+    } else {
+      this.hasUnsavedChanges = false;
+    }
+  }
+
   refreshUnsavedIndicator() {
-    const current = this.editor ? this.editor.getValue() : this.textareaTarget.value;
-    this.hasUnsavedChanges = current !== this.originalContent;
+    this.hasUnsavedChanges = this.text() !== this.originalContent;
     this.unsavedIndicatorTarget.classList.toggle("hidden", !this.hasUnsavedChanges);
   }
 
@@ -203,64 +212,5 @@ export default class extends Controller {
     el.textContent = text;
     el.className = colorClass;
     if (hideAfterMs) this.saveStatusTimer = setTimeout(() => (el.textContent = ""), hideAfterMs);
-  }
-
-  // Debounced live push of the current CSS to the open preview tab, so it
-  // updates as you type — the same pre-save auto-refresh posts/pages/products
-  // get. Harmless when no preview tab is listening.
-  schedulePreviewUpdate() {
-    if (!this.previewChannel) return;
-    clearTimeout(this.previewUpdateTimer);
-    this.previewUpdateTimer = setTimeout(() => this.pushPreviewCss(), 150);
-  }
-
-  pushPreviewCss() {
-    if (!this.previewChannel || !this.editor) return;
-    this.previewChannel.postMessage({ action: "css", css: this.editor.getValue() });
-  }
-
-  preview() {
-    const previewUrl = `/?preview_theme=${this.themeNameValue}`;
-    window.open(previewUrl, this.previewIdValue);
-  }
-
-  confirmCancel(e) {
-    if (this.hasUnsavedChanges) {
-      if (!confirm("You have unsaved changes. Are you sure you want to leave?")) {
-        e.preventDefault();
-      }
-    }
-  }
-
-  checkForSaveTrigger() {
-    const trigger = document.getElementById("theme-saved-trigger");
-    if (trigger) {
-      this.broadcastRefresh();
-      const savedPosition = sessionStorage.getItem("cssEditorScrollPosition");
-      if (savedPosition) {
-        setTimeout(() => {
-          window.scrollTo(0, parseInt(savedPosition));
-          sessionStorage.removeItem("cssEditorScrollPosition");
-        }, 0);
-      }
-    }
-  }
-
-  broadcastRefresh() {
-    if (typeof BroadcastChannel !== "undefined") {
-      const channel = new BroadcastChannel(`preview-${this.previewIdValue}`);
-      channel.postMessage({ action: "refresh" });
-      channel.close();
-    }
-  }
-
-  disconnect() {
-    document.removeEventListener("keydown", this.handleKeyboard.bind(this));
-    window.removeEventListener("beforeunload", this.handleBeforeUnload.bind(this));
-    clearTimeout(this.previewUpdateTimer);
-    if (this.previewChannel) this.previewChannel.close();
-    if (this.editor) {
-      this.editor.toTextArea();
-    }
   }
 }

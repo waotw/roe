@@ -5,7 +5,11 @@
     rather than in the page's flow: a theme with a sidebar lays body out as a
     grid, and an extra child of body would take a grid cell. The page is
     pushed down by the bar's height instead. %>
+<%# In the theme editor's preview (?in_editor=1) the editor's own page menu
+    does the bar's job, so the bar is left out. The script that stops sample
+    links and forms going anywhere is outside it and always runs. %>
 <% content_for :admin_bar do %>
+<% unless params[:in_editor].present? %>
   <style>
     #theme-reference-bar, #theme-reference-bar * { all: revert; box-sizing: border-box; }
     #theme-reference-bar {
@@ -98,10 +102,6 @@
       <% end %>
     </nav>
   </div>
-  <%# Forms and buy buttons look real but do nothing here: a sign-up would
-      sign someone up, and Add to Cart would fill the real cart. Links to the
-      sample posts and products would 404, since those only exist while the
-      page renders. %>
   <script nonce="<%= safe_csp_nonce %>">
     (() => {
       const bar = document.getElementById("theme-reference-bar");
@@ -131,6 +131,13 @@
         }
       });
     })();
+  </script>
+<% end %>
+  <%# Forms and buy buttons look real but do nothing here: a sign-up would
+      sign someone up, and Add to Cart would fill the real cart. Links to the
+      sample posts and products would 404, since those only exist while the
+      page renders. %>
+  <script nonce="<%= safe_csp_nonce %>">
     window.addEventListener("submit", (event) => {
       if (event.target.closest("main")) event.preventDefault();
     }, true);
