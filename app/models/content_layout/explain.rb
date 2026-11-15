@@ -183,9 +183,9 @@ class ContentLayout
       when "post"
         type = Post::POST_TYPES.key?(@name.to_sym) ? @name : "article"
         [ %(<article class="post post-#{type}">), %(<div class="content">) ]
-      when "page"          then [ %(<article class="page">) ]
+      when "page"          then [ %(<article class="page">), %(<div class="content">) ]
       when "product"       then [ %(<div class="product">), %(<div class="content">) ]
-      when "documentation" then [ %(<article class="content documentation">) ]
+      when "documentation" then [ %(<article class="documentation-page">), %(<div class="content documentation">) ]
       end
     end
 
@@ -227,7 +227,7 @@ class ContentLayout
         case k
         when "post"    then %(<div class="post-content">…the post's writing…</div>)
         when "product" then "…the product's writing…"
-        else %(<div class="content">…the #{noun}'s writing…</div>)
+        else %(<div class="#{k}-content">…the #{noun}'s writing…</div>)
         end
       else %(<p class="#{k}-field #{k}-#{part.dasherize}">#{part}</p>)
       end

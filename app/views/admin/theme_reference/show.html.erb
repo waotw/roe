@@ -141,5 +141,7 @@
   </script>
 <% end %>
 <article class="page page-<%= @page.url_name %>">
-  <%= render_content_layout(@page) %>
+  <div class="content">
+    <%= render_content_layout(@page) %>
+  </div>
 </article>

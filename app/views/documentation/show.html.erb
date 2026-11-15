@@ -7,6 +7,11 @@
     include it, so it's being read from the app instead.
   </p>
 <% end %>
-<article class="content documentation">
-  <%= render_content_layout(@doc) %>
+<%# .content wraps the whole layout, as on posts and pages; `article .content`
+    rules (the aside column) need it inside an article. .documentation stays
+    on the same element so `.content.documentation` rules still match. %>
+<article class="documentation-page">
+  <div class="content documentation">
+    <%= render_content_layout(@doc) %>
+  </div>
 </article>

@@ -93,14 +93,20 @@ kept.
 - Pages have no media of their own: on a page with `release:` / `podcast:`,
   `[player]` is an empty card that plays the playlist after it.
 - Boxes on one line share a `<div>` (the row's name, or `.layout-row`) for CSS
-  to style; **Roe doesn't lay them out**. Neither shipped theme styles
-  `.layout-row` yet, so boxes on one line stack. Box styling is CSS only, and
-  `.content` / `[body]` styling waits for the theme rework.
+  to style; **Roe doesn't lay them out**. The shipped themes leave
+  `.layout-row` unstyled on purpose, so boxes on one line stack; a theme can
+  lay the row out. Side by side was tried and looked worse. A
+  `[player] [playlist]` row keeps the joined border, since the two are still
+  neighbours inside the row.
+- **`.content` wraps the whole layout** on every type (posts, pages, docs,
+  products), so Markdown styles reach the boxes too. The writing alone is
+  `.post-content`, `.page-content` or `.documentation-content`; a product's
+  writing has no wrapper, because the product grid styles `.content`'s direct
+  children. Docs are `article.documentation-page > .content.documentation`, so
+  `article .content` (the aside column) and `.content.documentation` rules
+  both match. Putting `.content` on `[body]` only was measured and rejected:
+  the product page falls apart, and every site theme written against
+  `article .content` would change without an update to accept.
 - A site's saved layout overrides Roe's default, so a copy of an older
   default hides a box the new one gained. When diagnosing "no player", check
   the site's layout file first.
-
-## Open, for the theme rework
-
-- `[player] [playlist]` on one line loses the joined border between them.
-- `.layout-row` has no styles in either theme.

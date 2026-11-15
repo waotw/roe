@@ -184,6 +184,23 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select "h1", 1
   end
 
+  # .content wraps the whole layout on every type, so Markdown styles reach the
+  # boxes too; the writing alone has its own class.
+  test "a page's and a doc's .content wraps the whole layout, with the body named inside it" do
+    site_layout("page", "[title]\n[body]\n")
+    page = create(:page, metadata: { "title" => "Wrapped", "url_name" => "wrapped", "status" => "published" }, content: "Hello.")
+    get "/#{page.url_name}"
+    assert_select "article.page > .content > h1.page-title", "Wrapped"
+    assert_select "article.page > .content > .page-content", /Hello/
+    assert_select ".content .content", 0
+
+    Documentation.stubs(:roe_docs_published?).returns(true)
+    get "/documentation/roe/troubleshoot-deployment"
+    assert_response :success
+    assert_select "article.documentation-page > .content.documentation > .documentation-content"
+    assert_select ".content .content", 0
+  end
+
   test "a page connected to a podcast uses the podcast-page layout" do
     SiteFeature.stubs(:podcast_enabled?).returns(true)
     PodcastConfig.stubs(:get).returns({ "title" => "The Show" })
