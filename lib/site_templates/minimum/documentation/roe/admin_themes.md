@@ -157,6 +157,24 @@ Colors for the player's times and a podcast's subscribe buttons. The rest of the
 
 When the variables aren't enough, edit the full CSS file for a completely custom theme. The class names are semantic, and many are documented in the CSS itself. If a change goes sideways, revert to the original at any time from Admin → Themes → `EDIT CSS`.
 
+### Sections
+
+The themes Roe ships are split into sections in the order things appear on a page: theme variables, the layout (nav, search, sidebar, footer), the content, then collections, galleries, cards, players, buttons and forms, then features such as the podcast, members and the store. Your own CSS goes in `CUSTOM CODE`, the last section.
+
+Each section starts with a heading on one line, in capitals:
+
+```css
+/* ==== CARDS ==== */
+```
+
+Larger sections are split into subsections:
+
+```css
+/* ---- Card: aside ---- */
+```
+
+Write a heading exactly this way and it shows up in the theme editor's list of sections. You can add, rename, remove or reorder sections in your own theme.
+
 If you get stuck or want to share your work:
 
 - [Email support](mailto:roe@weareontheweb.com) and a human will get back to you.

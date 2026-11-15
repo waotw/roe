@@ -1,7 +1,7 @@
-/* ============== THEME INFO ================
+/* ==== THEME INFO ====
    Roe Theme: Default
-   Version: 1.6.11
-   Fingerprint: 2ee76918
+   Version: 1.6.13
+   Fingerprint: fd19d867
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -16,7 +16,7 @@
    You can always download a fresh copy of the newest version of any built in theme.
 */
 
-/* ============ THEME VARIABLES ============ */
+/* ==== THEME VARIABLES ==== */
 
 :root {
   /* Light/Dark Mode */
@@ -89,7 +89,7 @@
   --player-meta-color: #888888;
 }
 
-/* ============ DARK MODE ============ */
+/* ==== DARK MODE ==== */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -124,7 +124,7 @@
   }
 }
 
-/* ============== BASE STYLES =============== */
+/* ==== BASE ==== */
 
 /* The `hidden` attribute must win over component display rules (e.g.
    .btn-primary { display: inline-block }), so JS that toggles [hidden] to
@@ -226,7 +226,7 @@ a.heading-anchor,
   border-bottom: none;
 }
 
-/* =========== LAYOUT — SITE NAV ============ */
+/* ==== LAYOUT — SITE NAV ==== */
 
 .site-nav {
   padding: var(--space-4) 0;
@@ -321,7 +321,7 @@ p:has(.site-logo) {
   background-size: contain;
 }
 
-/* ================ SITE ACTIONS (cart, member icon) ================= */
+/* ==== LAYOUT — SITE ACTIONS ==== */
 
 html.snipcart-cart--opened .site-actions,
 html.snipcart-sidecart--opened .site-actions {
@@ -368,7 +368,7 @@ html.snipcart-sidecart--opened .site-actions {
   font-size: var(--text-xs);
 }
 
-/* ================ SITE SEARCH ================= */
+/* ==== LAYOUT — SITE SEARCH ==== */
 
 /* Toggle: sits with the cart/member icons. It carries `.site-action` too,
    so it inherits their color + svg sizing; this just resets the <button>. */
@@ -636,7 +636,7 @@ html.snipcart-sidecart--opened .site-actions {
   }
 }
 
-/* ============ LAYOUT — SIDEBAR ============ */
+/* ==== LAYOUT — SIDEBAR ==== */
 
 body:not(.has-sidebar) article {
   margin-top: var(--space-4);
@@ -806,7 +806,7 @@ body.sidebar-right {
   }
 }
 
-/* ============ LAYOUT - FOOTER ============= */
+/* ==== LAYOUT — FOOTER ==== */
 
 .site-footer {
   margin-top: var(--space-16);
@@ -819,7 +819,7 @@ body.sidebar-right {
   text-decoration: underline;
 }
 
-/* ============ FLASH MESSAGES ============== */
+/* ==== FLASH MESSAGES ==== */
 
 div.flash {
   padding: var(--space-3) var(--space-4);
@@ -833,7 +833,7 @@ div.flash mark {
   background-color: var(--color-highlight-text);
 }
 
-/* ======== POST/PAGE CONTENT GLOBAL ======== */
+/* ==== POST/PAGE GLOBAL ==== */
 
 /* First element in any content block never has top margin */
 .content > :first-child {
@@ -1124,7 +1124,7 @@ a.footnote-backlink-number:hover {
   }
 }
 
-/* ============ POST/PAGE SINGLE ============ */
+/* ==== POST/PAGE SINGLE ==== */
 
 /* A layout's [image], [cover] and [artwork] sit outside .content, so its
    image rule doesn't reach them. */
@@ -1282,7 +1282,7 @@ ul.product-tags {
   }
 }
 
-/* ============== COLLECTIONS =============== */
+/* ==== COLLECTIONS ==== */
 
 .collection-page-heading {
   display: flex;
@@ -1374,7 +1374,7 @@ p.collection-more a:hover {
   color: var(--color-muted);
 }
 
-/* List */
+/* ---- List ---- */
 
 .collection.list .collection-item {
   margin-bottom: var(--space-4);
@@ -1401,6 +1401,8 @@ p.collection-more a:hover {
   vertical-align: -1px;
 }
 
+/* ---- Compact ---- */
+
 /* Compact - single line, link, date • author */
 
 .collection.compact .item-title {
@@ -1422,6 +1424,8 @@ p.collection-more a:hover {
 .collection.compact .paid-lock-icon {
   vertical-align: -4px;
 }
+
+/* ---- Full ---- */
 
 /* Full — Image + body when item has media */
 
@@ -1528,7 +1532,7 @@ p.collection-more a:hover {
   }
 }
 
-/* Links */
+/* ---- Links ---- */
 
 .collection.links .collection-item {
   margin-bottom: var(--space-1);
@@ -1546,6 +1550,8 @@ p.collection-more a:hover {
   margin: 0 0 0 0;
   line-height: 1;
 }
+
+/* ---- Menu ---- */
 
 /* Nav — a bare link list for layout areas (navigation, footer, sidebar).
    `style: horizontal|vertical` toggles the modifier class; default vertical. */
@@ -1588,8 +1594,88 @@ p.collection-more a:hover {
   margin: 0;
 }
 
-/* ============ COLLECTION PLAYLIST (music / podcast) ============
-   The `playlist` collection renders the track/episode list. Rows carry the data
+/* ---- Glossary ---- */
+
+.collection.glossary dl {
+  margin: 0 0 0 0;
+  max-width: 60%;
+}
+
+.collection.glossary .glossary-entry {
+  margin: 0 0 var(--space-4) 0;
+}
+
+.collection.glossary dd {
+  font-size: var(--text-sm);
+  margin-inline-start: var(--space-0);
+}
+
+.collection.glossary .item-title {
+  font-size: var(--text-lg);
+}
+
+.collection.glossary .item-title a {
+  text-decoration: underline;
+}
+
+.collection.glossary .item-subtitle {
+  font-size: var(--text-base);
+  font-style: italic;
+  line-height: 1.3;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.collection.glossary .item-excerpt {
+  font-size: var(--text-sm);
+}
+
+/* ---- Grid ---- */
+
+.collection-grid {
+  display: grid;
+  gap: var(--space-8);
+  margin: var(--space-4) 0;
+}
+
+.collection-grid-2,
+.collection-grid-3 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 700px) {
+  .collection-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .collection-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .collection.glossary dl {
+    margin: 0 0 0 0;
+    max-width: 100%;
+  }
+}
+
+.collection-grid .collection {
+  margin: 0;
+}
+
+.collection-grid h2 {
+  font-size: var(--text-3xl);
+  margin-top: 0;
+}
+
+@media (max-width: 630px) {
+  .collection.glossary dl {
+    margin: 0 0 0 0;
+    max-width: 100%;
+  }
+}
+
+/* ==== COLLECTION PLAYLIST ==== */
+
+/* The `playlist` collection renders the track/episode list. Rows carry the data
    a `player` card reads to build its queue. TUI-flavored: mono, compact, symbol
    markers. Override or replace freely. (`player` is an alias for `playlist`.) */
 .collection.playlist,
@@ -1674,86 +1760,7 @@ p.collection-more a:hover {
   border: 1px solid currentColor;
 }
 
-/* Collection Glossary */
-
-.collection.glossary dl {
-  margin: 0 0 0 0;
-  max-width: 60%;
-}
-
-.collection.glossary .glossary-entry {
-  margin: 0 0 var(--space-4) 0;
-}
-
-.collection.glossary dd {
-  font-size: var(--text-sm);
-  margin-inline-start: var(--space-0);
-}
-
-.collection.glossary .item-title {
-  font-size: var(--text-lg);
-}
-
-.collection.glossary .item-title a {
-  text-decoration: underline;
-}
-
-.collection.glossary .item-subtitle {
-  font-size: var(--text-base);
-  font-style: italic;
-  line-height: 1.3;
-  margin: 0 0 var(--space-1) 0;
-}
-
-.collection.glossary .item-excerpt {
-  font-size: var(--text-sm);
-}
-
-/* Collection Grids */
-
-.collection-grid {
-  display: grid;
-  gap: var(--space-8);
-  margin: var(--space-4) 0;
-}
-
-.collection-grid-2,
-.collection-grid-3 {
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 700px) {
-  .collection-grid-2 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .collection-grid-3 {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .collection.glossary dl {
-    margin: 0 0 0 0;
-    max-width: 100%;
-  }
-}
-
-.collection-grid .collection {
-  margin: 0;
-}
-
-.collection-grid h2 {
-  font-size: var(--text-3xl);
-  margin-top: 0;
-}
-
-@media (max-width: 630px) {
-  .collection.glossary dl {
-    margin: 0 0 0 0;
-    max-width: 100%;
-  }
-}
-
-/* ================ GALLERIES =============== */
+/* ==== GALLERIES ==== */
 
 .gallery {
   margin-bottom: var(--space-6);
@@ -1831,7 +1838,9 @@ figcaption {
   }
 }
 
-/* --- Gallery item wrapper + click-to-zoom --------------------------------
+/* ---- Zoom ---- */
+
+/* Gallery item wrapper + click-to-zoom.
    Each image is wrapped in .gallery-item (the grid/track cell) and a
    .gallery-zoom-link (the click target). Zoom is pure CSS: the link points
    at an overlay's #id and .gallery-zoom:target reveals it — no JS needed.
@@ -1904,6 +1913,8 @@ figcaption {
   cursor: pointer;
 }
 
+/* ---- Ratios ---- */
+
 /* Explicit gallery ratios (grids only — carousels size by height).
    Images crop to fill; `object-fit: cover` comes from `.content .gallery img`.
    `auto`/`original` keep the image's natural shape instead. */
@@ -1931,7 +1942,9 @@ figcaption {
   object-fit: contain;
 }
 
-/* --- Carousel (slideshow: true) ------------------------------------------
+/* ---- Carousel ---- */
+
+/* Carousel (slideshow: true).
    CSS scroll-snap does the scrolling/snapping with no JS. gallery.js adds
    prev/next buttons and dots as progressive enhancement. */
 
@@ -2044,13 +2057,13 @@ figcaption {
   background: var(--color-text);
 }
 
-/* ================= CARDS ================== */
+/* ==== CARDS ==== */
 
 .card {
   position: relative;
 }
 
-/* Pullquote */
+/* ---- Card: pullquote ---- */
 
 .card-pullquote {
   text-align: center;
@@ -2115,7 +2128,7 @@ figcaption {
   }
 }
 
-/* Post Link Cards (small / medium / large) */
+/* ---- Card: post link ---- */
 
 .card.post-link-small,
 .card.post-link-medium,
@@ -2220,7 +2233,7 @@ figcaption {
   color: var(--color-text);
 }*/
 
-/* Post Link - Small */
+/* ---- Card: post link, small ---- */
 
 .card.post-link-small {
   gap: var(--space-4);
@@ -2251,7 +2264,7 @@ figcaption {
   color: var(--color-muted);
 }
 
-/* Product Link - Small */
+/* ---- Card: product link, small ---- */
 
 .product-link-small .card-header {
   display: flex;
@@ -2279,7 +2292,7 @@ figcaption {
   line-height: 1;
 }
 
-/* Post Link - Medium */
+/* ---- Card: post link, medium ---- */
 
 .card.post-link-medium {
   gap: var(--space-5);
@@ -2318,7 +2331,7 @@ figcaption {
   color: var(--color-text);
 }
 
-/* Product Link - Medium */
+/* ---- Card: product link, medium ---- */
 
 .product-link-medium .card-header {
   display: flex;
@@ -2339,6 +2352,8 @@ figcaption {
 .post-link-medium.product-link-medium .card-link {
   font-size: var(--text-base);
 }
+
+/* ---- Card: post link, large ---- */
 
 /* Post Link - Large
    Grid layout with template areas. Mobile-first single column where
@@ -2468,7 +2483,7 @@ figcaption {
   }
 }
 
-/* Product Link - Large */
+/* ---- Card: product link, large ---- */
 
 .product-link-large .card-header {
   display: flex;
@@ -2491,7 +2506,7 @@ figcaption {
   margin-top: 0;
 }
 
-/* Asides */
+/* ---- Card: aside ---- */
 
 .card-aside {
   float: none;
@@ -2655,6 +2670,10 @@ article .content,
   }
 }
 
+/* ==== MEDIA PLAYERS ==== */
+
+/* ---- Player: card ---- */
+
 /* Player card (card type: player, and every post's own player) — the
    transport, driven by player.js. It plays through a `playlist` collection
    on the same page (if any). TUI-flavored: mono, compact, symbol-based
@@ -2813,6 +2832,8 @@ article .content,
   padding: 0;
 }
 
+/* ---- Player: previous and next ---- */
+
 /* ⏮ ⏭ in the transport. player.js (1.4) shows them only where this theme
    says it styles them (--player-nav: 1); the theme then shows them on touch
    screens. On a desktop the ⏮ ⏭ links under the player stay as they are. */
@@ -2840,6 +2861,8 @@ article .content,
   opacity: 0.3;
   cursor: default;
 }
+
+/* ---- Player: before player.js ---- */
 
 /* Before player.js takes over. The browser's own audio bar used to show for
    a moment, then Roe's controls replaced it and the card changed height.
@@ -2878,6 +2901,8 @@ article .content,
     visibility: visible;
   }
 }
+
+/* ---- Player: touch screens ---- */
 
 /* Touch screens — a finger, not a mouse pointer, whatever the screen width.
    No artwork, and every control big enough to hit: the times flank a
@@ -2989,7 +3014,7 @@ article .content,
   }
 }
 
-/* ============ MEDIA PLAYERS =============== */
+/* ---- Player: chapters ---- */
 
 /* Chapters and playlist: a podcast episode's `chapters:` inside the player
    card (click a row to jump there), and a `playlist` collection's tracks or
@@ -3059,6 +3084,8 @@ li.chapter {
   content: "\25B8 ";
 }
 
+/* ---- Player: playlist ---- */
+
 /* A `playlist` collection, or the layout's [playlist] (the same thing), as
    a box like the player card's. Straight after a player — a player card in
    the writing, or the layout's [player] — it joins it: the player's bottom
@@ -3089,7 +3116,7 @@ li.chapter {
   border-top: 1px dashed var(--color-border);
 }
 
-/* Video Player */
+/* ---- Player: video ---- */
 
 .video-player-container {
   position: relative;
@@ -3104,6 +3131,8 @@ li.chapter {
   aspect-ratio: 16 / 9;
   background: #000;
 }
+
+/* ---- Player: video in the text ---- */
 
 /* A video embedded in a post's text: ![label](/media/video/clip.mp4).
    Same player as a video post, spaced like an image. */
@@ -3266,222 +3295,7 @@ a.video-btn {
   display: block;
 }
 
-/* ================ PODCAST ================= */
-
-article.post-podcast {
-  margin-left: 0;
-}
-
-/* Subscribe / feed */
-
-/* Subscribe block spacing — used on episode pages and on podcast-connected
-   pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
-.podcast-subscribe {
-  margin: var(--space-2) 0;
-  font-size: 0.85rem;
-}
-
-/* Larger feed-link variant */
-
-.podcast-subscribe .feed-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem var(--space-3);
-  border: 1px solid var(--player-border);
-  color: var(--player-btn-color);
-  font-size: 0.8rem;
-  text-transform: none;
-  letter-spacing: normal;
-  opacity: 1;
-}
-
-.podcast-subscribe .feed-link:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.feed-link {
-  font-size: var(--text-xxs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.15rem 0.4rem;
-  border: 1px solid currentColor;
-  text-decoration: none;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-}
-
-.feed-link:hover {
-  opacity: 1;
-}
-
-.feed-link-private {
-  opacity: 0.8;
-}
-
-/* Subscribe links row (app/service links + RSS). Used both inline and
-   inside the collapsible menu below. */
-.subscribe-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-/* Menu mode (subscribe_display: menu): a native <details> disclosure —
-   the "Subscribe" button is the <summary> styled as a button, and
-   clicking it reveals the links. No JS. */
-.podcast-subscribe--menu > summary {
-  display: inline-block;
-  list-style: none;
-  cursor: pointer;
-}
-
-.podcast-subscribe--menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.podcast-subscribe--menu[open] > summary {
-  margin-bottom: var(--space-3);
-}
-
-/* ============ DOCUMENTATION =============== */
-
-.docs-back-link {
-  margin-bottom: var(--space-0);
-  font-size: var(--text-sm);
-  display: inline-block;
-}
-
-.content.documentation p mark,
-.documentation mark {
-  background-color: var(--color-highlight-text);
-  color: var(--color-text);
-  padding: 0 calc(var(--space-1) * 0.8);
-  border-radius: 1px;
-  line-height: 1;
-}
-
-.documentation img.screenshot {
-  border: 1px solid var(--color-muted);
-}
-
-@media (prefers-color-scheme: dark) {
-  .content.documentation p mark,
-  .documentation mark {
-    color: var(--color-bg);
-  }
-}
-
-.content.documentation p code {
-  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
-}
-
-.content.documentation a code {
-  color: var(--color-link);
-}
-
-.content.documentation a:hover code {
-  color: var(--color-text);
-}
-
-.content.documentation li pre {
-  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-4);
-  margin: 0;
-}
-
-.content.documentation li code {
-  font-size: var(--text-xs);
-  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
-}
-
-.content.documentation li pre code {
-  padding: 0;
-}
-
-.page-documentation .collection-grid,
-.documentation .collection-grid {
-  display: grid;
-  column-gap: var(--space-8);
-  row-gap: var(--space-4);
-  margin: var(--space-4) 0;
-}
-
-.page-documentation .collection-grid h2 {
-  font-size: var(--text-2xl);
-  margin-top: 0;
-}
-
-.content.documentation table {
-  font-size: var(--text-sm);
-  line-height: 1.75;
-}
-
-/* =============== UTILITIES ================ */
-
-.back-link {
-  display: inline-block;
-  margin-top: var(--space-12);
-  padding-top: var(--space-8);
-  color: var(--color-link);
-  text-decoration: underline;
-}
-
-.back-link:hover {
-  color: var(--color-text);
-}
-
-hr.clear-floats {
-  clear: both;
-  border-top: none;
-}
-
-/* ================= FORMS ================== */
-
-/* Global form vocabulary. Promoted from member pages (the only place forms
-   appear today); any future form reuses these. Member-specific bits stay in
-   the Members section. */
-
-.form-field {
-  margin-bottom: var(--space-4);
-}
-
-.form-field label {
-  display: block;
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-1);
-  color: var(--color-muted);
-}
-
-.form-field input[type="email"],
-.form-field input[type="text"],
-.form-field input[type="password"] {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg);
-  font-family: inherit;
-  font-size: var(--text-base);
-  color: var(--color-text);
-  box-sizing: border-box;
-}
-
-.form-field input:focus {
-  outline: 2px solid var(--color-link);
-  outline-offset: -1px;
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-}
-
-.form-actions a {
-  text-decoration: none;
-}
-
-/* ================ BUTTONS ================= */
+/* ==== BUTTONS ==== */
 
 /* Global button vocabulary: .btn-* classes any feature reuses (share menu,
    products, member forms). Member pages override the .btn-* palette at higher
@@ -3574,7 +3388,52 @@ a.btn-grid {
   font-size: var(--text-sm);
 }
 
-/* ================= SHARE ================== */
+/* ==== FORMS ==== */
+
+/* Global form vocabulary. Promoted from member pages (the only place forms
+   appear today); any future form reuses these. Member-specific bits stay in
+   the Members section. */
+
+.form-field {
+  margin-bottom: var(--space-4);
+}
+
+.form-field label {
+  display: block;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+  color: var(--color-muted);
+}
+
+.form-field input[type="email"],
+.form-field input[type="text"],
+.form-field input[type="password"] {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.form-field input:focus {
+  outline: 2px solid var(--color-link);
+  outline-offset: -1px;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.form-actions a {
+  text-decoration: none;
+}
+
+/* ==== SHARE ==== */
 
 /* Share button (Roe-anji `for: share`): a single trigger (.btn-primary) that
    reveals Copy link + Email (.btn-outline) on desktop, or opens the native
@@ -3633,9 +3492,88 @@ a.btn-grid {
   font-size: var(--text-xs);
 }
 
-/* ================ MEMBERS ================= */
+/* ==== PODCAST ==== */
 
-/* Member pages (account/edit) */
+article.post-podcast {
+  margin-left: 0;
+}
+
+/* ---- Podcast: subscribe ---- */
+
+/* Subscribe block spacing — used on episode pages and on podcast-connected
+   pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
+.podcast-subscribe {
+  margin: var(--space-2) 0;
+  font-size: 0.85rem;
+}
+
+/* Larger feed-link variant */
+
+.podcast-subscribe .feed-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem var(--space-3);
+  border: 1px solid var(--player-border);
+  color: var(--player-btn-color);
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 1;
+}
+
+.podcast-subscribe .feed-link:hover {
+  background: var(--player-btn-hover-bg);
+}
+
+.feed-link {
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid currentColor;
+  text-decoration: none;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.feed-link:hover {
+  opacity: 1;
+}
+
+.feed-link-private {
+  opacity: 0.8;
+}
+
+/* Subscribe links row (app/service links + RSS). Used both inline and
+   inside the collapsible menu below. */
+.subscribe-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Menu mode (subscribe_display: menu): a native <details> disclosure —
+   the "Subscribe" button is the <summary> styled as a button, and
+   clicking it reveals the links. No JS. */
+.podcast-subscribe--menu > summary {
+  display: inline-block;
+  list-style: none;
+  cursor: pointer;
+}
+
+.podcast-subscribe--menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.podcast-subscribe--menu[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+/* ==== MEMBERS ==== */
+
+/* ---- Members: account ---- */
 
 .member-page .account-details {
   margin: 0 0 var(--space-6) 0;
@@ -3668,6 +3606,8 @@ a.btn-grid {
   display: contents;
 }
 
+/* ---- Members: pages ---- */
+
 /* Member pages (signup/signin/upgrade/donate/unsubscribe wrapper) */
 
 .member-page {
@@ -3686,6 +3626,8 @@ a.btn-grid {
 .member-page form {
   margin: 0 0;
 }
+
+/* ---- Members: buttons ---- */
 
 /* Buttons (member palette) — override the global .btn-* colors on member pages
    (link-coloured rather than the heading-coloured global default). The base
@@ -3742,6 +3684,8 @@ a.btn-grid {
   color: var(--color-bg);
 }
 
+/* ---- Members: checkout ---- */
+
 .checkout-form-wrapper {
   margin-top: var(--space-6);
   margin-bottom: var(--space-2);
@@ -3751,6 +3695,8 @@ a.btn-grid {
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
 }
+
+/* ---- Members: podcast feeds ---- */
 
 /* Private podcast feeds on the member account page. The URL sits in a
    readonly input so it can be selected and copied on a phone, where a
@@ -3809,7 +3755,7 @@ a.btn-grid {
   display: inline;
 }
 
-/* Alerts */
+/* ---- Members: alerts ---- */
 
 .member-page .alert {
   padding: var(--space-6);
@@ -3915,7 +3861,7 @@ a.btn-grid {
   margin-top: var(--space-3);
 }
 
-/* Donation presets */
+/* ---- Members: donations ---- */
 
 .member-page .donate-presets {
   display: flex;
@@ -3946,7 +3892,7 @@ a.btn-grid {
   border-color: var(--color-link);
 }
 
-/* Paid-content gate */
+/* ---- Members: paywall ---- */
 
 .paid-content-gate {
   font-size: var(--text-2xl);
@@ -3968,6 +3914,8 @@ a.btn-grid {
 .paid-content-signin {
   font-size: var(--text-xs);
 }
+
+/* ---- Members: deleting an account ---- */
 
 /* Deleting an account — separated from the account actions, and behind a
    disclosure, because it can't be undone. */
@@ -4000,7 +3948,7 @@ a.btn-grid {
   color: inherit;
 }
 
-/* ========== STORE — PRODUCT PAGE ========== */
+/* ==== STORE — PRODUCT PAGE ==== */
 
 .product .content {
   max-width: var(--container-width);
@@ -4152,7 +4100,7 @@ a.btn-grid {
   }
 }
 
-/* ==== STORE — PRODUCT COLLECTION GRID ===== */
+/* ==== STORE — PRODUCT GRID ==== */
 
 article.page-store,
 article.page-store .content {
@@ -4341,7 +4289,98 @@ article.page-store h2 {
   color: var(--color-heading);
 }
 
-/* ============== BREADCRUMBS =============== */
+/* ==== DOCUMENTATION ==== */
+
+.docs-back-link {
+  margin-bottom: var(--space-0);
+  font-size: var(--text-sm);
+  display: inline-block;
+}
+
+.content.documentation p mark,
+.documentation mark {
+  background-color: var(--color-highlight-text);
+  color: var(--color-text);
+  padding: 0 calc(var(--space-1) * 0.8);
+  border-radius: 1px;
+  line-height: 1;
+}
+
+.documentation img.screenshot {
+  border: 1px solid var(--color-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .content.documentation p mark,
+  .documentation mark {
+    color: var(--color-bg);
+  }
+}
+
+.content.documentation p code {
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation a code {
+  color: var(--color-link);
+}
+
+.content.documentation a:hover code {
+  color: var(--color-text);
+}
+
+.content.documentation li pre {
+  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.content.documentation li code {
+  font-size: var(--text-xs);
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation li pre code {
+  padding: 0;
+}
+
+.page-documentation .collection-grid,
+.documentation .collection-grid {
+  display: grid;
+  column-gap: var(--space-8);
+  row-gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.page-documentation .collection-grid h2 {
+  font-size: var(--text-2xl);
+  margin-top: 0;
+}
+
+.content.documentation table {
+  font-size: var(--text-sm);
+  line-height: 1.75;
+}
+
+/* ==== UTILITIES ==== */
+
+.back-link {
+  display: inline-block;
+  margin-top: var(--space-12);
+  padding-top: var(--space-8);
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+.back-link:hover {
+  color: var(--color-text);
+}
+
+hr.clear-floats {
+  clear: both;
+  border-top: none;
+}
+
+/* ==== BREADCRUMBS ==== */
 
 .breadcrumbs {
   margin-top: calc(var(--space-4) * -1);
@@ -4368,7 +4407,7 @@ article.page-store h2 {
   font-weight: 600;
 }
 
-/* ============== CUSTOM CODE =============== */
+/* ==== CUSTOM CODE ==== */
 [data-typewriter]::after {
   color: var(--color-link);
   font-weight: bold;

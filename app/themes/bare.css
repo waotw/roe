@@ -1,7 +1,7 @@
-/* ============== THEME INFO ================
+/* ==== THEME INFO ====
    Roe Theme: Bare
-   Version: 1.5.11
-   Fingerprint: 9bdab480
+   Version: 1.5.13
+   Fingerprint: dba35029
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -20,7 +20,7 @@
    Leave this comment in place so the admin can detect updates.
 */
 
-/* ============ THEME VARIABLES ============ */
+/* ==== THEME VARIABLES ==== */
 
 :root {
   color-scheme: light dark;
@@ -92,7 +92,7 @@
   --player-meta-color: #666666;
 }
 
-/* ============ DARK MODE ============ */
+/* ==== DARK MODE ==== */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -121,7 +121,7 @@
   }
 }
 
-/* ============== BASE STYLES =============== */
+/* ==== BASE ==== */
 
 [hidden] {
   display: none !important;
@@ -227,7 +227,7 @@ a.heading-anchor,
   border-bottom: none;
 }
 
-/* =========== LAYOUT — SITE NAV ============ */
+/* ==== LAYOUT — SITE NAV ==== */
 
 .site-nav {
   padding: var(--space-2) 0;
@@ -313,7 +313,7 @@ p:has(.site-logo) {
   background-size: contain;
 }
 
-/* ================ SITE ACTIONS ================= */
+/* ==== LAYOUT — SITE ACTIONS ==== */
 
 html.snipcart-cart--opened .site-actions,
 html.snipcart-sidecart--opened .site-actions {
@@ -355,7 +355,7 @@ html.snipcart-sidecart--opened .site-actions {
   font-size: var(--text-xs);
 }
 
-/* ================ SITE SEARCH ================= */
+/* ==== LAYOUT — SITE SEARCH ==== */
 
 .site-actions .site-search svg {
   height: var(--space-4);
@@ -560,7 +560,7 @@ html.snipcart-sidecart--opened .site-actions {
   color: var(--color-muted);
 }
 
-/* ============ LAYOUT — SIDEBAR ============ */
+/* ==== LAYOUT — SIDEBAR ==== */
 
 body:not(.has-sidebar) article {
   margin-top: var(--space-4);
@@ -717,7 +717,7 @@ body.sidebar-right {
   }
 }
 
-/* ============ LAYOUT - FOOTER ============= */
+/* ==== LAYOUT — FOOTER ==== */
 
 .site-footer {
   margin-top: var(--space-12);
@@ -730,7 +730,7 @@ body.sidebar-right {
   text-decoration: underline;
 }
 
-/* ============ FLASH MESSAGES ============== */
+/* ==== FLASH MESSAGES ==== */
 
 div.flash {
   padding: var(--space-3) var(--space-4);
@@ -744,7 +744,7 @@ div.flash mark {
   background-color: var(--color-highlight-text);
 }
 
-/* ======== POST/PAGE CONTENT GLOBAL ======== */
+/* ==== POST/PAGE GLOBAL ==== */
 
 .content:not(:has(.card-player)) > :first-child {
   margin-top: 0 !important;
@@ -1023,7 +1023,7 @@ a.footnote-backlink-number:hover {
   margin: var(--space-6) 0;
 }
 
-/* ============ POST/PAGE SINGLE ============ */
+/* ==== POST/PAGE SINGLE ==== */
 
 /* A layout's [image], [cover] and [artwork] sit outside .content, so its
    image rule doesn't reach them. */
@@ -1172,7 +1172,7 @@ ul.product-tags {
   }
 }
 
-/* ============== COLLECTIONS =============== */
+/* ==== COLLECTIONS ==== */
 
 .collection-page-heading {
   display: flex;
@@ -1256,7 +1256,7 @@ p.collection-more a {
   color: var(--color-muted);
 }
 
-/* List */
+/* ---- List ---- */
 
 .collection.list .collection-item {
   margin-bottom: var(--space-4);
@@ -1278,7 +1278,7 @@ p.collection-more a {
   margin: 0;
 }
 
-/* Compact */
+/* ---- Compact ---- */
 
 .collection.compact .item-title {
   font-size: var(--text-base);
@@ -1295,7 +1295,7 @@ p.collection-more a {
   font-style: italic;
 }
 
-/* Full */
+/* ---- Full ---- */
 
 .collection.full .collection-item {
   border-bottom: 1px solid var(--color-border);
@@ -1378,7 +1378,7 @@ p.collection-more a {
   }
 }
 
-/* Links */
+/* ---- Links ---- */
 
 .collection.links .collection-item {
   margin-bottom: var(--space-1);
@@ -1397,7 +1397,7 @@ p.collection-more a {
   line-height: 1;
 }
 
-/* Menu */
+/* ---- Menu ---- */
 
 .collection.menu {
   margin: 0;
@@ -1437,8 +1437,109 @@ p.collection-more a {
   margin: 0;
 }
 
-/* ============ COLLECTION PLAYLIST (music / podcast) ============
-   The `playlist` collection renders the track/episode list. Rows carry the data
+/* ---- Glossary ---- */
+
+.collection.glossary dl {
+  margin: 0;
+  max-width: 60%;
+}
+
+.collection.glossary .glossary-entry {
+  margin: 0 0 var(--space-4) 0;
+}
+
+.collection.glossary dd {
+  font-size: var(--text-sm);
+  margin-inline-start: 0;
+}
+
+.collection.glossary .item-title {
+  font-size: var(--text-lg);
+}
+
+.collection.glossary .item-title a {
+  text-decoration: underline;
+}
+
+.collection.glossary .item-subtitle {
+  font-size: var(--text-base);
+  font-style: italic;
+  line-height: 1.3;
+  margin: 0 0 var(--space-1) 0;
+}
+
+.collection.glossary .item-excerpt {
+  font-size: var(--text-sm);
+}
+
+/* Paid tracks in a playlist, and the player's paywall notice.
+   A protected track's audio 403s, which on its own just looks like the player
+   is broken — the lock says why before you press play, and the notice says it
+   again if you do. */
+.player-track.is-paid .player-track-title {
+  opacity: 0.7;
+}
+
+.player-track .paid-lock-icon {
+  margin-left: 0.35em;
+  vertical-align: -0.2em;
+  width: var(--space-4);
+  height: var(--space-4);
+  opacity: 0.6;
+}
+
+.content p.player-paywall {
+  margin: 1rem 0 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
+}
+
+/* ---- Grid ---- */
+
+.collection-grid {
+  display: grid;
+  gap: var(--space-8);
+  margin: var(--space-4) 0;
+}
+
+.collection-grid-2,
+.collection-grid-3 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 700px) {
+  .collection-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .collection-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .collection.glossary dl {
+    max-width: 100%;
+  }
+}
+
+.collection-grid .collection {
+  margin: 0;
+}
+
+.collection-grid h2 {
+  font-size: var(--text-2xl);
+  margin-top: 0;
+}
+
+@media (max-width: 630px) {
+  .collection.glossary dl {
+    max-width: 100%;
+  }
+}
+
+/* ==== COLLECTION PLAYLIST ==== */
+
+/* The `playlist` collection renders the track/episode list. Rows carry the data
    a `player` card reads to build its queue. TUI-flavored: mono, compact, symbol
    markers. Override or replace freely. (`player` is an alias for `playlist`.) */
 .collection.playlist,
@@ -1506,107 +1607,7 @@ p.collection-more a {
   inset: 0;
 }
 
-/* Glossary */
-
-.collection.glossary dl {
-  margin: 0;
-  max-width: 60%;
-}
-
-.collection.glossary .glossary-entry {
-  margin: 0 0 var(--space-4) 0;
-}
-
-.collection.glossary dd {
-  font-size: var(--text-sm);
-  margin-inline-start: 0;
-}
-
-.collection.glossary .item-title {
-  font-size: var(--text-lg);
-}
-
-.collection.glossary .item-title a {
-  text-decoration: underline;
-}
-
-.collection.glossary .item-subtitle {
-  font-size: var(--text-base);
-  font-style: italic;
-  line-height: 1.3;
-  margin: 0 0 var(--space-1) 0;
-}
-
-.collection.glossary .item-excerpt {
-  font-size: var(--text-sm);
-}
-
-/* Paid tracks in a playlist, and the player's paywall notice.
-   A protected track's audio 403s, which on its own just looks like the player
-   is broken — the lock says why before you press play, and the notice says it
-   again if you do. */
-.player-track.is-paid .player-track-title {
-  opacity: 0.7;
-}
-
-.player-track .paid-lock-icon {
-  margin-left: 0.35em;
-  vertical-align: -0.2em;
-  width: var(--space-4);
-  height: var(--space-4);
-  opacity: 0.6;
-}
-
-.content p.player-paywall {
-  margin: 1rem 0 0 0;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  border: 1px solid currentColor;
-}
-
-/* Collection Grids */
-
-.collection-grid {
-  display: grid;
-  gap: var(--space-8);
-  margin: var(--space-4) 0;
-}
-
-.collection-grid-2,
-.collection-grid-3 {
-  grid-template-columns: 1fr;
-}
-
-@media (min-width: 700px) {
-  .collection-grid-2 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .collection-grid-3 {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .collection.glossary dl {
-    max-width: 100%;
-  }
-}
-
-.collection-grid .collection {
-  margin: 0;
-}
-
-.collection-grid h2 {
-  font-size: var(--text-2xl);
-  margin-top: 0;
-}
-
-@media (max-width: 630px) {
-  .collection.glossary dl {
-    max-width: 100%;
-  }
-}
-
-/* ================ GALLERIES =============== */
+/* ==== GALLERIES ==== */
 
 .gallery {
   margin-bottom: var(--space-6);
@@ -1674,7 +1675,7 @@ figcaption {
   text-align: center;
 }
 
-/* Gallery zoom lightbox */
+/* ---- Zoom ---- */
 
 .gallery-item {
   margin: 0;
@@ -1739,7 +1740,7 @@ figcaption {
   cursor: pointer;
 }
 
-/* Gallery ratios */
+/* ---- Ratios ---- */
 
 .gallery-ratio-square .gallery-row img {
   aspect-ratio: 1 / 1;
@@ -1764,7 +1765,7 @@ figcaption {
   object-fit: contain;
 }
 
-/* Carousel */
+/* ---- Carousel ---- */
 
 .gallery-carousel {
   position: relative;
@@ -1859,13 +1860,13 @@ figcaption {
   background: var(--color-text);
 }
 
-/* ================= CARDS ================== */
+/* ==== CARDS ==== */
 
 .card {
   position: relative;
 }
 
-/* Pullquote */
+/* ---- Card: pullquote ---- */
 
 .card-pullquote {
   text-align: center;
@@ -1930,7 +1931,7 @@ figcaption {
   }
 }
 
-/* Post Link Cards */
+/* ---- Card: post link ---- */
 
 .card.post-link-small,
 .card.post-link-medium,
@@ -2022,7 +2023,7 @@ figcaption {
   color: var(--color-muted);
 }
 
-/* Post Link - Small */
+/* ---- Card: post link, small ---- */
 
 .card.post-link-small {
   gap: var(--space-4);
@@ -2053,7 +2054,7 @@ figcaption {
   color: var(--color-muted);
 }
 
-/* Product Link - Small */
+/* ---- Card: product link, small ---- */
 
 .product-link-small .card-header {
   display: flex;
@@ -2081,7 +2082,7 @@ figcaption {
   line-height: 1;
 }
 
-/* Post Link - Medium */
+/* ---- Card: post link, medium ---- */
 
 .card.post-link-medium {
   gap: var(--space-5);
@@ -2119,7 +2120,7 @@ figcaption {
   line-height: 1.5;
 }
 
-/* Product Link - Medium */
+/* ---- Card: product link, medium ---- */
 
 .product-link-medium .card-header {
   display: flex;
@@ -2141,7 +2142,7 @@ figcaption {
   font-size: var(--text-base);
 }
 
-/* Post Link - Large */
+/* ---- Card: post link, large ---- */
 
 .card.post-link-large {
   display: grid;
@@ -2242,7 +2243,7 @@ figcaption {
   font-size: var(--text-sm);
 }
 
-/* Product Link - Large */
+/* ---- Card: product link, large ---- */
 
 .product-link-large .card-header {
   display: flex;
@@ -2265,7 +2266,7 @@ figcaption {
   margin-top: 0;
 }
 
-/* Asides */
+/* ---- Card: aside ---- */
 
 .card-aside {
   float: none;
@@ -2417,6 +2418,10 @@ article .content,
     margin: var(--aside-text-top-offset) 0 0 0;
   }
 }
+
+/* ==== MEDIA PLAYERS ==== */
+
+/* ---- Player: card ---- */
 
 /* Player card (card type: player, and every post's own player) — the
    transport, driven by player.js. It plays through a `playlist` collection
@@ -2572,6 +2577,8 @@ article .content,
   width: 100%;
 }
 
+/* ---- Player: previous and next ---- */
+
 /* ⏮ ⏭ in the transport. player.js (1.4) shows them only where this theme
    says it styles them (--player-nav: 1); the theme then shows them on touch
    screens. On a desktop the ⏮ ⏭ links under the player stay as they are. */
@@ -2599,6 +2606,8 @@ article .content,
   opacity: 0.3;
   cursor: default;
 }
+
+/* ---- Player: before player.js ---- */
 
 /* Before player.js takes over. The browser's own audio bar used to show for
    a moment, then Roe's controls replaced it and the card changed height.
@@ -2637,6 +2646,8 @@ article .content,
     visibility: visible;
   }
 }
+
+/* ---- Player: touch screens ---- */
 
 /* Touch screens — a finger, not a mouse pointer, whatever the screen width.
    No artwork, and every control big enough to hit: the times flank a
@@ -2748,7 +2759,7 @@ article .content,
   }
 }
 
-/* ============ MEDIA PLAYERS =============== */
+/* ---- Player: chapters ---- */
 
 /* Chapters and playlist: a podcast episode's `chapters:` inside the player
    card (click a row to jump there), and a `playlist` collection's tracks or
@@ -2818,6 +2829,8 @@ li.chapter {
   content: "\25B8 ";
 }
 
+/* ---- Player: playlist ---- */
+
 /* A `playlist` collection, or the layout's [playlist] (the same thing), as
    a box like the player card's. Straight after a player — a player card in
    the writing, or the layout's [player] — it joins it: the player's bottom
@@ -2848,7 +2861,7 @@ li.chapter {
   border-top: 1px dashed var(--color-border);
 }
 
-/* Video Player */
+/* ---- Player: video ---- */
 
 .video-player-container {
   position: relative;
@@ -2862,6 +2875,8 @@ li.chapter {
   aspect-ratio: 16 / 9;
   background: #000;
 }
+
+/* ---- Player: video in the text ---- */
 
 /* A video embedded in a post's text: ![label](/media/video/clip.mp4).
    Same player as a video post, spaced like an image. */
@@ -3010,201 +3025,7 @@ a.video-btn {
   display: block;
 }
 
-/* ================ PODCAST ================= */
-
-article.post-podcast {
-  margin-left: 0;
-}
-
-/* Subscribe / feed */
-
-.podcast-subscribe {
-  margin-top: var(--space-4);
-  font-size: 0.85rem;
-}
-
-.podcast-subscribe .feed-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem var(--space-3);
-  border: 1px solid var(--player-border);
-  color: var(--player-btn-color);
-  font-size: 0.8rem;
-  text-decoration: none;
-}
-
-.podcast-subscribe .feed-link:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.feed-link {
-  font-size: var(--text-xxs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.15rem 0.4rem;
-  border: 1px solid currentColor;
-  text-decoration: none;
-  opacity: 0.6;
-}
-
-.feed-link:hover {
-  opacity: 1;
-}
-
-.feed-link-private {
-  opacity: 0.8;
-}
-
-.subscribe-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.podcast-subscribe--menu > summary {
-  display: inline-block;
-  list-style: none;
-  cursor: pointer;
-}
-
-.podcast-subscribe--menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.podcast-subscribe--menu[open] > summary {
-  margin-bottom: var(--space-3);
-}
-
-/* ============ DOCUMENTATION =============== */
-
-.docs-back-link {
-  margin-bottom: 0;
-  font-size: var(--text-sm);
-  display: inline-block;
-}
-
-.content.documentation p mark,
-.documentation mark {
-  background-color: var(--color-highlight-text);
-  color: var(--color-text);
-  padding: 0 calc(var(--space-1) * 0.8);
-  line-height: 1;
-}
-
-.documentation img.screenshot {
-  border: 1px solid var(--color-muted);
-}
-
-@media (prefers-color-scheme: dark) {
-  .content.documentation p mark,
-  .documentation mark {
-    color: var(--color-bg);
-  }
-}
-
-.content.documentation p code {
-  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
-}
-
-.content.documentation a code {
-  color: var(--color-link);
-}
-
-.content.documentation li pre {
-  padding: var(--space-4);
-  margin: 0;
-}
-
-.content.documentation li code {
-  font-size: var(--text-xs);
-  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
-}
-
-.content.documentation li pre code {
-  padding: 0;
-}
-
-.page-documentation .collection-grid,
-.documentation .collection-grid {
-  display: grid;
-  column-gap: var(--space-8);
-  row-gap: var(--space-4);
-  margin: var(--space-4) 0;
-}
-
-.page-documentation .collection-grid h2 {
-  font-size: var(--text-2xl);
-  margin-top: 0;
-}
-
-.content.documentation table {
-  font-size: var(--text-sm);
-  line-height: 2;
-}
-
-/* =============== UTILITIES ================ */
-
-.back-link {
-  display: inline-block;
-  margin-top: var(--space-12);
-  padding-top: var(--space-6);
-  color: var(--color-link);
-  text-decoration: underline;
-}
-
-.back-link:hover {
-  color: var(--color-text);
-}
-
-hr.clear-floats {
-  clear: both;
-  border-top: none;
-}
-
-/* ================= FORMS ================== */
-
-.form-field {
-  margin-bottom: var(--space-4);
-}
-
-.form-field label {
-  display: block;
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-1);
-  color: var(--color-muted);
-}
-
-.form-field input[type="email"],
-.form-field input[type="text"],
-.form-field input[type="password"] {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg);
-  font-family: inherit;
-  font-size: var(--text-base);
-  color: var(--color-text);
-  box-sizing: border-box;
-}
-
-.form-field input:focus {
-  outline: 2px solid var(--color-link);
-  outline-offset: -1px;
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-}
-
-.form-actions a {
-  text-decoration: none;
-}
-
-/* ================ BUTTONS ================= */
+/* ==== BUTTONS ==== */
 
 .btn-primary {
   display: inline-block;
@@ -3285,7 +3106,48 @@ hr.clear-floats {
   font-size: var(--text-sm);
 }
 
-/* ================ SHARE ================== */
+/* ==== FORMS ==== */
+
+.form-field {
+  margin-bottom: var(--space-4);
+}
+
+.form-field label {
+  display: block;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+  color: var(--color-muted);
+}
+
+.form-field input[type="email"],
+.form-field input[type="text"],
+.form-field input[type="password"] {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.form-field input:focus {
+  outline: 2px solid var(--color-link);
+  outline-offset: -1px;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.form-actions a {
+  text-decoration: none;
+}
+
+/* ==== SHARE ==== */
 
 .share {
   display: inline-flex;
@@ -3333,7 +3195,76 @@ hr.clear-floats {
   font-size: var(--text-xs);
 }
 
-/* ================ MEMBERS ================= */
+/* ==== PODCAST ==== */
+
+article.post-podcast {
+  margin-left: 0;
+}
+
+/* ---- Podcast: subscribe ---- */
+
+.podcast-subscribe {
+  margin-top: var(--space-4);
+  font-size: 0.85rem;
+}
+
+.podcast-subscribe .feed-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem var(--space-3);
+  border: 1px solid var(--player-border);
+  color: var(--player-btn-color);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.podcast-subscribe .feed-link:hover {
+  background: var(--player-btn-hover-bg);
+}
+
+.feed-link {
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid currentColor;
+  text-decoration: none;
+  opacity: 0.6;
+}
+
+.feed-link:hover {
+  opacity: 1;
+}
+
+.feed-link-private {
+  opacity: 0.8;
+}
+
+.subscribe-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.podcast-subscribe--menu > summary {
+  display: inline-block;
+  list-style: none;
+  cursor: pointer;
+}
+
+.podcast-subscribe--menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.podcast-subscribe--menu[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+/* ==== MEMBERS ==== */
+
+/* ---- Members: account ---- */
 
 .member-page .account-details {
   margin: 0 0 var(--space-6) 0;
@@ -3349,6 +3280,8 @@ hr.clear-floats {
 .member-page .account-actions form {
   display: contents;
 }
+
+/* ---- Members: pages ---- */
 
 .member-page {
   max-width: 26rem;
@@ -3366,6 +3299,8 @@ hr.clear-floats {
 .member-page form {
   margin: 0;
 }
+
+/* ---- Members: buttons ---- */
 
 .member-page button,
 .member-page [class*="btn-"] {
@@ -3419,6 +3354,8 @@ hr.clear-floats {
   color: var(--color-bg);
 }
 
+/* ---- Members: checkout ---- */
+
 .checkout-form-wrapper {
   margin-top: var(--space-6);
 }
@@ -3427,6 +3364,8 @@ hr.clear-floats {
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
 }
+
+/* ---- Members: podcast feeds ---- */
 
 /* Private podcast feeds on the member account page. The URL sits in a
    readonly input so it can be selected and copied on a phone, where a
@@ -3482,7 +3421,7 @@ hr.clear-floats {
   display: inline;
 }
 
-/* Alerts */
+/* ---- Members: alerts ---- */
 
 .member-page .alert {
   padding: var(--space-4);
@@ -3588,7 +3527,7 @@ hr.clear-floats {
   margin-top: var(--space-3);
 }
 
-/* Donation presets */
+/* ---- Members: donations ---- */
 
 .member-page .donate-presets {
   display: flex;
@@ -3619,7 +3558,7 @@ hr.clear-floats {
   border-color: var(--color-link);
 }
 
-/* Paid-content gate */
+/* ---- Members: paywall ---- */
 
 .paid-content-gate {
   font-size: var(--text-2xl);
@@ -3634,6 +3573,8 @@ hr.clear-floats {
   color: var(--color-link);
   text-decoration: none;
 }
+
+/* ---- Members: deleting an account ---- */
 
 /* Deleting an account — separated from the account actions, and behind a
    disclosure, because it can't be undone. */
@@ -3666,7 +3607,7 @@ hr.clear-floats {
   color: inherit;
 }
 
-/* ========== STORE — PRODUCT PAGE ========== */
+/* ==== STORE — PRODUCT PAGE ==== */
 
 .product .content {
   max-width: var(--container-width);
@@ -3807,7 +3748,7 @@ hr.clear-floats {
   }
 }
 
-/* ==== STORE — PRODUCT COLLECTION GRID ===== */
+/* ==== STORE — PRODUCT GRID ==== */
 
 article.page-store,
 article.page-store .content {
@@ -3979,7 +3920,93 @@ article.page-store h2 {
   color: var(--color-heading);
 }
 
-/* ============== BREADCRUMBS =============== */
+/* ==== DOCUMENTATION ==== */
+
+.docs-back-link {
+  margin-bottom: 0;
+  font-size: var(--text-sm);
+  display: inline-block;
+}
+
+.content.documentation p mark,
+.documentation mark {
+  background-color: var(--color-highlight-text);
+  color: var(--color-text);
+  padding: 0 calc(var(--space-1) * 0.8);
+  line-height: 1;
+}
+
+.documentation img.screenshot {
+  border: 1px solid var(--color-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .content.documentation p mark,
+  .documentation mark {
+    color: var(--color-bg);
+  }
+}
+
+.content.documentation p code {
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation a code {
+  color: var(--color-link);
+}
+
+.content.documentation li pre {
+  padding: var(--space-4);
+  margin: 0;
+}
+
+.content.documentation li code {
+  font-size: var(--text-xs);
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation li pre code {
+  padding: 0;
+}
+
+.page-documentation .collection-grid,
+.documentation .collection-grid {
+  display: grid;
+  column-gap: var(--space-8);
+  row-gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.page-documentation .collection-grid h2 {
+  font-size: var(--text-2xl);
+  margin-top: 0;
+}
+
+.content.documentation table {
+  font-size: var(--text-sm);
+  line-height: 2;
+}
+
+/* ==== UTILITIES ==== */
+
+.back-link {
+  display: inline-block;
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+.back-link:hover {
+  color: var(--color-text);
+}
+
+hr.clear-floats {
+  clear: both;
+  border-top: none;
+}
+
+/* ==== BREADCRUMBS ==== */
 
 .breadcrumbs {
   margin-top: calc(var(--space-4) * -1);
@@ -4006,7 +4033,7 @@ article.page-store h2 {
   font-weight: 600;
 }
 
-/* ============== CUSTOM CODE =============== */
+/* ==== CUSTOM CODE ==== */
 
 [data-typewriter]::after {
   color: var(--color-link);

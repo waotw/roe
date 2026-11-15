@@ -74,6 +74,26 @@ warnings on and fails on any warning.
 
 ## Traps
 
+- **Two kinds of theme change, checked two ways.** A change that should
+  look identical (reorganising, renaming, moving rules) gets a comparison
+  of computed styles, not screenshots. Every element's box and about 140
+  computed properties are recorded on every reference page in each shipped
+  theme at 1280 and 390 px wide, before and after. The heading and reorder
+  passes on 1.6.13 / 1.5.13 were checked this way:
+  - 36 reference pages;
+  - 52 real pages (home, docs, store, product, post, member pages), with the
+    old file installed as `zz-before-<theme>.css` and shown through
+    `?preview_theme=`;
+  - 24 pages in dark mode.
+
+  All were identical. A change meant to look different gets before and after
+  screenshots for a person to judge.
+- The shipped themes' section headings and order are fixed by
+  `test/services/theme_sections_test.rb`; `ThemeSections.parse` is the
+  parser the editor's section list will use. THEME INFO is the one heading
+  that runs over several lines, because it is also the header comment the
+  update system reads (`ShippedFileInspector`), and that has to stay a
+  single comment.
 - Sample images are `loading="lazy"`. Full-page screenshots need
   `img.loading = "eager"` first, or most images come out blank.
 - `(*caption*)` image captions can't contain `*`, so no bold inside them.
