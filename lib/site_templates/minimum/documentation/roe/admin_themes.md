@@ -24,7 +24,7 @@ A theme controls how your site looks — its colors, fonts, spacing, and layout.
 
 Admin → Themes → `EDIT CSS` opens the editor: the sections of the theme on the left, its CSS in the middle and your site on the right.
 
-**Preview.** The preview shows your changes as you type, before you save. It opens on the page you last looked at, or the first reference page. Links in it work, so you can go to any page of your site. The menu above it jumps to a reference page, the home page or a path you type. `WIDE` and `PHONE` set its width. In a narrow window the preview is hidden until you click `PREVIEW`.
+**Preview.** The preview shows your changes as you type, before you save. It opens on the page you last looked at, or the first reference page. Links in it work, so you can go to any page of your site. The menu above it jumps to a reference page, the home page or a path you type. The width menu beside it sets the preview's width: the whole pane, a laptop, tablet or phone, or one of the widths where your theme's layout changes, read from its `@media` rules. A width wider than the pane is shown smaller, laid out at the full width. In a narrow window the preview is hidden until you click `PREVIEW`.
 
 **Sections.** The list on the left has one entry per section heading in the CSS (see [Sections](#sections)), plus the subsections of the section you're in. Click one to go to it. `HIDE ‹` folds the list into a strip on the left edge; hover the strip to see the list, and click it or `KEEP OPEN` to bring it back for good.
 
@@ -32,13 +32,18 @@ Admin → Themes → `EDIT CSS` opens the editor: the sections of the theme on t
 
 - A rule that applies only on hover or focus, or to `::before` and `::after`, is labelled.
 - A rule inside an `@media` block that doesn't match the preview right now, such as a phone-only rule in a wide preview, is greyed out.
+- Rules for the same element in another state, such as the play button while playing or a playlist while open, are listed in purple with the condition, for example `when [data-playing="true"]`.
 - Click a variable, such as `--font-mono → THEME VARIABLES, line 38`, to go to where it's set. Change it there to change it everywhere it's used.
 - **Inherited from** lists the text settings, such as color and font, that the element takes from the elements around it.
 - The path at the top shows where the element sits on the page. Click a step to inspect that element instead.
 
+Shift-click in the preview to use the page as normal while you inspect: press play, open a playlist. The list follows the element's new state.
+
 `INSPECT` stays on until you click `INSPECTING` or press Escape.
 
 **Saving.** `SAVE`, or ⌘S / Ctrl+S, saves without leaving the page. Undo keeps working after you save. `FIND & REPLACE`, or ⌘F / Ctrl+F, searches the CSS.
+
+Unsaved changes are kept in your browser as you type. If you close the tab or the browser quits before you save, the editor offers them back the next time you open the theme: `RESTORE` puts them back, `DISCARD` keeps the saved file.
 
 **SAVE AS…** saves what's in the editor as a new theme, next to the one you're editing, and opens it. Give it a name, such as Default Dark, and Roe writes `default-dark.css`. The theme you started from stays as it was last saved. The new theme is yours: Roe never updates it. It isn't used on your site until you click `ACTIVATE` on the Themes page.
 

@@ -639,6 +639,28 @@ body {
    theme-sections, theme-preview and theme-inspector controllers; the class
    names start with te-. */
 
+.te-draft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.875rem;
+}
+
+.te-draft[hidden] {
+  display: none;
+}
+
+.te-draft.te-draft-stale {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #78350f;
+}
+
 .te-body {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) minmax(320px, 42%);
@@ -794,16 +816,43 @@ body {
 
 /* Rules INSPECT found: the one PREV / NEXT is on, the others, and those in
    an @media block this preview doesn't meet. */
+/* Selected text, and other places the selected text appears, in two
+   different colours. CodeMirror draws the selection on a layer behind the
+   lines, so the active line's and INSPECT's line backgrounds would hide it:
+   the layer is lifted above the text and multiplied, as in the Markdown
+   editor. The focused rule copies CodeMirror's own shape to outrank it. */
+.te-editor .cm-selectionLayer {
+  z-index: 1 !important;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.te-editor .cm-selectionLayer .cm-selectionBackground,
+.te-editor.cm-editor.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: #93c5fd; /* blue-300 */
+}
+
+.te-editor .cm-selectionMatch {
+  background: #fef08a; /* yellow-200 */
+}
+
+/* Rules INSPECT found: the one PREV / NEXT is on, the other matches, those
+   in an @media block this preview doesn't meet, and rules for another state
+   of the element (playing, open, checked…). */
 .te-editor .te-rule-current {
-  background: #fde68a;
+  background: #fed7aa; /* orange-200 */
 }
 
 .te-editor .te-rule-match {
-  background: #fef9c3;
+  background: #ffedd5; /* orange-100 */
 }
 
 .te-editor .te-rule-dim {
   background: #f3f4f6;
+}
+
+.te-editor .te-rule-state {
+  background: #f3e8ff; /* purple-100 */
 }
 
 .te-editor .cm-panels {
@@ -818,12 +867,35 @@ body {
   font-size: 0.75rem;
 }
 
+.te-editor .cm-panels button,
+.te-editor .cm-panels label {
+  text-transform: uppercase;
+}
+
+.te-editor .cm-panels button {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid #1f2937;
+  background: #e5e7eb;
+  background-image: none;
+  border-radius: 2px;
+}
+
+.te-editor .cm-panels button:hover {
+  background: #d1d5db;
+}
+
+.te-editor .cm-panel.cm-search button[name="close"] {
+  border: 0;
+  background: none;
+  font-size: 1rem;
+}
+
 .te-editor .cm-searchMatch {
-  background: #bfdbfe;
+  background: #fde68a; /* amber-200 */
 }
 
 .te-editor .cm-searchMatch-selected {
-  background: #60a5fa;
+  background: #f59e0b; /* amber-500 */
 }
 
 /* ── INSPECT ──────────────────────────────────────────────────────────── */
@@ -924,6 +996,14 @@ body {
 
 .te-inspect-rules [data-inactive] button {
   color: #9ca3af;
+}
+
+.te-inspect-rules [data-state] .te-selector {
+  color: #6b21a8; /* purple-800 */
+}
+
+.te-inspect-rules [data-state][data-current] button {
+  background: #e9d5ff; /* purple-200 */
 }
 
 .te-line {
@@ -1068,6 +1148,7 @@ body {
 .te-preview-frame {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   background: #fff;
 }
 
@@ -1079,15 +1160,31 @@ body {
   background: #fff;
 }
 
-.te-preview-frame[data-width="phone"] {
+/* A set width: the frame is that wide, centred, and scaled down to fit when
+   the pane is narrower (theme_preview_controller#fit sets the sizes). */
+.te-preview-frame[data-width="fixed"] {
   background: #e5e7eb;
 }
 
-.te-preview-frame[data-width="phone"] iframe {
-  width: 390px;
-  max-width: 100%;
+.te-preview-frame[data-width="fixed"] iframe {
   margin: 0 auto;
   box-shadow: 0 0 0 1px #d1d5db;
+  transform-origin: top left;
+}
+
+.te-width-menu {
+  flex: none;
+}
+
+.te-width-list {
+  left: auto;
+  right: 0;
+  width: 240px;
+}
+
+.te-width-note {
+  float: right;
+  color: #9ca3af;
 }
 
 /* ── SAVE AS… ─────────────────────────────────────────────────────────── */

@@ -11,18 +11,25 @@ import { Controller } from "@hotwired/stimulus";
 //
 // If the editor can't load, the textarea stays visible and the form still
 // saves it: the fallback is a plain editor, not a blank page.
+//
+// Unsaved text is also kept in the browser (localStorage) a second after
+// typing stops, as the Markdown editor does. If the page is left without
+// saving — a closed tab, a crash — the next visit offers it back.
 export default class extends Controller {
   static targets = [
     "textarea", "unsavedIndicator", "editorContainer", "saveStatus",
-    "saveAsDialog", "saveAsName", "saveAsFile", "saveAsError",
+    "saveAsDialog", "saveAsName", "saveAsFile", "saveAsError", "draftBanner",
   ];
   static values = { themeName: String, highlight: String, saveAsUrl: String };
 
   async connect() {
     this.originalContent = this.textareaTarget.value;
     this.hasUnsavedChanges = false;
+    this.draftKey = `roe:theme-draft:${this.themeNameValue}`;
+    this.draftBaseline = fingerprint(this.originalContent);
     this.onBeforeUnload = (e) => {
       if (!this.hasUnsavedChanges) return;
+      this.saveDraft();
       e.preventDefault();
       e.returnValue = "";
     };
@@ -42,6 +49,7 @@ export default class extends Controller {
       textarea: this.textareaTarget,
       onChange: (text) => {
         this.refreshUnsavedIndicator();
+        this.scheduleDraftSave();
         this.dispatch("change", { detail: { text } });
       },
       onSave: () => this.save(),
@@ -53,12 +61,15 @@ export default class extends Controller {
       setInspectRanges: (ranges) => this.view.dispatch({ effects: editor.setInspectRanges.of(ranges) }),
     };
     this.dispatch("ready", { detail: { view: this.view } });
+    this.offerDraft();
 
     if (this.highlightValue) this.highlightReference(this.highlightValue);
   }
 
   disconnect() {
     window.removeEventListener("beforeunload", this.onBeforeUnload);
+    if (this.hasUnsavedChanges) this.saveDraft();
+    clearTimeout(this.draftTimer);
     if (this.view) {
       this.textareaTarget.hidden = false;
       this.view.destroy();
@@ -118,7 +129,10 @@ export default class extends Controller {
       // COPY: save messages
       if (response.ok && result?.saved) {
         this.originalContent = content;
+        this.draftBaseline = fingerprint(content);
         this.refreshUnsavedIndicator();
+        if (!this.hasUnsavedChanges) this.clearDraft();
+        else this.saveDraft();
         this.showSaveStatus("✓ Saved", "text-green-700", 2000);
         this.dispatch("saved");
       } else if (result?.error) {
@@ -179,6 +193,7 @@ export default class extends Controller {
       if (response.ok && result?.saved) {
         // The text went into the new file; leaving this one isn't losing it.
         this.hasUnsavedChanges = false;
+        this.clearDraft();
         window.location.href = result.url;
       } else {
         // COPY: SAVE AS… failed
@@ -196,8 +211,74 @@ export default class extends Controller {
     if (this.hasUnsavedChanges && !confirm("You have unsaved changes. Leave without saving?")) {
       e.preventDefault();
     } else {
+      // Leaving on purpose: the unsaved text isn't wanted.
       this.hasUnsavedChanges = false;
+      this.clearDraft();
     }
+  }
+
+  // ── Unsaved text kept in the browser ────────────────────────────────────
+
+  scheduleDraftSave() {
+    clearTimeout(this.draftTimer);
+    this.draftTimer = setTimeout(() => this.saveDraft(), 1000);
+  }
+
+  saveDraft() {
+    clearTimeout(this.draftTimer);
+    if (!this.hasUnsavedChanges) return this.clearDraft();
+    try {
+      localStorage.setItem(this.draftKey, JSON.stringify({
+        content: this.text(),
+        baseline: this.draftBaseline,
+        savedAt: Date.now(),
+      }));
+    } catch {
+      // Full or private storage: the draft is a safety net, never an error.
+    }
+  }
+
+  clearDraft() {
+    clearTimeout(this.draftTimer);
+    try {
+      localStorage.removeItem(this.draftKey);
+    } catch {
+      // ignore
+    }
+  }
+
+  // A draft that differs from the file is offered back. If the file has
+  // changed since the draft was made (edited elsewhere, Site Sync, an
+  // update), the banner says so: restoring would replace that change.
+  offerDraft() {
+    let draft;
+    try {
+      draft = JSON.parse(localStorage.getItem(this.draftKey) || "null");
+    } catch {
+      draft = null;
+    }
+    if (!draft?.content) return;
+    if (draft.content === this.originalContent) return this.clearDraft();
+
+    const stale = draft.baseline && draft.baseline !== this.draftBaseline;
+    const banner = this.draftBannerTarget;
+    // COPY: unsaved theme draft banner
+    banner.querySelector("[data-message]").innerHTML = stale
+      ? `<strong>Unsaved changes (${draftAge(draft.savedAt)}).</strong> ` +
+        "This theme's file has changed since then. Restoring replaces what's in the editor with your unsaved changes; " +
+        "discarding keeps the file as it is now."
+      : `<strong>Unsaved changes (${draftAge(draft.savedAt)}).</strong> Restore them, or discard them and keep the saved theme.`;
+    banner.classList.toggle("te-draft-stale", !!stale);
+    banner.hidden = false;
+    banner.querySelector("[data-restore]").onclick = () => {
+      // One change, so a single undo goes back to the saved file.
+      this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: draft.content } });
+      banner.hidden = true;
+    };
+    banner.querySelector("[data-discard]").onclick = () => {
+      this.clearDraft();
+      banner.hidden = true;
+    };
   }
 
   refreshUnsavedIndicator() {
@@ -213,4 +294,22 @@ export default class extends Controller {
     el.className = colorClass;
     if (hideAfterMs) this.saveStatusTimer = setTimeout(() => (el.textContent = ""), hideAfterMs);
   }
+}
+
+// Change detection only, not security: a short hash plus the length.
+function fingerprint(text) {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) hash = (hash * 33) ^ text.charCodeAt(i);
+  return `${(hash >>> 0).toString(36)}:${text.length.toString(36)}`;
+}
+
+function draftAge(savedAt) {
+  if (!savedAt) return "a moment ago";
+  const mins = Math.round((Date.now() - savedAt) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.round(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }

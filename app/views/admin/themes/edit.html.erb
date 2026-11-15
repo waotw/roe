@@ -41,6 +41,17 @@
     </div>
   </div>
 
+  <%# Unsaved text from an earlier visit, offered back. Filled in by
+      css_editor_controller#offerDraft. %>
+  <div class="te-draft" data-css-editor-target="draftBanner" role="alert" hidden>
+    <p data-message></p>
+    <div class="flex gap-2 shrink-0">
+      <%# COPY: draft banner buttons %>
+      <button type="button" data-restore class="<%= button %> bg-blue-200 hover:bg-blue-300">Restore</button>
+      <button type="button" data-discard class="<%= button %> bg-gray-200 hover:bg-gray-300">Discard</button>
+    </div>
+  </div>
+
   <%# Toolbar %>
   <div class="flex items-center justify-between gap-3 px-4 py-2 border-b border-gray-200">
     <div class="flex items-center gap-2 min-w-0">
@@ -107,11 +118,12 @@
                   data-theme-preview-target="pathButton" aria-haspopup="true" aria-expanded="false"></button>
           <div class="te-page-list hidden" data-theme-preview-target="menu"></div>
         </div>
-        <div class="flex items-center gap-1">
-          <button type="button" class="<%= button %> bg-gray-200 hover:bg-gray-300" data-action="click->theme-preview#wide"
-                  data-theme-preview-target="wideButton">Wide</button>
-          <button type="button" class="<%= button %> bg-gray-200 hover:bg-gray-300" data-action="click->theme-preview#phone"
-                  data-theme-preview-target="phoneButton">Phone</button>
+        <%# The preview's width: the whole pane, a common device width, or one
+            of the widths where this theme's layout changes. %>
+        <div class="te-page-menu te-width-menu">
+          <button type="button" class="te-page-button" data-action="click->theme-preview#toggleWidthMenu"
+                  data-theme-preview-target="widthButton" aria-haspopup="true" aria-expanded="false"></button>
+          <div class="te-page-list te-width-list hidden" data-theme-preview-target="widthMenu"></div>
         </div>
       </div>
       <div class="te-preview-frame" data-theme-preview-target="frameWrap">

@@ -24,9 +24,9 @@ controller grows past its own:
 
 | Controller | Job |
 |---|---|
-| `css_editor` | The editor, background save, SAVE AS…, find |
+| `css_editor` | The editor, background save, the unsaved-text draft, SAVE AS…, find |
 | `theme_sections` | The SECTIONS list and its open / hidden / peek states |
-| `theme_preview` | The iframe, the live CSS, the page menu, WIDE / PHONE, PREVIEW |
+| `theme_preview` | The iframe, the live CSS, the page menu, the width menu, PREVIEW |
 | `theme_inspector` | INSPECT: picking in the iframe, the results panel, the highlights |
 
 They talk through events on the element: `css-editor:ready`,
@@ -62,6 +62,32 @@ scratch setup).
   - `@media` and `@supports` are tested with the iframe's `matchMedia` and
     `CSS.supports`. A rule that doesn't apply right now is dimmed, not
     hidden.
+- **Other states** (`otherStateRules`): a rule that doesn't match now but
+  would if its conditions held. Attribute tests and state pseudo-classes
+  (`:checked`, `:open`, `:not(.class)`…) are taken out of every part of the
+  selector, ancestors included; if what's left matches, the rule is listed in
+  purple as `when <the conditions>`. `:has()`, `:empty` and the structural
+  pseudo-classes aren't states, so rules using them are left out, or every
+  paragraph would list `p:has(.site-logo)`. States written as classes
+  (`.is-open`) aren't found; Roe's markup uses attributes.
+- **Shift-click passes through.** While INSPECT is on, a shift-click is
+  turned into a plain `el.click()` inside the real click, so the browser
+  still counts it as the person's own and audio may start. A shift-click
+  can't just be let through, because on a link it opens a new window. A
+  MutationObserver on the picked element and its ancestors, ignoring
+  `style` (a playing player rewrites it constantly), re-runs the match
+  when the state changes from anywhere.
+- **Preview widths:** full, three common widths (`COMMON` in the
+  controller), and the theme's own breakpoints from its `min-width` and
+  `max-width` queries (`breakpoints()`), read from the editor's text. A width
+  wider than the pane is laid out at that width and scaled down with a
+  transform, so `@media` rules see the real width.
+- **Draft:** the Markdown editor's pattern. Unsaved text goes to
+  `localStorage` (`roe:theme-draft:<name>`) a second after typing stops and
+  on `beforeunload`, with a fingerprint of the file it started from. It's
+  offered back on the next visit, with a warning when the file has changed
+  since. It's cleared on save, on SAVE AS…, on leaving with CANCEL or THEMES,
+  and when undo brings the text back to the saved file.
 - **What it doesn't do:**
   - It doesn't work out which declaration wins the cascade. That is the hard
     part, and the card left it out of the first version.
@@ -77,6 +103,12 @@ scratch setup).
   what "undo keeps working after you save" in the toolbar means.
 
 ## Traps
+
+- CodeMirror draws the selection on a layer behind the lines, so a line
+  with a background (the active line, INSPECT's highlights) hid it
+  completely. The layer is lifted above the text and multiplied, as in the
+  Markdown editor. The selection (blue) and the other occurrences of the
+  selected text (yellow) need different colours.
 
 - The CodeMirror line highlights are line decorations; a rule's whole lines
   are marked. Rank `current` > `match` > `dim` when rules share a line.

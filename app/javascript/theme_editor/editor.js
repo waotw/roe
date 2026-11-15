@@ -31,7 +31,8 @@ import { css } from "@codemirror/lang-css";
 //
 // setInspectRanges([{ from, to, kind }]) marks whole lines: "current" for the
 // rule PREV / NEXT is on, "match" for the other matches, "dim" for a match
-// inside an @media block this preview doesn't meet. An empty list clears.
+// inside an @media block this preview doesn't meet, "state" for a rule that
+// styles the element in another state. An empty list clears.
 
 export const setInspectRanges = StateEffect.define();
 
@@ -39,6 +40,7 @@ const lineClass = {
   current: Decoration.line({ class: "te-rule-current" }),
   match: Decoration.line({ class: "te-rule-match" }),
   dim: Decoration.line({ class: "te-rule-dim" }),
+  state: Decoration.line({ class: "te-rule-state" }),
 };
 
 const inspectField = StateField.define({
@@ -48,7 +50,7 @@ const inspectField = StateField.define({
     for (const e of tr.effects) {
       if (!e.is(setInspectRanges)) continue;
       const byLine = new Map();
-      const rank = { dim: 0, match: 1, current: 2 };
+      const rank = { dim: 0, state: 1, match: 2, current: 3 };
       for (const r of e.value) {
         const first = tr.state.doc.lineAt(r.from).number;
         const last = tr.state.doc.lineAt(Math.max(r.from, r.to - 1)).number;

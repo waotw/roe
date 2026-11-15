@@ -6,7 +6,12 @@ import { Controller } from "@hotwired/stimulus";
 //
 // It opens on the page you last previewed, or the TEXT reference page the
 // first time. Links work as on the site. The page menu jumps to any reference
-// page, the home page or a typed path. WIDE and PHONE set the frame's width.
+// page, the home page or a typed path.
+//
+// The width menu sets the frame's width: the whole pane, a common device
+// width, or one of the widths where this theme's layout changes, read from
+// its @media queries as you edit. A width wider than the pane is scaled down
+// to fit, so the page is laid out at that width but shown smaller.
 //
 // Below about 1100px the preview is hidden behind the PREVIEW button.
 //
@@ -15,12 +20,19 @@ import { Controller } from "@hotwired/stimulus";
 export default class extends Controller {
   static targets = [
     "body", "pane", "pathButton", "menu", "frame", "frameWrap",
-    "wideButton", "phoneButton", "previewToggle",
+    "widthButton", "widthMenu", "previewToggle",
   ];
   static values = { theme: String, reference: Array };
 
   static PATH = "roe.themeEditor.path";
   static WIDTH = "roe.themeEditor.width";
+
+  // COPY: common preview widths
+  static COMMON = [
+    { label: "Laptop", width: 1280 },
+    { label: "Tablet", width: 768 },
+    { label: "Phone", width: 390 },
+  ];
   static NARROW_OPEN = "roe.themeEditor.preview";
 
   connect() {
@@ -32,7 +44,8 @@ export default class extends Controller {
     if (this.element.cssEditor) this.onReady();
 
     this.onOutside = (e) => {
-      if (!this.menuTarget.classList.contains("hidden") && !e.target.closest(".te-page-menu")) this.closeMenu();
+      if (!e.target.closest(".te-page-menu:not(.te-width-menu)")) this.closeMenu();
+      if (!e.target.closest(".te-width-menu")) this.closeWidthMenu();
     };
     document.addEventListener("click", this.onOutside);
 
@@ -40,7 +53,10 @@ export default class extends Controller {
     this.onNarrow = () => this.layout();
     this.narrow.addEventListener("change", this.onNarrow);
 
-    this.setWidth(localStorage.getItem(this.constructor.WIDTH) || "wide");
+    this.resizer = new ResizeObserver(() => this.fit());
+    this.resizer.observe(this.frameWrapTarget);
+    const saved = localStorage.getItem(this.constructor.WIDTH);
+    this.setWidth(/^\d+$/.test(saved || "") ? Number(saved) : "full");
     this.layout();
     this.load(localStorage.getItem(this.constructor.PATH) || this.referenceValue[0]?.path || "/");
   }
@@ -50,6 +66,7 @@ export default class extends Controller {
     this.element.removeEventListener("css-editor:ready", this.onReady);
     document.removeEventListener("click", this.onOutside);
     this.narrow.removeEventListener("change", this.onNarrow);
+    this.resizer?.disconnect();
     clearTimeout(this.cssTimer);
   }
 
@@ -153,6 +170,7 @@ export default class extends Controller {
   }
 
   openMenu() {
+    this.closeWidthMenu();
     // COPY: the page menu's headings
     const menu = this.menuTarget;
     menu.replaceChildren();
@@ -203,19 +221,78 @@ export default class extends Controller {
 
   // ── Width and showing the preview ───────────────────────────────────────
 
-  wide() {
-    this.setWidth("wide");
+  async toggleWidthMenu() {
+    if (!this.widthMenuTarget.classList.contains("hidden")) return this.closeWidthMenu();
+    this.closeMenu();
+    const { breakpoints } = await import("theme_editor/css_rules");
+    const menu = this.widthMenuTarget;
+    menu.replaceChildren();
+    // COPY: the width menu
+    const heading = (text) => {
+      const h = document.createElement("div");
+      h.className = "te-page-heading";
+      h.textContent = text;
+      menu.append(h);
+    };
+    const item = (label, width, note = "") => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "te-page-item";
+      b.textContent = label;
+      if (note) {
+        const n = document.createElement("span");
+        n.className = "te-width-note";
+        n.textContent = note;
+        b.append(n);
+      }
+      if (width === this.width) b.setAttribute("aria-current", "true");
+      b.addEventListener("click", () => {
+        this.setWidth(width);
+        this.closeWidthMenu();
+      });
+      menu.append(b);
+    };
+    item("Full width", "full", "the whole pane");
+    heading("Common");
+    for (const c of this.constructor.COMMON) item(`${c.label}  ${c.width}px`, c.width);
+    const points = breakpoints(this.css ?? "");
+    heading(points.length ? "Where this theme changes" : "This theme has no width breakpoints");
+    for (const p of points) item(`${p.width}px`, p.width, `${p.queries} @media`);
+    menu.classList.remove("hidden");
+    this.widthButtonTarget.setAttribute("aria-expanded", "true");
   }
 
-  phone() {
-    this.setWidth("phone");
+  closeWidthMenu() {
+    this.widthMenuTarget.classList.add("hidden");
+    this.widthButtonTarget.setAttribute("aria-expanded", "false");
   }
 
   setWidth(width) {
-    this.frameWrapTarget.dataset.width = width;
-    localStorage.setItem(this.constructor.WIDTH, width);
-    this.wideButtonTarget.setAttribute("aria-pressed", width === "wide");
-    this.phoneButtonTarget.setAttribute("aria-pressed", width === "phone");
+    this.width = width;
+    localStorage.setItem(this.constructor.WIDTH, String(width));
+    this.frameWrapTarget.dataset.width = width === "full" ? "full" : "fixed";
+    this.fit();
+  }
+
+  // A set width wider than the pane is scaled down: the page is laid out at
+  // that width (its @media rules see it), then drawn smaller.
+  fit() {
+    const frame = this.frameTarget;
+    const label = this.widthButtonTarget;
+    if (this.width === "full" || !this.width) {
+      Object.assign(frame.style, { width: "", height: "", transform: "", marginLeft: "" });
+      label.textContent = "Full width ▾";
+      return;
+    }
+    const pane = this.frameWrapTarget;
+    const scale = Math.min(1, pane.clientWidth / this.width);
+    Object.assign(frame.style, {
+      width: `${this.width}px`,
+      height: `${pane.clientHeight / scale}px`,
+      transform: scale < 1 ? `scale(${scale})` : "",
+      marginLeft: scale < 1 ? "0" : "",
+    });
+    label.textContent = `${this.width}px${scale < 1 ? ` · ${Math.round(scale * 100)}%` : ""} ▾`;
   }
 
   togglePreview() {

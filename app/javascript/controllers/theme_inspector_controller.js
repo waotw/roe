@@ -9,8 +9,14 @@ import { Controller } from "@hotwired/stimulus";
 // browser's own (theme_editor/matching.js has the details: :hover and
 // ::before rules, @media blocks).
 //
+// Rules for the element in a state it isn't in right now (the play button
+// while playing, a playlist while open) are listed too, in purple, labelled
+// with the condition: `when [data-playing="true"]`.
+//
 // INSPECT stays on until INSPECTING is clicked again or Escape is pressed.
-// While it's on, clicks in the preview pick instead of following links.
+// While it's on, a click in the preview picks instead of following links. A
+// shift-click goes through to the page as an ordinary click — press play,
+// open a playlist — and the results follow the element's new state.
 export default class extends Controller {
   static targets = ["panel", "button", "buttonLabel"];
 
@@ -126,14 +132,17 @@ export default class extends Controller {
         this.positionOverlays();
       },
       click: (e) => {
+        if (this.passing) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         const el = this.targetOf(e);
-        if (el) this.pick(el);
+        if (!el) return;
+        if (e.shiftKey) this.passThrough(el);
+        else this.pick(el);
       },
       // A press would start a drag, focus a field or submit on some
       // controls before the click arrives.
-      mousedown: (e) => { e.preventDefault(); e.stopImmediatePropagation(); },
+      mousedown: (e) => { if (!this.passing) { e.preventDefault(); e.stopImmediatePropagation(); } },
       submit: (e) => { e.preventDefault(); e.stopImmediatePropagation(); },
       keydown: (e) => { if (e.key === "Escape") this.stop(); },
       scroll: () => this.positionOverlays(),
@@ -143,7 +152,45 @@ export default class extends Controller {
     this.listeners = listeners;
   }
 
+  // Shift-click: the click the page would have had, without shift (a
+  // shift-click on a link opens a new window). It runs inside the real
+  // click, so the browser still counts it as the person's own — audio is
+  // allowed to start.
+  passThrough(el) {
+    this.passing = true;
+    try {
+      el.click();
+    } finally {
+      this.passing = false;
+    }
+    this.refreshSoon();
+  }
+
+  refreshSoon() {
+    clearTimeout(this.stateTimer);
+    this.stateTimer = setTimeout(() => {
+      if (this.on && this.picked?.isConnected) this.pick(this.picked, { keep: true });
+    }, 120);
+  }
+
+  // When the picked element, or anything around it, changes state — a
+  // data-playing attribute, an open <details> — the results follow. Style
+  // attributes are left out: a playing player rewrites them many times a
+  // second.
+  watch(el) {
+    this.observer?.disconnect();
+    this.observer = new this.win.MutationObserver((records) => {
+      if (records.some((r) => r.attributeName !== "style")) this.refreshSoon();
+    });
+    for (let a = el; a && a !== this.doc.documentElement; a = a.parentElement) {
+      this.observer.observe(a, { attributes: true });
+    }
+  }
+
   teardownPage() {
+    this.observer?.disconnect();
+    this.observer = null;
+    clearTimeout(this.stateTimer);
     if (!this.doc) return;
     try {
       for (const [type, fn] of Object.entries(this.listeners || {})) this.win.removeEventListener(type, fn, true);
@@ -197,16 +244,19 @@ export default class extends Controller {
       this.renderHint();
       return;
     }
-    const { matchRules, inheritedRules } = this.modules.matching;
+    const { matchRules, otherStateRules, inheritedRules } = this.modules.matching;
     const { rules } = this.parsed();
     const previous = keep && this.matches?.[this.index]?.ruleIndex;
+    if (el !== this.picked) this.watch(el);
     this.picked = el;
-    this.matches = matchRules(el, rules, this.win);
+    const matching = matchRules(el, rules, this.win);
+    const others = otherStateRules(el, rules, this.win, new Set(matching.map((m) => m.ruleIndex)));
+    this.matches = [...matching, ...others].sort((a, b) => a.ruleIndex - b.ruleIndex);
     this.inherited = inheritedRules(el, rules, this.win);
     const again = this.matches.findIndex((m) => m.ruleIndex === previous);
-    const firstActive = this.matches.findIndex((m) => m.active);
+    const firstActive = this.matches.findIndex((m) => m.active && !m.state);
     this.index = again >= 0 ? again : Math.max(firstActive, 0);
-    const count = this.matches.length;
+    const count = matching.length;
     // COPY: the label on the picked element
     const label = this.doc.createElement("span");
     label.textContent = `${this.modules.matching.describe(el)} · ${count} ${count === 1 ? "rule" : "rules"}`;
@@ -239,7 +289,7 @@ export default class extends Controller {
     this.panelTarget.replaceChildren(
       h("p", { class: "te-inspect-hint" },
         h("span", { class: "te-inspect-label" }, "Inspecting"),
-        " Click anything in the preview to see the rules that style it. Escape or INSPECTING to stop."),
+        " Click anything in the preview to see the rules that style it. Shift-click to use the page as normal — press play, open a playlist — without leaving INSPECT. Escape or INSPECTING to stop."),
     );
   }
 
@@ -266,6 +316,7 @@ export default class extends Controller {
     });
 
     const count = this.matches.length;
+    const states = this.matches.filter((m) => m.state).length;
     const nav = h("div", { class: "te-inspect-nav" });
     // COPY: INSPECT results
     if (count) {
@@ -275,7 +326,9 @@ export default class extends Controller {
       next.addEventListener("click", () => this.next());
       nav.append(
         h("strong", {}, `${this.index + 1} of ${count} ${count === 1 ? "rule" : "rules"}`), prev, next,
-        h("span", { class: "te-inspect-note" }, "in file order · dimmed rules are inside an @media block that doesn't match this preview"),
+        h("span", { class: "te-inspect-note" },
+          "in file order · grey: inside an @media block this preview doesn't meet" +
+          (states ? ` · purple: ${states} for another state — shift-click the page to change it` : "")),
       );
     } else {
       nav.append(h("span", { class: "te-inspect-note" }, `No rule in this theme styles ${describe(el)} itself. What it inherits is below.`));
@@ -293,6 +346,7 @@ export default class extends Controller {
           h("span", { class: "te-note" }, note)));
       if (i === this.index) row.dataset.current = "";
       if (!m.active) row.dataset.inactive = "";
+      if (m.state) row.dataset.state = "";
       row.querySelector("button").addEventListener("click", () => this.goTo(i));
       list.append(row);
     });
@@ -326,7 +380,7 @@ export default class extends Controller {
     editor.setInspectRanges(this.matches.map((m, i) => ({
       from: rules[m.ruleIndex].from,
       to: rules[m.ruleIndex].to,
-      kind: i === this.index ? "current" : m.active ? "match" : "dim",
+      kind: i === this.index ? "current" : !m.active ? "dim" : m.state ? "state" : "match",
     })));
     if (reveal && current) editor.reveal(rules[current.ruleIndex].from, rules[current.ruleIndex].from);
   }

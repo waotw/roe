@@ -145,6 +145,25 @@ export function variablesIn(value) {
   return [...value.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]);
 }
 
+// The widths at which a theme's layout changes, from its @media
+// (min-width / max-width) queries in px, widest first:
+//   [{ width, rules }]
+// A min-width of 601px is shown at 601 (the first width it applies at), a
+// max-width of 600px at 600 (the last). `queries` is how many @media blocks
+// use that width.
+export function breakpoints(text) {
+  const counts = new Map();
+  const re = /@media[^{]*?\((min|max)-width:\s*(\d+(?:\.\d+)?)px\)[^{]*\{/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const width = Math.round(parseFloat(m[2]));
+    counts.set(width, (counts.get(width) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([width, queries]) => ({ width, queries }))
+    .sort((a, b) => b.width - a.width);
+}
+
 // The section a position falls in: the last heading at or before it.
 export function sectionAt(sections, pos) {
   let section = null;

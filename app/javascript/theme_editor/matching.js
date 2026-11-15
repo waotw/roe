@@ -135,6 +135,113 @@ export function matchRules(el, rules, win) {
   return results;
 }
 
+// ── Other states ──────────────────────────────────────────────────────────
+//
+// A rule for the same element in a state it isn't in right now: the play
+// button while playing, a <details> while open, a field while checked. Found
+// by taking the conditions out of a selector — attribute tests and
+// pseudo-classes, in every part of it, ancestors included — and asking
+// whether what's left matches. What was taken out becomes the label:
+// `when [data-playing="true"]`.
+//
+// Classes stay in, so a state written as a class (`.is-open`) isn't found
+// this way; Roe's markup marks states with attributes.
+
+// ".card-player[data-x] .t:not(.a)" →
+//   { selector: ".card-player .t", removed: ["[data-x]", ":not(.a)"] }
+export function relaxSelector(selector) {
+  let out = "";
+  const removed = [];
+  for (let i = 0; i < selector.length; i++) {
+    const c = selector[i];
+    if (c === "[") {
+      let j = i;
+      let quote = null;
+      for (; j < selector.length; j++) {
+        const d = selector[j];
+        if (quote) { if (d === "\\") j++; else if (d === quote) quote = null; }
+        else if (d === '"' || d === "'") quote = d;
+        else if (d === "]") break;
+      }
+      removed.push(selector.slice(i, j + 1));
+      i = j;
+      continue;
+    }
+    if (c === ":" && selector[i + 1] !== ":") {
+      const m = selector.slice(i + 1).match(/^-?[\w-]+/);
+      let j = i + 1 + (m ? m[0].length : 0);
+      if (selector[j] === "(") {
+        let d = 0;
+        for (; j < selector.length; j++) {
+          if (selector[j] === "(") d++;
+          else if (selector[j] === ")" && --d === 0) { j++; break; }
+        }
+      }
+      removed.push(selector.slice(i, j));
+      i = j - 1;
+      continue;
+    }
+    out += c;
+  }
+  // A part left with nothing (".a > :checked" → ".a > ") means "any element".
+  const tokens = out.replace(/\s*([>+~])\s*/g, " $1 ").trim().split(/\s+/).filter(Boolean);
+  const parts = [];
+  for (const t of tokens) {
+    const combinator = /^[>+~]$/.test(t);
+    if (combinator && (!parts.length || /^[>+~]$/.test(parts[parts.length - 1]))) parts.push("*");
+    parts.push(t);
+  }
+  if (!parts.length || /^[>+~]$/.test(parts[parts.length - 1])) parts.push("*");
+  return { selector: parts.join(" "), removed };
+}
+
+// The pseudo-classes that are a state an element moves in and out of. Not
+// :has(), :empty or :first-child: those describe where it is, not a state,
+// and listing them would put every paragraph's :has(.site-logo) rule under
+// every paragraph.
+const STATE_PSEUDOS = new Set([
+  "checked", "disabled", "enabled", "open", "closed", "invalid", "valid",
+  "user-invalid", "user-valid", "required", "optional", "placeholder-shown",
+  "indeterminate", "default", "read-only", "read-write", "popover-open",
+  "modal", "fullscreen", "playing", "paused", "autofill",
+]);
+
+// "[data-playing]", ":checked", ":not(.is-enhanced)", ":not([hidden])"
+export function isStateCondition(part) {
+  if (part.startsWith("[")) return true;
+  const m = part.match(/^:([\w-]+)(?:\((.*)\))?$/s);
+  if (!m) return false;
+  if (m[1] === "not" && m[2] !== undefined) {
+    return m[2].split(",").every((x) => /^\s*(\.[\w-]+|\[[^\]]+\]|:[\w-]+)\s*$/.test(x) &&
+      (!x.trim().startsWith(":") || STATE_PSEUDOS.has(x.trim().slice(1))));
+  }
+  return m[2] === undefined && STATE_PSEUDOS.has(m[1]);
+}
+
+// Rules that would style `el` in another state, in file order:
+//   [{ ruleIndex, selector, label, state: true, active }]
+// `skip` is the set of rule indexes already listed as matching.
+export function otherStateRules(el, rules, win, skip = new Set()) {
+  const results = [];
+  rules.forEach((rule, ruleIndex) => {
+    if (skip.has(ruleIndex)) return;
+    for (const sel of rule.selectors) {
+      const stripped = stripSelector(sel.text);
+      // Only rules that name the element itself: the last part must have a
+      // class, an id or a tag. Otherwise `:checked` alone would match
+      // everything once taken out.
+      const last = stripped.selector.split(/\s*[>+~\s]\s*/).pop();
+      if (!/[.#]|^[a-z]/i.test(relaxSelector(last).selector)) continue;
+      const { selector, removed } = relaxSelector(stripped.selector);
+      if (!removed.length || !removed.every(isStateCondition) || !safeMatches(el, selector)) continue;
+      const label = ["when " + removed.join(""), labelFor(stripped)].filter(Boolean).join(" · ");
+      results.push({ ruleIndex, selector: sel, label, state: true, plain: false, active: contextActive(rule.context, win) });
+      break;
+    }
+  });
+  return results;
+}
+
 // Properties a child takes from its parent unless it sets its own.
 export const INHERITED = new Set([
   "color", "font", "font-family", "font-size", "font-style", "font-variant",
