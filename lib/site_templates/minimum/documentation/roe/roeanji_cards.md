@@ -457,7 +457,7 @@ template: playlist
 ```
 ````
 
-A card with no `audio` or `video` on a page starts on the playlist's first track. A page can have more than one pair; each player plays the playlist after it.
+A card with no `audio` or `video` on a page starts on the playlist's first track. A page can have more than one pair; each playlist plays in the nearest player above it.
 
 A playlist with no player links each row to its post. The post opens and starts its player, if the browser allows a page to start sound by itself. If not, the player is ready on that track for one tap.
 

@@ -28,7 +28,7 @@ title: A Short Film
 
 ## Player and podcast playlist
 
-A player with nothing of its own to play takes the first track of the playlist under it.
+If a player doesn't have a collection or playlist, it will play the first playlist after it in the markdown file. If there isn't one, it will play the first playlist on the page.
 
 ```card
 type: player
@@ -42,8 +42,11 @@ tags: theme-reference-podcast
 order: episode_number
 ```
 
-## Music playlist, folded
+## Player and music playlist, folded
 
+```card
+type: player
+```
 ```collection
 template: playlist
 source: posts

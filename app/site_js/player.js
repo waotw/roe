@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: player
-   Version: 1.4
-   Fingerprint: d7e7169d
+   Version: 1.5
+   Fingerprint: c81998b7
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -31,8 +31,9 @@
 //   [data-player-ui]                  hidden until this script shows it
 //   [data-player-chapter][data-time]  a chapter row; clicking seeks there
 //   [data-player-info]                the [info] link, shown for a playlist
-//   [data-playlist] .player-track     a `playlist` collection's rows; the
-//     first playlist after the player, else the first on the page
+//   [data-playlist] .player-track     a `playlist` collection's rows. A
+//     playlist belongs to the nearest player above it; a player with no
+//     playlist anywhere below it takes the first on the page
 //   .player-series                    ⏮ ⏭ links, hidden once a playlist is
 //     adopted, since the list does the same job
 //   .player-track-link                a row's link to its post. Without a
@@ -371,10 +372,21 @@
   //
   // A `playlist` collection on the page becomes this player's queue:
   // choosing a row loads it here, and playback runs on down the list. A
-  // player takes the first playlist after it, so a page can pair several
-  // ([player] then [playlist], or a card then a collection). With none after
-  // it, the first on the page. A playlist has one player. Without this file
-  // every row plays on its own, in its own browser controls.
+  // playlist belongs to the nearest player above it, so a page can pair
+  // several ([player] then [playlist], or a card then a collection) and a
+  // player higher up the page never takes a list meant for the one beside
+  // it. A player with no playlist anywhere below it takes the first on the
+  // page. A playlist has one player. Without this file every row plays on
+  // its own, in its own browser controls.
+
+  // The last player that comes before `list` on the page, or null.
+  function nearestPlayerAbove(list) {
+    var nearest = null;
+    Array.prototype.slice.call(document.querySelectorAll("[data-player]")).forEach(function (el) {
+      if (!el.contains(list) && (el.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING)) nearest = el;
+    });
+    return nearest;
+  }
 
   Player.prototype.setupPlaylist = function () {
     var self = this;
@@ -387,8 +399,10 @@
     var after = all.filter(function (list) {
       return !root.contains(list) && (root.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
     });
-    var playlist = root.querySelector("[data-playlist]") ||
-      after.filter(function (list) { return !taken(list); })[0] || all[0];
+    var mine = after.filter(function (list) {
+      return !taken(list) && nearestPlayerAbove(list) === root;
+    })[0];
+    var playlist = root.querySelector("[data-playlist]") || mine || (after.length ? null : all[0]);
     if (!playlist || taken(playlist)) return;
     playlist._playerOwner = this;
 

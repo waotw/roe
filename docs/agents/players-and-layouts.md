@@ -22,8 +22,11 @@ on its CSS rather than adding another style.
 ## A player plays, a playlist lists
 
 - They are **always separate, paired by position.** `player.js` gives each
-  player the first untaken playlist after it, else the first on the page, so
-  a page can hold several pairs. A list drawn inside the card, and a playlist
+  playlist to the nearest player above it (player.js 1.5; before that, each
+  player took the first untaken playlist after it, so a player higher up the
+  page stole the list meant for the one beside it). A player with no playlist
+  anywhere below it takes the first on the page. A page can hold several
+  pairs. A list drawn inside the card, and a playlist
   with its own player, were both built and removed.
 - A playlist with no player is **links**: each row goes to its post with
   `?play`, which starts playing on arrival (a real click is needed; a direct
