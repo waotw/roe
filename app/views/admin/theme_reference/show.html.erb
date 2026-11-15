@@ -1,0 +1,102 @@
+<%# The reference bar is Roe's admin, drawn over the site in the site's own
+    layout. Its styles are scoped under #theme-reference-bar, an id, so they
+    win over the theme's element and class rules, and `all: revert` drops
+    whatever the theme set on the bar's elements first. It's fixed to the top
+    rather than in the page's flow: a theme with a sidebar lays body out as a
+    grid, and an extra child of body would take a grid cell. The page is
+    pushed down by the bar's height instead. %>
+<% content_for :admin_bar do %>
+  <style>
+    #theme-reference-bar, #theme-reference-bar * { all: revert; box-sizing: border-box; }
+    #theme-reference-bar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+      padding: 6px 12px; background: #111827; color: #e5e7eb;
+      font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-transform: uppercase; letter-spacing: 0.02em;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+    }
+    html {
+      padding-top: var(--theme-reference-bar-height, 32px);
+      scroll-padding-top: var(--theme-reference-bar-height, 32px);
+    }
+    <%# The site's search and account icons are fixed to the top of the window
+        too; move them down out from under the bar. `translate` rather than
+        `top` or `transform`, so whatever the theme sets on those still applies. %>
+    .site-actions { translate: 0 var(--theme-reference-bar-height, 32px); }
+    #theme-reference-bar a { color: #e5e7eb; text-decoration: none; }
+    #theme-reference-bar .trb-label { color: #9ca3af; font-weight: bold; }
+    #theme-reference-bar nav { display: flex; flex-wrap: wrap; gap: 2px; }
+    #theme-reference-bar nav a { padding: 3px 8px; }
+    #theme-reference-bar nav a:hover { background: #374151; }
+    #theme-reference-bar nav a[aria-current="page"] { background: #fff; color: #111827; }
+    #theme-reference-bar .trb-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    #theme-reference-bar details { position: relative; }
+    #theme-reference-bar summary {
+      list-style: none; cursor: pointer; padding: 3px 8px;
+      background: #1f2937; border: 1px solid #4b5563; color: #f9fafb;
+    }
+    #theme-reference-bar summary::-webkit-details-marker { display: none; }
+    #theme-reference-bar details ul {
+      position: absolute; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px 0;
+      list-style: none; min-width: 220px; background: #fff; border: 1px solid #d1d5db;
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+    }
+    #theme-reference-bar details li a { display: block; padding: 4px 10px; color: #111827; text-transform: none; }
+    #theme-reference-bar details li a:hover { background: #f3f4f6; }
+    #theme-reference-bar details li a[aria-current="true"] { background: #dbeafe; color: #1e3a8a; }
+    #theme-reference-bar .trb-button {
+      padding: 3px 8px; background: #bfdbfe; color: #111827; border: 1px solid #1f2937;
+    }
+  </style>
+  <div id="theme-reference-bar">
+    <%# COPY: bar label %>
+    <span class="trb-label">Theme reference</span>
+    <nav aria-label="Theme reference pages">
+      <% ThemeReference::PAGES.each do |entry| %>
+        <%= link_to entry.title,
+              admin_theme_reference_path(entry.slug, preview_theme: params[:preview_theme].presence),
+              "aria-current": (entry == @reference_page ? "page" : nil) %>
+      <% end %>
+    </nav>
+    <div class="trb-end">
+      <% active = SiteConfig.get("theme.active") || "default" %>
+      <details>
+        <%# COPY: theme picker; "(active)" marks the site's active theme %>
+        <summary>Theme: <%= @reference_theme %>.css<%= " (active)" if @reference_theme == active %> ▾</summary>
+        <ul>
+          <% @reference_themes.each do |name| %>
+            <li>
+              <%= link_to "#{name}.css#{' (active)' if name == active}",
+                    admin_theme_reference_path(@reference_page.slug, preview_theme: (name == active ? nil : name)),
+                    "aria-current": (name == @reference_theme ? "true" : nil) %>
+            </li>
+          <% end %>
+        </ul>
+      </details>
+      <%# COPY: button %>
+      <%= link_to "Edit CSS", edit_admin_theme_path(@reference_theme), class: "trb-button" %>
+    </div>
+  </div>
+  <%# Forms and buy buttons look real but do nothing here: a sign-up would
+      sign someone up, and Add to Cart would fill the real cart. Links to the
+      sample posts and products would 404, since those only exist while the
+      page renders. %>
+  <script nonce="<%= safe_csp_nonce %>">
+    (() => {
+      const bar = document.getElementById("theme-reference-bar");
+      const fit = () => { document.documentElement.style.setProperty("--theme-reference-bar-height", `${bar.offsetHeight}px`); };
+      new ResizeObserver(fit).observe(bar);
+      fit();
+    })();
+    window.addEventListener("submit", (event) => {
+      if (event.target.closest("main")) event.preventDefault();
+    }, true);
+    window.addEventListener("click", (event) => {
+      const el = event.target.closest(".snipcart-add-item, main a[href*='/<%= ThemeReference::SAMPLE_PREFIX %>']");
+      if (el) { event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
+  </script>
+<% end %>
+<article class="page page-<%= @page.url_name %>">
+  <%= render_content_layout(@page) %>
+</article>

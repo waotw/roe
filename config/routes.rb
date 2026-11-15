@@ -282,6 +282,12 @@ Rails.application.routes.draw do
     post   "configs/snipcart/verify",     to: "configs#verify_snipcart",        as: "verify_snipcart_integration_config"
     delete "configs/snipcart/disconnect", to: "configs#disconnect_snipcart",    as: "disconnect_snipcart_integration_config"
 
+    # Theme reference pages: every element a theme styles, admin-only. Above
+    # resources :themes so "reference" is never read as a theme's :id.
+    get "themes/reference/media/:path", to: "theme_reference_media#show", as: :theme_reference_media,
+        constraints: { path: /[\w.-]+/ }, format: false
+    get "themes/reference(/:page)", to: "theme_reference#show", as: :theme_reference
+
     resources :themes, only: [ :index, :destroy ] do
       member do
         get :edit

@@ -37,6 +37,16 @@ To set it up:
 
 For best results, size the two windows so the editor sits on one side and the preview on the other. That way every change lands in front of you, and you can tune a color or a spacing value until it looks right.
 
+## See every element a theme styles
+
+The theme reference pages show everything a theme can style, on pages drawn the way your site draws its own: text, images and galleries, players, cards and collections, buttons, forms and the store. Use them to check a theme before you make it active, or to see what a change to the CSS touched.
+
+Open them from Admin → Themes → `REFERENCE` on any installed theme. The bar at the top has one tab per page, a theme menu that shows the same page in another installed theme, and `EDIT CSS`. Picking a theme there doesn't make it active.
+
+Only you can see these pages: they need you to be signed in, and they're never part of your site's navigation, search or sitemap.
+
+The posts, products and media on these pages are samples that ship with Roe. They aren't added to your site, so their links go nowhere. Forms and buttons look real but do nothing here. Members, payments and store forms show even when those features are off, so a theme can be ready before you turn them on.
+
 ## Customizing a theme
 
 The fastest way to restyle your site is through the **CSS variables** at the top of the theme file. They set colors, spacing, fonts, and layout in one place, so you can make sweeping changes without touching the rest of the CSS. The rest of this page lists those variables. You're free to edit the full file too — see [Going further](#going-further).
