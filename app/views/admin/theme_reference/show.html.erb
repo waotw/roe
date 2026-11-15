@@ -63,14 +63,14 @@
     #theme-reference-bar .trb-button {
       padding: 3px 8px; background: #bfdbfe; color: #111827; border: 1px solid #1f2937; white-space: nowrap;
     }
-    #theme-reference-bar .trb-back { padding: 3px 8px; background: #e5e7eb; color: #111827; border: 1px solid #1f2937; white-space: nowrap; }
+    #theme-reference-bar .trb-back { padding: 3px 8px; background: #111827; color: #bfdbfe; border: 1px solid #bfdbfe; white-space: nowrap; }
     #theme-reference-bar summary { white-space: nowrap; }
   </style>
   <div id="theme-reference-bar">
     <div class="trb-start">
       <%# COPY: back button and bar label %>
-      <%= link_to "← Themes", admin_themes_path, class: "trb-back" %>
       <span class="trb-label">Theme reference</span>
+      <%= link_to "← Themes", admin_themes_path, class: "trb-back" %>
     </div>
     <div class="trb-end">
       <% active = SiteConfig.get("theme.active") || "default" %>
