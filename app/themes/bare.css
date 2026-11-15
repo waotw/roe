@@ -1,7 +1,7 @@
 /* ==== THEME INFO ====
    Roe Theme: Bare
-   Version: 1.5.13
-   Fingerprint: dba35029
+   Version: 1.5.15
+   Fingerprint: f6b7c523
    Bundled with: Roe v0.4.2
 
    This theme was installed from Roe. Leave this comment
@@ -746,7 +746,11 @@ div.flash mark {
 
 /* ==== POST/PAGE GLOBAL ==== */
 
-.content:not(:has(.card-player)) > :first-child {
+/* A page's or a doc's writing sits inside .content in its own wrapper, so
+   its first element gets the same. */
+.content:not(:has(.card-player)) > :first-child,
+.page-content > :first-child,
+.documentation-content > :first-child {
   margin-top: 0 !important;
 }
 
@@ -1025,8 +1029,8 @@ a.footnote-backlink-number:hover {
 
 /* ==== POST/PAGE SINGLE ==== */
 
-/* A layout's [image], [cover] and [artwork] sit outside .content, so its
-   image rule doesn't reach them. */
+/* A layout's [image], [cover] and [artwork]. They sit inside .content, so
+   its image rule applies too. */
 .post-image,
 .page-image {
   max-width: 100%;
@@ -1431,6 +1435,13 @@ p.collection-more a {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
+  column-gap: var(--space-3);
+}
+
+/* In the site nav every link already has its own space after it
+   (.site-nav a), so a gap there would double it. */
+.site-nav .collection-menu-horizontal {
+  column-gap: 0;
 }
 
 .collection-menu-item {
@@ -2853,7 +2864,7 @@ li.chapter {
 }
 .card-player + .collection.playlist,
 .post-player + .collection.playlist {
-  margin-top: calc(-1 * var(--space-6, 1.5rem));
+  margin-top: var(--space-0);
   border-top: 0;
 }
 .card-player + .collection.playlist > .player-playlist,
