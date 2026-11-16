@@ -3035,12 +3035,16 @@ check_content_watcher() {
     [ -f "$APP_DIR/bin/roe-watch-check" ] || return 0
     check_ruby > /dev/null 2>&1 || return 0
 
-    local detail
-    detail="$(cd "$APP_DIR" && ruby "$APP_DIR/bin/roe-watch-check" "$SITE_DIR" 2>/dev/null)" && return 0
-    [ -n "$detail" ] || return 0
+    local detail status=0
+    detail="$(cd "$APP_DIR" && ruby "$APP_DIR/bin/roe-watch-check" "$SITE_DIR" 2>/dev/null)" || status=$?
+    [ "$status" -ne 0 ] && [ -n "$detail" ] || return 0
 
     echo ""
-    log_warning "The ContentWatcher appears to have stopped picking up changes."
+    if [ "$status" -eq 2 ]; then
+        log_warning "The ContentWatcher couldn't load some changed files."
+    else
+        log_warning "The ContentWatcher appears to have stopped picking up changes."
+    fi
     echo "$detail"
 
     # Only ask when someone can answer: piped or scripted, a prompt would

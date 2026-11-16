@@ -49,6 +49,28 @@ class RoeWatchCheckTest < ActiveSupport::TestCase
     assert_not_includes out, "posts/old.md", "changed before the mark: the watcher saw it"
   end
 
+  def errors(hash)
+    File.write(File.join(@app, "tmp/content_watcher.errors"), JSON.generate(hash))
+  end
+
+  test "files the watcher couldn't load are reported with their error" do
+    seen(at: Time.now - 60)
+    errors("posts/bad.md" => { "error" => "NoMethodError: undefined method 'x'", "at" => (Time.now - 300).to_i })
+
+    code, out = check
+
+    assert_equal 2, code
+    assert_includes out, "posts/bad.md (#{(Time.now - 300).strftime('%H:%M')}): NoMethodError: undefined method 'x'"
+  end
+
+  test "a missed change is reported before load errors" do
+    seen(at: Time.now - 3600)
+    file("posts/a.md", at: Time.now - 120)
+    errors("posts/bad.md" => { "error" => "boom", "at" => Time.now.to_i })
+
+    assert_equal 1, check.first
+  end
+
   test "nothing changed since: silent" do
     seen(at: Time.now - 60)
     file("posts/a.md", at: Time.now - 3600)

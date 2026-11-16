@@ -16,6 +16,11 @@
 # When it finds one it prints the detail lines and exits 1; roe.sh prints
 # the warning and offers the restart. It only reads.
 #
+# It also reports files the watcher heard about but couldn't load
+# (tmp/content_watcher.errors, written by ContentWatcher.handling): exit 2,
+# with one line per file. A missed change is reported first; it's the
+# bigger problem.
+#
 #   bin/roe-watch-check <site dir>
 #
 # Plain Ruby, no Rails, like bin/roe-logs.
@@ -25,6 +30,7 @@ require "find"
 module RoeWatchCheck
   APP = File.expand_path("..", __dir__)
   SEEN_FILE = File.join(APP, "tmp", "content_watcher.seen")
+  ERRORS_FILE = File.join(APP, "tmp", "content_watcher.errors")
 
   # The folders ContentWatcher::WATCH_PATHS watches. Keep the two in step
   # (test/bin/roe_watch_check_test.rb checks they match).
@@ -46,6 +52,30 @@ module RoeWatchCheck
   module_function
 
   def run(site_dir)
+    missed = run_missed(site_dir)
+    return missed unless missed.zero?
+
+    run_errors
+  end
+
+  # Files the watcher couldn't load: "posts/a.md (10:03): NoMethodError: …".
+  def run_errors
+    require "json"
+    return 0 unless File.file?(ERRORS_FILE)
+
+    errors = JSON.parse(File.read(ERRORS_FILE))
+    return 0 unless errors.is_a?(Hash) && errors.any?
+
+    errors.first(SHOWN).each do |path, info|
+      puts "    #{path} (#{at(Time.at(info['at'].to_i))}): #{info['error']}"
+    end
+    puts "    and #{errors.size - SHOWN} more" if errors.size > SHOWN
+    2
+  rescue JSON::ParserError, SystemCallError
+    0
+  end
+
+  def run_missed(site_dir)
     return 0 unless site_dir && File.directory?(site_dir) && File.file?(SEEN_FILE)
 
     seen_at = File.mtime(SEEN_FILE)
