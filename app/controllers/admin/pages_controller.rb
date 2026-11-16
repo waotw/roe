@@ -178,7 +178,6 @@ class Admin::PagesController < Admin::BaseController
     # Capture pre-save state to detect a publishing transition for flash text.
     was_published = @page.published?
     status_before = @page.status
-    name_clash_before = @page.name_class_clash?
     old_address = rename_redirect_source(@page)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
@@ -189,12 +188,6 @@ class Admin::PagesController < Admin::BaseController
 
     # A plain save says nothing — the editor's dot shows "changes saved".
     flash[:notice] = "Page published" if !was_published && @page.published?
-    # A new url_name that clashes with a layout part: say so now (the
-    # warning also reloads the editor, which then keeps showing it).
-    if @page.name_class_clash? && !name_clash_before
-      flash[:warning] = helpers.strip_tags(render_to_string(partial: "admin/pages/name_class_clash",
-                                                            locals: { page: @page }, formats: [ :html ])).squish
-    end
     add_rename_redirect(Page, old_address, metadata, @page.file_path)
 
     finish_editor_save(record: @page, resource_type: "page", edit_path: edit_admin_page_path(@page),

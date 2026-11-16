@@ -13,6 +13,10 @@
 //     would draw it, when the file's metadata now differs from what was sent
 //     (a podcast GUID, a filled-in duration, tidied tags). Swapped only if
 //     nothing was typed in it during the save;
+//   - the issues box above the editor (missing fields, missing files): the
+//     server sends it back after every save, so it appears and goes as the
+//     record changes. Notices about the file as it was (a YAML error, the
+//     last save's warning) are marked data-clears-on-save and removed;
 //   - the saved address the "you changed a live URL" prompt compares against;
 //   - the preview window, if open.
 //
@@ -127,6 +131,9 @@ function succeeded(controller, reply, sentContent, sentMetadata) {
     controller.originalMetadata = sentMetadata;
   }
 
+  if (typeof reply.issues_html === "string") swapIssues(reply.issues_html);
+  document.querySelectorAll("[data-clears-on-save]").forEach((el) => el.remove());
+
   // The "you changed a live URL" prompt compares against the saved address.
   if (typeof reply.url_name === "string") {
     controller.originalUrlNameValue = reply.url_name;
@@ -178,6 +185,16 @@ function showMessage(controller, text) {
     el.title = "";
     el.classList.remove(ERROR_CLASS);
   });
+}
+
+// The issues box is outside the editor's element, so it's found on the page.
+function swapIssues(html) {
+  const current = document.getElementById("editor-issues");
+  if (!current) return;
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  const fresh = template.content.getElementById("editor-issues");
+  if (fresh) current.replaceWith(fresh);
 }
 
 // Put the server's metadata panel in place of the current one. Stimulus
