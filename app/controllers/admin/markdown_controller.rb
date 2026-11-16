@@ -12,7 +12,7 @@ class Admin::MarkdownController < Admin::BaseController
   # POST /admin/markdown/check
   # → { issues: [{ type:, line:, message:, fixable:, label: }], fixable_count: }
   def check
-    issues = MarkdownDoctor.diagnose(content_param, page_ids: page_ids)
+    issues = MarkdownDoctor.diagnose(content_param, page_ids: page_ids, gfm: gfm?)
 
     render json: {
       issues: issues.map { |i| present(i) },
@@ -33,7 +33,7 @@ class Admin::MarkdownController < Admin::BaseController
     render json: {
       content: fixed,
       applied: applied.map { |i| present(i) },
-      remaining: MarkdownDoctor.diagnose(fixed, page_ids: page_ids(fixed)).map { |i| present(i) }
+      remaining: MarkdownDoctor.diagnose(fixed, page_ids: page_ids(fixed), gfm: gfm?).map { |i| present(i) }
     }
   end
 
@@ -57,6 +57,13 @@ class Admin::MarkdownController < Admin::BaseController
   end
 
   private
+
+  # The parser the site renders with: GFM when soft line breaks are on
+  # (HasMarkdownExtensions#soft_line_breaks?).
+  def gfm?
+    value = SiteConfig.content("soft_line_breaks")
+    value == true || value == "true"
+  end
 
   # A throwaway Post is only a vehicle for HasMarkdownExtensions: it's never
   # saved, and nothing on it but the content is read. The file path is a

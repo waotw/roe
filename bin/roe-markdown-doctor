@@ -41,6 +41,20 @@ def site_path
   ENV["ROE_SITE_PATH"] || File.join(project_root, "site")
 end
 
+# The site's parser: GFM when soft line breaks are on, as in
+# HasMarkdownExtensions#to_html. Read from content.yml directly, since this
+# runs without Rails.
+def gfm?
+  require "yaml"
+  file = File.join(site_path, "system", "global", "content.yml")
+  return false unless File.exist?(file)
+
+  value = (YAML.safe_load(File.read(file)) || {})["soft_line_breaks"]
+  value == true || value == "true"
+rescue StandardError
+  false
+end
+
 def markdown_files(dir)
   return [] unless Dir.exist?(dir)
 
@@ -101,7 +115,7 @@ def run
   all_issues = []
 
   files.each do |file|
-    MarkdownDoctor.diagnose_file(file).each do |issue|
+    MarkdownDoctor.diagnose_file(file, gfm: gfm?).each do |issue|
       all_issues << issue.merge(file: file)
     end
   end
