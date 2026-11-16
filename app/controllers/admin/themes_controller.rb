@@ -142,14 +142,14 @@ class Admin::ThemesController < Admin::BaseController
 
     error = if slug.blank?
       "The name needs at least one letter or number."
-    elsif USER_THEME_DIR.join("#{slug}.css").exist? || THEMES_DIR.join("#{slug}.css").exist?
+    elsif theme_css_path(USER_THEME_DIR, slug).exist? || theme_css_path(THEMES_DIR, slug).exist?
       "There's already a theme called #{slug}.css. Choose another name."
     end
     return render(json: { error: error }, status: :unprocessable_entity) if error
 
-    based_on = ThemeInspector.parse_header(USER_THEME_DIR.join("#{source}.css"))
+    based_on = ThemeInspector.parse_header(theme_css_path(USER_THEME_DIR, source))
     FileUtils.mkdir_p(USER_THEME_DIR)
-    File.write(USER_THEME_DIR.join("#{slug}.css"), variant_css(params[:content].to_s, display_name, based_on))
+    File.write(theme_css_path(USER_THEME_DIR, slug), variant_css(params[:content].to_s, display_name, based_on))
     render json: { saved: true, name: slug, url: edit_admin_theme_path(slug) }
   rescue => e
     render json: { error: e.message }, status: :unprocessable_entity
@@ -339,6 +339,13 @@ class Admin::ThemesController < Admin::BaseController
   end
 
   private
+
+  # <dir>/<name>.css, with any folders stripped from the name. A theme
+  # name arrives in the URL, where an encoded `..%2F` would otherwise reach
+  # outside the theme folder.
+  def theme_css_path(dir, name)
+    dir.join("#{File.basename(name.to_s)}.css")
+  end
 
   # A SAVE AS… copy's text: the header comment, when it's Roe's THEME INFO
   # one, is replaced with one naming the new theme. No fingerprint and a new

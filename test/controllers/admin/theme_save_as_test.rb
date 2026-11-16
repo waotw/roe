@@ -44,6 +44,14 @@ class Admin::ThemeSaveAsTest < ActionDispatch::IntegrationTest
     assert_equal 1, File.read(copy).scan("THEME INFO").size
   end
 
+  # Theme names come from the URL. The route already refuses dots in :id,
+  # and the path helper strips folders as well, so a name can't reach
+  # outside the theme folder.
+  test "theme paths keep only the file name" do
+    path = Admin::ThemesController.new.send(:theme_css_path, DIR, "../../config/#{SOURCE}")
+    assert_equal DIR.join("#{SOURCE}.css"), path
+  end
+
   test "refuses a name that's taken or has no letters" do
     save_as("Default", "body {}")
     assert_response :unprocessable_entity
