@@ -3,7 +3,11 @@
 require "test_helper"
 
 class Admin::SiteSyncHistoryTest < ActionDispatch::IntegrationTest
-  def clear! = (File.delete(SiteSync::History.path) if File.exist?(SiteSync::History.path))
+  # Sync History also lists the version store's events, so both start empty.
+  def clear!
+    FileUtils.rm_f(SiteSync::History.path)
+    FileUtils.rm_rf(SiteSync::Versions.root)
+  end
   setup { clear!; sign_in_as(User.take) }
   teardown { clear! }
 

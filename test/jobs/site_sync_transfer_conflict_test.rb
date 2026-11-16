@@ -5,6 +5,10 @@ require "test_helper"
 # unreachable peer refuses to sync blind; a clean run pushes only the
 # safe local-only changes.
 class SiteSyncTransferConflictTest < ActiveSupport::TestCase
+  # A completed push records an event in the version store; left behind, it
+  # shows up on Sync History in tests that run later.
+  teardown { FileUtils.rm_rf(SiteSync::Versions.root) }
+
   def e(size, mtime)
     { "size" => size, "mtime" => mtime }
   end
