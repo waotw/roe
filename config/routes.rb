@@ -14,6 +14,7 @@ Rails.application.routes.draw do
     namespace :site_sync do
       post "exchange",                  to: "exchange#create"
       post "refresh_ledger",            to: "exchange#refresh_ledger"
+      post "rewind_ledger",             to: "exchange#rewind_ledger"
       post "reconcile_content",         to: "exchange#reconcile_content"
       post "file_states",               to: "exchange#file_states"
       post "file_hashes",               to: "exchange#file_hashes"

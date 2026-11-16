@@ -229,16 +229,12 @@ module SiteSync
     # the version the rewound side now holds. The other side still has what
     # the sync left, so the next sync sees that side as the one that changed
     # and makes the same move again.
+    #
+    # Live's record goes back the same way (settle!), or live's own report
+    # would say the opposite side changed.
     def rewind_baseline!(steps)
-      files = (Ledger.recorded&.dig("files") || {}).dup
-      steps.each do |step|
-        if step.remove?
-          files.delete(step.path)
-        else
-          files[step.path] = { "size" => step.size, "mtime" => step.mtime }
-        end
-      end
-      Ledger.write_manifest!(files)
+      @baseline_entries = steps.to_h { |step| [ step.path, step.remove? ? nil : { "size" => step.size, "mtime" => step.mtime } ] }
+      Ledger.rewind_entries!(@baseline_entries)
     end
 
     def settle!(live:, local:)
@@ -247,6 +243,9 @@ module SiteSync
         Exchange.reconcile_peer_content!
         Exchange.refresh_peer_ledger!
       end
+      # After refresh_peer_ledger!, which keeps live's old entry for any path
+      # the two sides hold differently: this replaces it with the rewound one.
+      Exchange.rewind_peer_ledger!(@baseline_entries) if @baseline_entries.present?
       Checker.clear_cache
       Rails.cache.delete("site_sync:current_fingerprint")
       Exchange.call_peer if Exchange.can_call_peer?

@@ -66,6 +66,28 @@ module Api
         render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # POST /api/site_sync/rewind_ledger
+      #
+      # Body:    { files: { "posts/foo.md": {size, mtime}, "media/gone.jpg": null } }
+      #
+      # Called by the peer after a REWIND. The peer put its own record of
+      # these paths back to the version the rewound side now holds
+      # (SiteSync::Rewind#rewind_baseline!); this records the same here, so
+      # this side's own report agrees with the peer's about which side has
+      # the change. null removes the path. Only the paths given change.
+      def rewind_ledger
+        payload = JSON.parse(request.body.read)
+        entries = payload["files"]
+        return render(json: { ok: false, error: "files must be an object" }, status: :bad_request) unless entries.is_a?(Hash)
+
+        ::SiteSync::Ledger.rewind_entries!(entries)
+        ::SiteSync::Checker.clear_cache
+        Rails.cache.delete("site_sync:current_fingerprint")
+        render json: { ok: true, count: entries.size }
+      rescue ArgumentError, JSON::ParserError => e
+        render json: { ok: false, error: e.message }, status: :bad_request
+      end
+
       # POST /api/site_sync/file_states
       #
       # Body:    { paths: [ "posts/foo.md", "media/img.jpg", ... ] }

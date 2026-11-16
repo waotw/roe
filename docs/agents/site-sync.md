@@ -129,12 +129,16 @@ moves again unless someone changes the files first.
   video originals). The current versions are saved before anything is put
   back. It runs in `SiteSyncRewindJob` on the same status key as a sync, so
   the two can't overlap.
-- A rewind resets only **this computer's** record. Live's own record still
-  matches live, so each side's self-report says "no change" while the files
-  differ. `PeerAgreement` places such files by this computer's record
-  (`on_live` / `on_local`, the reconciler's rule), and the Site Sync page
-  shows them as live or local changes. Fixing live's record instead would
-  need a new live endpoint.
+- Both sides' records go back. `Rewind#rewind_baseline!` writes the rewound
+  entries here (`Ledger.rewind_entries!`), then `settle!` sends the same
+  entries to live (`Exchange.rewind_peer_ledger!` →
+  `POST /api/site_sync/rewind_ledger`), after `refresh_peer_ledger!` so they
+  win. Without that, live's record still matched live, each side said "no
+  change" while the files differed, and live's own Site Sync page was wrong.
+- A live site on a Roe without `rewind_ledger` answers 404 and its record
+  stays as it was; `PeerAgreement` still places those files by this
+  computer's record (`on_live` / `on_local`), so this side's page is right
+  either way.
 
 ---
 
@@ -265,5 +269,4 @@ own folder once the store has the files, so what's left is older syncs and
 
 ## Still open
 
-- Live's own sync record isn't rewound (see REWIND).
 - A schedule for local snapshots.

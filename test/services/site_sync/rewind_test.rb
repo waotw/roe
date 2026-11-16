@@ -75,6 +75,9 @@ class SiteSync::RewindTest < ActiveSupport::TestCase
     SiteSync.stubs(:transport).returns(transport)
     baseline = nil
     SiteSync::Ledger.expects(:write_manifest!).with { |files| baseline = files }
+    # Live's own record goes back to the same entries, so its report agrees.
+    SiteSync::Exchange.expects(:rewind_peer_ledger!)
+                      .with({ @css => entry("css before", OLD), @post => entry("post before", OLD) })
 
     SiteSync::Rewind.perform!(event)
 

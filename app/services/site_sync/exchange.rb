@@ -303,6 +303,36 @@ module SiteSync
         false
       end
 
+      # After a REWIND: the peer records the same baseline entries this side
+      # just did (Ledger.rewind_entries!). A peer on a Roe without the
+      # endpoint answers with an HTML 404; then nothing changes there and the
+      # Site Sync page still places the files by this side's record
+      # (PeerAgreement). Returns true when the peer took the entries.
+      def rewind_peer_ledger!(entries)
+        return false unless can_call_peer?
+
+        uri = URI.parse(File.join(peer_url, "/api/site_sync/rewind_ledger"))
+        with_retries(label: "rewind_peer_ledger", max_retries: 2) do
+          response = post_to_peer(uri, { files: entries }.to_json)
+          if response.nil?
+            raise "no response (network error)"
+          elsif response.is_a?(Net::HTTPSuccess)
+            return true
+          elsif missing_endpoint?(response)
+            Rails.logger.info "[SiteSync::Exchange] rewind_peer_ledger: live runs an older Roe without this endpoint — its record wasn't rewound"
+            return false
+          elsif response.code.to_i.between?(500, 599)
+            raise "HTTP #{response.code}: #{response.body}"
+          else
+            Rails.logger.warn "[SiteSync::Exchange] rewind_peer_ledger FAILED: HTTP #{response.code} — #{response.body}"
+            return false
+          end
+        end
+      rescue => e
+        Rails.logger.warn "[SiteSync::Exchange] rewind_peer_ledger ERROR after retries: #{e.class} #{e.message}"
+        false
+      end
+
       # Ask the peer for per-file state (size + mtime) of a specific
       # set of paths. Returns a hash of `{ "path" => {size, mtime} or nil }`.
       # Used by post-failure reassessment to figure out which specific
