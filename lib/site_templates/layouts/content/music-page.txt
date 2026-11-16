@@ -1,0 +1,9 @@
+[cover]
+[release title]
+[artist] [release date]
+[subscribe]
+
+[player]
+[playlist]
+
+[body]

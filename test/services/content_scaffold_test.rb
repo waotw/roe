@@ -21,81 +21,41 @@ class ContentScaffoldTest < ActiveSupport::TestCase
     result = body("post", { "title" => "My Post", "post_type" => "article" })
 
     assert_not_includes result, "# My Post",
-      "posts/_header.html.erb already renders the title; a body heading would double it"
+      "the post layout draws the title; a body heading would double it"
   end
 
   test "an article scaffolds nothing but its template body" do
     assert_equal "Write here.", body("post", { "post_type" => "article" }, "Write here.").strip
   end
 
-  # --- posts: players ------------------------------------------------------
+  # --- posts: the layout draws the player ------------------------------
 
-  test "audio and video posts get a player card" do
-    %w[audio video].each do |type|
-      result = body("post", { "post_type" => type })
-      assert_includes result, "```card", "#{type} should scaffold a player"
-      assert_includes result, "type: player"
+  test "media posts get no player card — their layout draws the player" do
+    %w[audio video podcast music].each do |type|
+      result = body("post", { "post_type" => type, "podcast" => "myshow", "release" => "ep" }, "Notes.")
+      assert_not_includes result, "type: player", "#{type}: the layout's player part supplies it"
+      assert_includes result, "Notes."
     end
   end
 
-  test "a podcast episode gets a player above the body and an episode list below" do
-    result = body("post", { "post_type" => "podcast", "podcast" => "myshow" }, "Show notes.")
-
-    assert_includes result, "type: player"
-    assert_includes result, "template: playlist"
-    assert_includes result, "podcast: myshow"
-    assert_includes result, "order: episode_number"
-    assert_operator result.index("type: player"), :<, result.index("Show notes.")
-    assert_operator result.index("Show notes."), :<, result.index("template: playlist"),
-      "the episode list belongs below the writing, as the ERB page had it"
+  test "a podcast episode gets no episode list — the layout draws it" do
+    assert_not_includes body("post", { "post_type" => "podcast", "podcast" => "myshow" }), "template: playlist"
   end
 
-  test "a music track gets a player and its release's track list" do
-    result = body("post", { "post_type" => "music", "release" => "summer-ep" })
-
-    assert_includes result, "type: player"
-    assert_includes result, "post_type: music"
-    assert_includes result, "release: summer-ep"
-    assert_includes result, "order: track_number"
+  test "a music track gets no track list — the layout draws it" do
+    assert_not_includes body("post", { "post_type" => "music", "release" => "summer-ep" }), "template: playlist"
   end
 
-  test "the playlist is skipped until the association is known" do
-    podcast = body("post", { "post_type" => "podcast" })
-    music   = body("post", { "post_type" => "music" })
-
-    assert_includes podcast, "type: player", "the player still works with no podcast set"
-    assert_not_includes podcast, "template: playlist",
-      "without a podcast key the collection would gather every episode on the site"
-    assert_not_includes music, "template: playlist"
-  end
-
-  # --- pages and products: the title IS in the body ------------------------
+  # --- pages: the title IS in the body ------------------------
 
   test "a page gets a title heading, because its view doesn't render one" do
     assert_includes body("page", { "title" => "About" }), "# About"
   end
 
-  test "a product gets a title and a buy button that shows its price" do
-    result = body("product", { "title" => "Zine", "price" => "12.00", "sku" => "Z1" })
+  test "a product's body is only its writing — the layout draws title, image and button" do
+    result = body("product", { "title" => "Zine", "price" => "12.00", "sku" => "Z1", "image" => "/media/images/zine.jpg" }, "About it.")
 
-    assert_includes result, "# Zine"
-    assert_includes result, "```button"
-    assert_includes result, "text: Add to Cart"
-  end
-
-  test "a product's image block is skipped until there's an image" do
-    without = body("product", { "title" => "Zine" })
-    with    = body("product", { "title" => "Zine", "image" => "/media/images/zine.jpg" })
-
-    assert_not_includes without, "![", "an empty src would render a broken image"
-    assert_includes with, "![Zine](/media/images/zine.jpg)"
-  end
-
-  test "no price is written into the body — the button renders it live" do
-    result = body("product", { "title" => "Zine", "price" => "12.00" })
-
-    assert_not_includes result, "12.00",
-      "a frozen price would contradict metadata after an edit"
+    assert_equal "About it.", result.strip
   end
 
   # --- the template body is composed in, not replaced ----------------------
@@ -112,7 +72,7 @@ class ContentScaffoldTest < ActiveSupport::TestCase
   # --- the scaffold lists themselves ---------------------------------------
 
   test "every post type declares a scaffold, and only of known blocks" do
-    known = %i[content title image player playlist buy_button]
+    known = %i[content title playlist]
     Post::POST_TYPES.each do |type, config|
       assert config[:scaffold].present?, "#{type} has no scaffold"
       assert_includes config[:scaffold], :content, "#{type} must place the body somewhere"

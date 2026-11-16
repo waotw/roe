@@ -3,7 +3,11 @@
 require "test_helper"
 
 class Admin::SiteSyncHistoryTest < ActionDispatch::IntegrationTest
-  def clear! = (File.delete(SiteSync::History.path) if File.exist?(SiteSync::History.path))
+  # Sync History also lists the version store's events, so both start empty.
+  def clear!
+    FileUtils.rm_f(SiteSync::History.path)
+    FileUtils.rm_rf(SiteSync::Versions.root)
+  end
   setup { clear!; sign_in_as(User.take) }
   teardown { clear! }
 
@@ -34,8 +38,8 @@ class Admin::SiteSyncHistoryTest < ActionDispatch::IntegrationTest
     get admin_site_sync_history_path
 
     assert_response :success
-    assert_match "Local → Live", response.body
-    assert_match "Live → Local", response.body
+    assert_match "LOCAL TO LIVE", response.body
+    assert_match "LIVE TO LOCAL", response.body
     assert_match "posts/pushed.md", response.body
     assert_match "posts/pulled.md", response.body
     assert_match "posts/removed.md", response.body

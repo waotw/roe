@@ -20,6 +20,7 @@ class Admin::LayoutsController < Admin::BaseController
       { name: "Footer", file: "footer", path: admin_layout_footer_edit_path, exists: LayoutFiles.exist?("footer") },
       { name: "Sidebar", file: "sidebar", path: admin_layout_sidebar_edit_path, exists: LayoutFiles.exist?("sidebar") }
     ]
+    @content_layouts = content_layouts
   end
 
   def edit_header
@@ -117,6 +118,39 @@ class Admin::LayoutsController < Admin::BaseController
   end
 
   private
+
+  # The Content table, grouped like the Products table: Posts (one row per
+  # post type), Pages, Products, Documentation, then the site's own extra
+  # layouts. A row whose feature is off (podcasts, music, the store) is left
+  # out to keep the list short — unless the site has customised it, so a
+  # file it made never disappears from view.
+  ContentLayoutGroup = Struct.new(:name, :rows)
+
+  def content_layouts
+    names = ->(dir) { Dir.glob(File.join(dir, "*#{ContentLayout::EXT}")).map { |f| File.basename(f, ContentLayout::EXT) } }
+    roe = names.call(ContentLayout::ROE_DIR)
+    site = names.call(ContentLayout::SITE_DIR)
+    row = ->(name, label) { { name: name, label: label, customised: site.include?(name), extra: !roe.include?(name) } }
+    shown = ->(name, feature) { roe.include?(name) && (feature.nil? || SiteFeature.public_send(feature) || site.include?(name)) }
+
+    posts = Post::POST_TYPES.filter_map do |type, config|
+      row.call(type.to_s, config[:label]) if shown.call(type.to_s, config[:feature])
+    end
+    pages = [ [ "page", "Page", nil ], [ "podcast-page", "Podcast page", :podcast_enabled? ], [ "music-page", "Music page", :music_enabled? ] ].filter_map do |name, label, feature|
+      row.call(name, label) if shown.call(name, feature)
+    end
+    products = shown.call("product", :store_enabled?) ? [ row.call("product", "Product") ] : []
+    docs = shown.call("documentation", nil) ? [ row.call("documentation", "Documentation") ] : []
+    extras = (site - roe).sort.map { |name| row.call(name, name) }
+
+    [
+      ContentLayoutGroup.new("Posts", posts),
+      ContentLayoutGroup.new("Pages", pages),
+      ContentLayoutGroup.new("Products", products),
+      ContentLayoutGroup.new("Documentation", docs),
+      ContentLayoutGroup.new("Extra layouts", extras)
+    ].reject { |group| group.rows.empty? }
+  end
 
   def ensure_layout_directory_exists
     layout_dir = File.join(RoeSitePaths::SITE_PATH, "layout")

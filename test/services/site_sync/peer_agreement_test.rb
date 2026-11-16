@@ -8,7 +8,11 @@ class SiteSync::PeerAgreementTest < ActiveSupport::TestCase
   FP_A = "aaa"
   FP_B = "bbb"
 
-  setup { Rails.cache.clear }
+  setup do
+    Rails.cache.clear
+    # No agreed record unless a test sets one, so differences stay unplaced.
+    SiteSync::Ledger.stubs(:recorded).returns(nil)
+  end
 
   def stub_manifests(local:, peer:)
     SiteSync::Ledger.stubs(:current).returns(local)
@@ -90,5 +94,19 @@ class SiteSync::PeerAgreementTest < ActiveSupport::TestCase
     SiteSync::Exchange.expects(:fetch_peer_file_hashes).once.returns({ "a.md" => "sha1" })
 
     2.times { SiteSync::PeerAgreement.verify(local_fingerprint: FP_A, peer_fingerprint: FP_B) }
+  end
+
+  # After a rewind this computer's record goes back but live's doesn't, so
+  # neither side reports a change on its own. This record still says which.
+  test "differing files are placed on the side that changed them since the last agreed record" do
+    stub_manifests(local: { "a.md" => entry(10, 100), "b.md" => entry(30, 300) },
+                   peer: { "a.md" => entry(12, 200), "b.md" => entry(31, 310), "new.md" => entry(5, 50) })
+    SiteSync::Ledger.stubs(:recorded).returns({ "files" => { "a.md" => entry(10, 100), "b.md" => entry(29, 290) } })
+
+    result = SiteSync::PeerAgreement.verify(local_fingerprint: FP_A, peer_fingerprint: FP_B)
+
+    assert_equal({ modified: [ "a.md" ], added: [ "new.md" ], deleted: [] }, result.on_live)
+    assert_nil result.on_local
+    assert_equal [ "b.md" ], result.differing, "changed on both sides: still unexplained"
   end
 end

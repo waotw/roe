@@ -1,0 +1,35 @@
+<%# The files one side changed, grouped by what happened. Each file opens in
+    place, under its row: the change the next sync will make
+    (pending_change). Roe-managed folders (SYNC_DISPLAY_GROUPS: Roe's
+    documentation, which an update rewrites wholesale) fold into one row,
+    which opens to list its files. `side` is "local" or "live". %>
+<% raw = { "changed" => Array(changes[:modified]), "added" => Array(changes[:added]), "deleted" => Array(changes[:deleted]) } %>
+<% raw.each do |action, paths| %>
+  <% list = collapse_sync_paths(paths) %>
+  <% next if list.empty? %>
+  <div>
+    <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= action.capitalize %> (<%= list.size %>)</h4>
+    <ul class="text-xs font-mono text-amber-800 space-y-1">
+      <% list.each do |row| %>
+        <% if paths.include?(row) %>
+          <%= render "pending_file", path: row, side: side, action: action %>
+        <% else %>
+          <% prefix, _label = SiteSyncHelper::SYNC_DISPLAY_GROUPS.find { |_, label| row.start_with?(label) } %>
+          <% members = prefix ? paths.select { |p| p.start_with?("#{prefix}/") }.sort : [] %>
+          <li>
+            <details class="group/files">
+              <summary class="inline-flex items-center gap-1.5 cursor-pointer list-none hover:text-amber-950">
+                <span class="transition-transform group-open/files:rotate-90">▸</span><span><%= row %></span>
+              </summary>
+              <ul class="mt-1 ml-4 space-y-1">
+                <% members.each do |path| %>
+                  <%= render "pending_file", path: path, side: side, action: action %>
+                <% end %>
+              </ul>
+            </details>
+          </li>
+        <% end %>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

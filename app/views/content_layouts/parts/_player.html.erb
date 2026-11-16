@@ -1,0 +1,16 @@
+<%# The post's audio or video: the same player a ```card type: player in the
+    body draws, with a podcast episode's S1E10 and chapters, and ⏮ ⏭ to the
+    episodes or tracks either side. Skipped when the body has its own player
+    card (BodyCheck), when the type has nothing to play, or when
+    content.yml's `players` setting turns it off. On a music or podcast page
+    (`release:` / `podcast:`), the player for its tracks or episodes,
+    starting on the first. %>
+<% if kind == "post" && (player_kind = record.template_player_kind) && Post.template_players_enabled?(player_kind) %>
+  <div class="post-player">
+    <%= record.template_player_card_html %>
+  </div>
+<% elsif kind == "page" && (record.metadata["release"].present? || record.metadata["podcast"].present?) && record.series_playlist_html.present? %>
+  <div class="post-player">
+    <%= record.series_player_card_html %>
+  </div>
+<% end %>

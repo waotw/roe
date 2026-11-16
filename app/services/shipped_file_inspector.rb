@@ -266,6 +266,30 @@ class ShippedFileInspector
     failed
   end
 
+  # Shipped files changed by hand in current/ since the last sync, which
+  # the sync would overwrite. bin/sync-from-site stamps each file's
+  # Fingerprint as it copies it in, so a copy in current/ whose body no
+  # longer matches its own Fingerprint was edited there afterwards. Files
+  # whose body already matches the site's copy are left out: syncing those
+  # loses nothing. Returns relative paths under current/, like
+  # check_release!. Read-only; run it before check_release! stamps site/.
+  def self.edited_in_app(site_root:)
+    shipped_files.sort.filter_map do |path|
+      rel = path.sub("#{Rails.root}/", "")
+      rel if edited_in_app?(path, site_path_for(rel, site_root))
+    end
+  end
+
+  def self.edited_in_app?(app_path, site_path)
+    return false unless File.exist?(app_path) && File.exist?(site_path)
+
+    stamped = parse_header(app_path)&.fingerprint
+    return false unless stamped
+    return false if fingerprint(app_path) == stamped
+
+    body_of(File.read(app_path)) != body_of(File.read(site_path))
+  end
+
   # Where a shipped file lives in a site: app/themes/x.css → site/theme/x.css,
   # app/site_js/x.js → site/javascript/x.js.
   def self.site_path_for(rel, site_root)

@@ -58,6 +58,29 @@ module SiteSync
       assert_equal "NEW", File.read(File.join(dst, "posts/http_new.md"))
     end
 
+    test "push from another root sends its files and times, and nothing rides along" do
+      root = Dir.mktmpdir("push-root")
+      @created << root
+      FileUtils.mkdir_p(File.join(root, "posts"))
+      File.write(File.join(root, "posts/http_back.md"), "OLD")
+      File.utime(Time.at(1_700_000_000), Time.at(1_700_000_000), File.join(root, "posts/http_back.md"))
+      LiveVideo.stubs(:to_purge).returns([ "media/video/held.mp4" ])
+
+      recorded = {}
+      Exchange.stubs(:upload_files).with do |archive_bytes:, manifest:, deleted:|
+        recorded.merge!(archive: archive_bytes, manifest: manifest, deleted: deleted)
+      end.returns({ "ok" => true })
+
+      HttpTransport.push_local_to_live!(diff: { added: [ "posts/http_back.md" ], modified: [], deleted: [ "posts/http_new.md" ] }, root: root)
+
+      assert_equal({ "size" => 3, "mtime" => 1_700_000_000 }, recorded[:manifest]["posts/http_back.md"])
+      assert_equal [ "posts/http_new.md" ], recorded[:deleted]
+      dst = Dir.mktmpdir("push-unpack")
+      @created << dst
+      TarArchive.unpack(recorded[:archive], dest: dst)
+      assert_equal "OLD", File.read(File.join(dst, "posts/http_back.md"))
+    end
+
     test "push raises when the peer upload fails" do
       site_write("posts/http_x.md", "X")
       Exchange.stubs(:upload_files).returns(nil)

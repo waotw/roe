@@ -1,0 +1,89 @@
+<%# One version of one file, opened from Sync History or a file's log.
+    FILE shows the version the change left (or deleted), DIFF what the change
+    did, and COMPARE TO CURRENT that version against the local file now —
+    offered only when they differ. Look-only: copy from it, or download. %>
+<% frame        = local_assigns[:frame].presence || "change_#{change[:id]}" %>
+<% in_log       = local_assigns[:in_log] %>
+<% side         = change_side(change) %>
+<% noun         = { "rewind" => "rewind", "restore" => "restore" }.fetch(change[:kind].to_s, "sync") %>
+<% deleted      = change[:action] == "deleted" %>
+<% shown_sha    = deleted ? change[:before_sha] : change[:after_sha] %>
+<% shown_abs    = SiteSync::VersionPreview.source(shown_sha, change[:path]) %>
+<% current_abs  = File.join(RoeSitePaths::SITE_PATH, change[:path]) %>
+<% current_sha  = File.file?(current_abs) ? Digest::SHA256.file(current_abs).hexdigest : nil %>
+<% compare      = shown_sha.present? && shown_sha != current_sha %>
+<% view         = view.presence || (change[:action] == "changed" ? "diff" : "file") %>
+<% view         = "diff" if view == "current" && !compare %>
+<% image        = SiteSync::VersionPreview.image?(change[:path]) %>
+<% link_args    = ->(v) { admin_site_sync_history_change_path(change[:id], view: v, frame: frame, in_log: (in_log ? 1 : nil)) } %>
+<% tab_class    = ->(on) { "px-2 py-1 font-mono text-xs #{on ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}" } %>
+<%= turbo_frame_tag frame do %>
+  <div class="bg-gray-50 border-t border-gray-200 px-4 py-3 space-y-2 font-mono" data-change-panel="<%= change[:id] %>">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-semibold text-gray-900 truncate mr-auto" title="<%= change[:path] %>"><%= change[:path] %></span>
+      <% unless image %>
+        <span class="inline-flex border border-gray-400 rounded-xs overflow-hidden">
+          <%= link_to "FILE", link_args.("file"), class: tab_class.(view == "file") %>
+          <%= link_to "DIFF", link_args.("diff"), class: tab_class.(view == "diff") %>
+        </span>
+        <% if compare %>
+          <%= link_to "COMPARE TO CURRENT", link_args.("current"), class: "#{history_button_class} #{'!bg-gray-900 !text-white' if view == 'current'}" %>
+        <% end %>
+      <% end %>
+      <% unless in_log %>
+        <%= link_to "HISTORY", admin_site_sync_history_file_path(path: change[:path]), class: history_button_class, data: { turbo_frame: "_top" } %>
+      <% end %>
+      <% if shown_abs %>
+        <%= link_to "DOWNLOAD", admin_site_sync_history_version_path(change[:id], version: (deleted ? "before" : "after")),
+              class: history_button_class, data: { turbo: false } %>
+      <% end %>
+    </div>
+
+    <% if image %>
+      <p class="text-xs text-gray-600 font-sans">Before and after this <%= noun %>, on <%= side %>.</p>
+      <div class="grid grid-cols-2 gap-3">
+        <% [ [ "BEFORE THIS #{noun.upcase}", "before", change[:before_sha], change[:before_size] ],
+             [ "AFTER THIS #{noun.upcase}", "after", change[:after_sha], change[:after_size] ] ].each do |label, which, sha, size| %>
+          <div class="space-y-1">
+            <p class="text-[10px] font-bold text-gray-500"><%= label %></p>
+            <% if sha && SiteSync::VersionPreview.source(sha, change[:path]) %>
+              <img src="<%= admin_site_sync_history_version_path(change[:id], version: which, inline: 1) %>" alt="" class="max-h-64 border border-gray-200 bg-white">
+              <p class="text-[10px] text-gray-500"><%= number_to_human_size(size) %></p>
+            <% elsif sha.nil? %>
+              <p class="text-xs text-gray-500 font-sans">Not there.</p>
+            <% else %>
+              <p class="text-xs text-gray-500 font-sans">Not kept.</p>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% elsif shown_sha && shown_abs.nil? %>
+      <p class="text-xs text-gray-600 font-sans">
+        This version wasn't kept: it's over <%= number_to_human_size(SiteSync::Versions::AFTER_COPY_MAX) %> and the file has changed since.
+      </p>
+    <% else %>
+      <% before_abs = SiteSync::VersionPreview.source(change[:before_sha], change[:path]) %>
+      <% shown_text = shown_abs && SiteSync::VersionPreview.text_of(shown_abs) %>
+      <% if shown_abs && shown_text.nil? %>
+        <p class="text-xs text-gray-600 font-sans">
+          This file can't be shown here (<%= number_to_human_size(File.size(shown_abs)) %>).  DOWNLOAD to open it.
+        </p>
+      <% elsif view == "file" %>
+        <p class="text-xs text-gray-600 font-sans">
+          FILE: the <%= side %> version <%= deleted ? "this #{noun} deleted" : "after this #{noun}" %>.
+        </p>
+        <%= render "file_lines", text: shown_text %>
+      <% else %>
+        <% if view == "current" %>
+          <% from_text, to_text = shown_text, (current_sha ? SiteSync::VersionPreview.text_of(current_abs) : "") %>
+          <p class="text-xs text-gray-600 font-sans">Difference between this older version → the version of the file you have right now on the local site<%= " (deleted)" unless current_sha %>.</p>
+        <% else %>
+          <% before_text = change[:before_sha] ? (before_abs && SiteSync::VersionPreview.text_of(before_abs)) : "" %>
+          <% from_text, to_text = before_text, (deleted ? "" : shown_text) %>
+          <p class="text-xs text-gray-600 font-sans">DIFF: these are the changes made from this sync to the <%= side %> version of this file.</p>
+        <% end %>
+        <%= render "diff_lines", from_text: from_text, to_text: to_text %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

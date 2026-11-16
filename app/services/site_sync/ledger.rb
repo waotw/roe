@@ -62,6 +62,32 @@ module SiteSync
         new.write_manifest!(manifest)
       end
 
+      # Puts the given paths' baseline entries back after a REWIND: an
+      # entry ({size, mtime}) records that version as agreed, nil removes the
+      # path. Every other path is left as it is. Both sides run this with the
+      # same entries (Rewind#rewind_baseline!, and live through
+      # Api::SiteSync::ExchangeController#rewind_ledger), so their own reports
+      # agree about which side holds the change.
+      def rewind_entries!(entries)
+        root = File.expand_path(RoeSitePaths::SITE_PATH)
+        files = (recorded&.dig("files") || {}).dup
+        entries.each do |path, entry|
+          rel = TarArchive.safe_relative_path(path.to_s, root)
+          raise ArgumentError, "not a file path: #{path.inspect}" if rel.empty?
+
+          if entry.nil?
+            files.delete(rel)
+          else
+            size = Integer(entry["size"] || entry[:size])
+            mtime = Integer(entry["mtime"] || entry[:mtime])
+            files[rel] = { "size" => size, "mtime" => mtime }
+          end
+        end
+        write_manifest!(files)
+      rescue TarArchive::UnsafeEntry, TypeError => e
+        raise ArgumentError, e.message
+      end
+
       # The only baseline write that's safe to make after a transfer.
       #
       # A deletion is inferred, never observed: "in the baseline, absent on the

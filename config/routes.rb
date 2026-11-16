@@ -14,6 +14,7 @@ Rails.application.routes.draw do
     namespace :site_sync do
       post "exchange",                  to: "exchange#create"
       post "refresh_ledger",            to: "exchange#refresh_ledger"
+      post "rewind_ledger",             to: "exchange#rewind_ledger"
       post "reconcile_content",         to: "exchange#reconcile_content"
       post "file_states",               to: "exchange#file_states"
       post "file_hashes",               to: "exchange#file_hashes"
@@ -81,6 +82,13 @@ Rails.application.routes.draw do
     post "pages/repair_statuses", to: "pages#repair_statuses", as: "repair_page_statuses"
     get "site_sync/history", to: "site_sync#history", as: "site_sync_history"
     post "site_sync/history/restore", to: "site_sync#restore_from_history", as: "restore_from_site_sync_history"
+    get  "site_sync/history/changes/:id", to: "site_sync#history_change", as: "site_sync_history_change"
+    get  "site_sync/history/changes/:id/version", to: "site_sync#history_version", as: "site_sync_history_version"
+    get  "site_sync/history/file", to: "site_sync#history_file", as: "site_sync_history_file"
+    get  "site_sync/history/rewind/:id", to: "site_sync#rewind", as: "site_sync_rewind"
+    get  "site_sync/pending", to: "site_sync#pending_change", as: "site_sync_pending_change"
+    get  "site_sync/pending/version", to: "site_sync#pending_version", as: "site_sync_pending_version"
+    post "site_sync/history/rewind/:id", to: "site_sync#perform_rewind"
     post "site_sync/backup", to: "site_sync#create_backup", as: "create_site_backup"
     post "site_sync/restore", to: "site_sync#restore_backup", as: "restore_site_backup"
     patch "site_sync/config", to: "site_sync#update_config", as: "update_site_sync_config"
@@ -98,6 +106,7 @@ Rails.application.routes.draw do
     post "site_sync/clone_to_live",    to: "site_sync#clone_to_live",   as: "clone_site_to_live"
     post "site_sync/resolve_conflicts", to: "site_sync#resolve_conflicts", as: "resolve_site_sync_conflicts"
     get  "site_sync/transfer_status",         to: "site_sync#transfer_status",        as: "site_transfer_status"
+    get  "site_sync/peer_status",             to: "site_sync#peer_status",            as: "site_sync_peer_status"
     post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"
     post "site_sync/transfer_status/retry",   to: "site_sync#retry_transfer",         as: "retry_site_transfer"
 
@@ -134,6 +143,14 @@ Rails.application.routes.draw do
     # list it found with a best-guess page for each. Pure — writes nothing;
     # the editor applies the result to its own textarea.
     post "layouts/menu_builder", to: "layouts#menu_builder", as: "layouts_menu_builder"
+    # Content layouts (site/layout/content/<name>.txt): what a type's page
+    # shows around its writing. Edit, save as the site's copy, go back to
+    # Roe's default, or add an extra layout for `layout: <name>`.
+    get    "layouts/content/:name/edit", to: "content_layouts#edit",    as: "edit_content_layout"
+    patch  "layouts/content/:name",      to: "content_layouts#update",  as: "content_layout"
+    delete "layouts/content/:name",      to: "content_layouts#destroy"
+    post   "layouts/content",            to: "content_layouts#create",  as: "content_layouts"
+    post   "layouts/content/:name/explain", to: "content_layouts#explain", as: "explain_content_layout"
 
     resources :posts, only: [ :index, :edit, :update, :new, :create, :destroy ] do
       collection do
@@ -184,6 +201,7 @@ Rails.application.routes.draw do
         post :bulk_destroy
         post :dismiss_video_notices
         get :video_notices
+        get :usages
         post :optimize_videos
       end
       member do
@@ -266,12 +284,19 @@ Rails.application.routes.draw do
     post   "configs/snipcart/verify",     to: "configs#verify_snipcart",        as: "verify_snipcart_integration_config"
     delete "configs/snipcart/disconnect", to: "configs#disconnect_snipcart",    as: "disconnect_snipcart_integration_config"
 
+    # Theme reference pages: every element a theme styles, admin-only. Above
+    # resources :themes so "reference" is never read as a theme's :id.
+    get "themes/reference/media/:path", to: "theme_reference_media#show", as: :theme_reference_media,
+        constraints: { path: /[\w.-]+/ }, format: false
+    get "themes/reference(/:page)", to: "theme_reference#show", as: :theme_reference
+
     resources :themes, only: [ :index, :destroy ] do
       member do
         get :edit
         patch :update
         post :activate
         post :reset
+        post :save_as
       end
       # The site scripts Roe ships live on the Themes page too — same
       # shipped-file story, no editor. :id is the script's basename.

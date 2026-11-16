@@ -118,9 +118,16 @@ Roe automatically adds RSS feeds for all podcasts to their pages/episodes. More 
 
 ## Podcast Pages
 
-You can connect a podcast to a page by adding `podcast: <podcast-key>` to the metadata for that page — this is the same way you connect a podcast post to its podcast. Podcast pages will have these elements added to them:
+You can connect a podcast to a page by adding `podcast: <podcast-key>` to the metadata for that page — this is the same way you connect a podcast post to its podcast. By default, podcast pages show:
 
-- Title of podcast
-- Subscribe section with links and RSS feeds
+- the podcast's artwork, name and author
+- the subscribe section with links and RSS feeds
+- a player and the list of episodes, above the page's writing
 
-This allows you to create a "home page" for the podcast.
+This allows you to create a "home page" for the podcast. Change what it shows in the `podcast-page` [content layout](/documentation/roe/layouts#content-layouts). More here: [Release and Podcast Pages](/documentation/roe/pages#release-and-podcast-pages)
+
+## The player on episodes
+
+Each episode gets a player at the top, from the `podcast` content layout. It shows the episode label (`S1E10`), the episode's chapters if it has any, and the episodes either side. `[playlist]` in the layout lists every episode, folded, and the player plays it. In the writing, the same is a [player card](/documentation/roe/cards#player) followed by a [`playlist` collection](/documentation/roe/collections_templates#when-to-use-the-playlist-template).
+
+Episodic podcasts list newest first and serial podcasts oldest first. An episode without an `episode_number` shows no number in the list.

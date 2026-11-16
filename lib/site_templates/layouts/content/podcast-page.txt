@@ -1,0 +1,9 @@
+[artwork]
+[podcast title]
+[creator]
+[subscribe]
+
+[player]
+[playlist]
+
+[body]

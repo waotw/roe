@@ -1,0 +1,13 @@
+<%# A post's image is often only its card image, so on the post itself it
+    shows when `image_in_header: true` — the rule from before layouts.
+    Other records show their image whenever they have one. %>
+<% image = record.metadata["image"].to_s.strip %>
+<% if image.present? %>
+  <% if kind == "post" %>
+    <% if record.metadata["image_in_header"].to_s == "true" %>
+      <%= ResponsiveImageRenderer.render(image, alt: record.title, class: "post-image", sizes: "(min-width: 1020px) 8rem, 100vw") %>
+    <% end %>
+  <% else %>
+    <%= ResponsiveImageRenderer.render(image, alt: record.title, class: "#{kind}-image") %>
+  <% end %>
+<% end %>

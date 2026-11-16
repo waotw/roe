@@ -74,17 +74,8 @@ class Admin::PostsController < Admin::BaseController
     @preview_mode = true
     @preview_id = "post-#{@post.id}"
 
-    # Podcast episodes need their show config so the player can resolve show
-    # artwork, subscribe links, etc. — mirror PostsController#show.
-    if @post.post_type == "podcast" && @post.metadata["podcast"].present?
-      @podcast_config = PodcastConfig.get(@post.metadata["podcast"])
-      @podcast_episodes = Post
-        .published
-        .where("json_extract(metadata, '$.post_type') = ?", "podcast")
-        .where("json_extract(metadata, '$.podcast') = ?", @post.metadata["podcast"])
-        .order(Arel.sql("json_extract(metadata, '$.date') DESC"))
-        .to_a
-    end
+    # The post's layout looks up its show and sibling episodes itself
+    # (ContentLayoutHelper), so the preview, the site and static exports match.
 
     render template: "posts/show", layout: "site"
   end

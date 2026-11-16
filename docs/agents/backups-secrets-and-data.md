@@ -119,15 +119,22 @@ is precisely why a restore must never naively swap key files.
 Under the project root, via `SiteSync::BackupPaths`:
 
 - `backups/local/<timestamp>/` — full `site/` content snapshots, using rsync plus
-  hardlinks. The "Local" tab in the UI. Managed by `BackupManager`.
+  hardlinks. The "Local" tab in the UI. Managed by `BackupManager`. Made by
+  Create backup and before a restore only; syncs stopped taking them in 0.5.0
+  (the version store holds what a sync replaces).
 - `backups/live/database/<timestamp>.enc` — encrypted live-database recovery
   bundles, captured every sync, retention 15. The "Live Site" tab.
   `SiteSync::DatabaseBackup` on the pull side,
   `BackupManager.build_encrypted_db_bundle` on the production side.
-- `backups/live/content/` — pre-push safety snapshots of live content. Internal;
-  not surfaced in the UI. Large files are fetched in pieces into
-  `backups/live/content/.downloads/` and moved into the snapshot once their
-  SHA-256 checks out.
+- `backups/live/content/` — live's copies of the files a push is about to
+  replace or delete. Internal; not surfaced in the UI. Large files are fetched
+  in pieces into `backups/live/content/.downloads/` and moved into place once
+  their SHA-256 checks out. Since 0.5.0 the version store hard-links each copy
+  in and removes that push's folder, so the copy is on disk once. Older
+  folders, and full live backups from `rake site:backup`, stay.
+- `backups/versions/` — the version store: every version a sync, rewind or
+  resolution replaced or deleted, on either side, for Sync History and
+  REWIND. See [site-sync.md](site-sync.md).
 
 `SiteSync::BackupPolicy` decides what goes into both kinds of content backup:
 everything except video web versions (renditions and posters under

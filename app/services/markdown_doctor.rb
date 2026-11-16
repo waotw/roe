@@ -102,12 +102,16 @@ class MarkdownDoctor
   # group 1 or 2.
   ANCHOR_LINK_RE = /\[[^\]]*\]\(#([^)\s]+)\)|href=["']#([^"']+)["']/
 
-  def self.diagnose(content, page_ids: nil)
-    new(content, page_ids: page_ids).diagnose
+  # gfm: whether the site renders with Kramdown's GFM parser, which Roe uses
+  # when soft line breaks are on (HasMarkdownExtensions#to_html). The two
+  # parsers nest lists differently, and a rule that's right for one is a
+  # false alarm for the other.
+  def self.diagnose(content, page_ids: nil, gfm: false)
+    new(content, page_ids: page_ids, gfm: gfm).diagnose
   end
 
-  def self.diagnose_file(path)
-    new(File.read(path)).diagnose
+  def self.diagnose_file(path, gfm: false)
+    new(File.read(path), gfm: gfm).diagnose
   end
 
   # page_ids: the id of every element on the rendered page, for checking
@@ -117,10 +121,11 @@ class MarkdownDoctor
   # rather than from re-deriving heading ids here: collection items, glossary
   # terms and galleries make ids of their own, and a guess would call good
   # links broken.
-  def initialize(content, page_ids: nil)
+  def initialize(content, page_ids: nil, gfm: false)
     @lines = content.to_s.lines
     @issues = []
     @page_ids = page_ids
+    @gfm = gfm
   end
 
   def diagnose
@@ -752,9 +757,12 @@ class MarkdownDoctor
     code_block_fence_len = nil
     pending_blockquotes = []
     last_list_item_line = nil
+    previous_blank = false
 
     effective_lines.each_with_index do |line, idx|
       line_num = effective_line_number(idx)
+      blank_before = previous_blank
+      previous_blank = line.strip.empty? unless inside_code_block
 
       # Track fenced code blocks
       if (match = line.match(FENCE_RE))
@@ -795,6 +803,16 @@ class MarkdownDoctor
         end
         pending_blockquotes = []
         last_list_item_line = line_num
+        next
+      end
+
+      # Plain text at column 0 after a blank line is a paragraph of its own:
+      # the list has ended, and a fence or blockquote after it isn't breaking
+      # anything. (Straight under an item, with no blank line, it's that
+      # item's text and the list goes on.)
+      if blank_before && !line.strip.empty? && line_indent(line).zero?
+        pending_blockquotes = []
+        last_list_item_line = nil
         next
       end
 
@@ -982,7 +1000,14 @@ class MarkdownDoctor
     return previous_item unless parts
 
     indent = parts[1].length
-    item = { indent: indent, content_column: parts[0].length }
+    item = { indent: indent, content_column: parts[0].length, ordered: parts[2].end_with?(".") }
+
+    # GFM nests a shallow item when it's the other kind of list (bullets
+    # under a number, or the reverse): `1. Click` then `  - Add` renders as
+    # a nested list there. Plain kramdown folds the line into the item's text.
+    if @gfm && previous_item && indent > previous_item[:indent] && item[:ordered] != previous_item[:ordered]
+      return item
+    end
 
     if previous_item && indent > previous_item[:indent] && indent < previous_item[:content_column]
       @issues << {

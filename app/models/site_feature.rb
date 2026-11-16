@@ -15,13 +15,35 @@ module SiteFeature
   INTEGRATIONS_PATH = File.join(RoeSitePaths::SITE_PATH, "system", "integrations")
   FEATURES_PATH     = File.join(RoeSitePaths::SITE_PATH, "system", "features")
 
+  # ── Everything on, for one render ──────────────────────────────────────
+
+  # The theme reference pages show every form and button a theme might
+  # style, including ones for features this site has turned off. Inside the
+  # block, the members, payments and store predicates answer as if those
+  # features were on and set up. Per thread, so no other request sees it.
+  def showing_everything
+    previous = Thread.current[:site_feature_showing_everything]
+    Thread.current[:site_feature_showing_everything] = true
+    yield
+  ensure
+    Thread.current[:site_feature_showing_everything] = previous
+  end
+
+  def showing_everything?
+    Thread.current[:site_feature_showing_everything] == true
+  end
+
   # ── Feature enabled (file presence) ────────────────────────────────────
 
   def members_enabled?
+    return true if showing_everything?
+
     File.exist?(File.join(FEATURES_PATH, "members.yml"))
   end
 
   def store_enabled?
+    return true if showing_everything?
+
     File.exist?(File.join(FEATURES_PATH, "store.yml"))
   end
 
@@ -31,6 +53,8 @@ module SiteFeature
   # cart. Everything Snipcart — buttons, the cart, its settings and warnings,
   # SKU and price being required — asks this rather than store_enabled?.
   def snipcart_enabled?
+    return true if showing_everything?
+
     store_enabled? && SiteConfig.feature("store", "snipcart.enabled").to_s != "false"
   end
 
@@ -58,6 +82,7 @@ module SiteFeature
 
   # Payments enabled = members enabled AND payments.enabled in members.yml
   def payments_feature_enabled?
+    return true if showing_everything?
     return false unless members_enabled?
     SiteConfig.feature("members", "payments.enabled") == true
   end
@@ -134,6 +159,8 @@ module SiteFeature
   # ── Keys present (integration file has keys) ────────────────────────────
 
   def payments_enabled?
+    return true if showing_everything?
+
     payments_feature_enabled? && StripeConfig.current.keys_present?
   end
 
@@ -238,6 +265,7 @@ module SiteFeature
   # ── Payments mode / memberships / donations ─────────────────────────────
 
   def payments_mode
+    return "both" if showing_everything?
     return nil unless payments_feature_enabled?
     SiteConfig.feature("members", "payments.mode").presence || "memberships"
   end
@@ -261,6 +289,8 @@ module SiteFeature
   # Memberships are set up AND Stripe is connected, i.e. someone could pay
   # today. Gate anything that offers a real transaction on this.
   def memberships_configured?
+    return true if showing_everything?
+
     memberships_enabled? && StripeConfig.current.keys_present?
   end
 

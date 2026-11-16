@@ -124,6 +124,35 @@ class Admin::ThemesController < Admin::BaseController
     @theme_content = File.read(@theme_file)
     @preview_id = "theme-#{@theme_name}"
     @suggested_copy_name = generate_unique_theme_name(@theme_name)
+    @theme_header = ThemeInspector.parse_header(@theme_file)
+    @theme_shipped = THEMES_DIR.join("#{@theme_name}.css").exist? &&
+                     ThemeInspector.status(bundled_path: THEMES_DIR.join("#{@theme_name}.css"), installed_path: @theme_file) != :custom
+    render layout: "theme_editor"
+  end
+
+  # SAVE AS… in the editor: the editor's text, saved or not, as a new theme
+  # file beside the original. The original is left as it was. The copy's
+  # header names it as its own theme, without the fingerprint, so the Themes
+  # page treats it as custom and an update never offers to replace it. It
+  # isn't made active; the editor opens it next.
+  def save_as
+    source = params[:id]
+    display_name = params[:name].to_s.gsub(/\s+/, " ").strip
+    slug = display_name.parameterize
+
+    error = if slug.blank?
+      "The name needs at least one letter or number."
+    elsif theme_css_path(USER_THEME_DIR, slug).exist? || theme_css_path(THEMES_DIR, slug).exist?
+      "There's already a theme called #{slug}.css. Choose another name."
+    end
+    return render(json: { error: error }, status: :unprocessable_entity) if error
+
+    based_on = ThemeInspector.parse_header(theme_css_path(USER_THEME_DIR, source))
+    FileUtils.mkdir_p(USER_THEME_DIR)
+    File.write(theme_css_path(USER_THEME_DIR, slug), variant_css(params[:content].to_s, display_name, based_on))
+    render json: { saved: true, name: slug, url: edit_admin_theme_path(slug) }
+  rescue => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   def update
@@ -147,7 +176,8 @@ class Admin::ThemesController < Admin::BaseController
         flash[:error] = "Failed to update theme: #{e.message}"
         @theme_name = theme_name
         @theme_content = params[:content]
-        render :edit
+        @theme_header = ThemeInspector.parse_header(theme_file)
+        render :edit, layout: "theme_editor"
       end
     end
   end
@@ -309,6 +339,36 @@ class Admin::ThemesController < Admin::BaseController
   end
 
   private
+
+  # <dir>/<name>.css, with any folders stripped from the name. A theme
+  # name arrives in the URL, where an encoded `..%2F` would otherwise reach
+  # outside the theme folder.
+  def theme_css_path(dir, name)
+    dir.join("#{File.basename(name.to_s)}.css")
+  end
+
+  # A SAVE AS… copy's text: the header comment, when it's Roe's THEME INFO
+  # one, is replaced with one naming the new theme. No fingerprint and a new
+  # name, so ShippedFileInspector reads it as custom. Anything else in the
+  # file is kept as written.
+  # COPY: the header written into a SAVE AS… copy
+  def variant_css(css, display_name, based_on)
+    header = <<~CSS.chomp
+      /* ==== THEME INFO ====
+         Roe Theme: #{display_name}
+         Version: 1.0.0
+      #{"   Based on: #{based_on.name} #{based_on.version}\n" if based_on&.name}
+         Made with SAVE AS… in the theme editor. It's your theme: Roe
+         never updates or replaces it.
+      */
+    CSS
+    header = header.gsub(/\n\n+/, "\n\n")
+    if css.match?(%r{\A\s*/\* =+ THEME INFO})
+      css.sub(%r{\A\s*/\*.*?\*/}m, header)
+    else
+      "#{header}\n\n#{css}"
+    end
+  end
 
   # Save the site's copy of a script beside it before an update replaces it:
   # search.js → search-v1.0.0.js (or a date when there's no version).

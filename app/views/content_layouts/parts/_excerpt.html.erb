@@ -1,0 +1,5 @@
+<%# The record's excerpt (`excerpt:`), as written. Nothing when it has none. %>
+<% excerpt = record.metadata["excerpt"].to_s.strip %>
+<% if excerpt.present? %>
+  <p class="<%= kind %>-excerpt"><%= excerpt %></p>
+<% end %>

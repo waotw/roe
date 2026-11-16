@@ -1,0 +1,11 @@
+<%# One pending file: click to open the change the next sync makes to it,
+    click again to close (history_panel_controller.js). %>
+<% frame = "pending_#{side}_#{Digest::SHA1.hexdigest(path)[0, 12]}" %>
+<li data-controller="history-panel">
+  <%= link_to admin_site_sync_pending_change_path(path: path, side: side, change: action, frame: frame),
+        data: { turbo_frame: frame, history_panel_target: "link", action: "history-panel#toggle" },
+        aria: { expanded: false }, class: "inline-flex items-center gap-1.5 hover:text-amber-950 hover:underline" do %>
+    <span class="transition-transform" data-arrow>▸</span><span><%= path %></span>
+  <% end %>
+  <%= turbo_frame_tag frame, data: { history_panel_target: "frame" } %>
+</li>

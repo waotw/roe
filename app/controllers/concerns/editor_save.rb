@@ -42,7 +42,8 @@ module EditorSave
             saved:         true,
             reload:        false,
             url_name:      record.url_name,
-            metadata_html: (render_metadata_panel(saved_yaml, resource_type, record) if changed)
+            metadata_html: (render_metadata_panel(saved_yaml, resource_type, record) if changed),
+            issues_html:   render_editor_issues(resource_type, record)
           }
         end
       end
@@ -56,6 +57,13 @@ module EditorSave
       format.html { redirect_to edit_path }
       format.json { render json: { saved: true, reload: true, url: edit_path } }
     end
+  end
+
+  # The issues box above the editor (admin/<type>s/_issues), drawn from the
+  # saved record, so it appears and goes on a save that doesn't reload.
+  def render_editor_issues(resource_type, record)
+    render_to_string(partial: "admin/#{resource_type.pluralize}/issues",
+                     locals: { resource_type.to_sym => record }, formats: [ :html ])
   end
 
   def editor_save_needs_reload?(record, status_before)

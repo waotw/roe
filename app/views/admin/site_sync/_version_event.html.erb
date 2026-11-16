@@ -1,0 +1,60 @@
+<%# One event from the version store. A sync shows what it moved each way;
+    click a file to open it below the columns. A rewind or restore is a
+    smaller entry listing the files it put back. Only the newest sync that
+    hasn't been rewound gets REWIND (SiteSync::Rewind.candidate). %>
+<% frame     = "event_#{event[:id]}_panel" %>
+<% kind      = event[:kind] %>
+<% compact   = %w[rewind restore].include?(kind) %>
+<% rewound   = event[:rewound_by] %>
+<% rewound_at = rewound && times[rewound] %>
+<div class="bg-white border border-gray-300 rounded-xs overflow-hidden font-mono <%= 'opacity-60' if rewound %>" id="event_<%= event[:id] %>"
+     data-controller="history-panel">
+  <div class="px-4 py-2.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-sm font-semibold text-gray-900"><%= sync_time(event[:at]) %></span>
+      <span class="text-xs uppercase text-gray-500"><%= kind %></span>
+      <% if rewound %>
+        <span class="inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">REWOUND<%= " #{sync_time(rewound_at).upcase}" if rewound_at %></span>
+      <% end %>
+      <% if event[:outcome] == "failed" %>
+        <span class="inline-flex bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Stopped partway</span>
+      <% end %>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-gray-500"><%= event[:changes].size %> file<%= "s" if event[:changes].size != 1 %></span>
+      <% if rewindable %>
+        <%= link_to "REWIND", admin_site_sync_rewind_path(event[:id]), class: history_button_class %>
+      <% end %>
+    </div>
+  </div>
+
+  <% if compact %>
+    <% if kind == "rewind" && (undone = times[event[:undoes]]) %>
+      <p class="px-4 pt-2 text-xs text-gray-600 font-sans">Rewound the <%= sync_time(undone) %> sync.</p>
+    <% end %>
+    <div class="py-1.5">
+      <% event[:changes].each do |c| %>
+        <div class="flex items-center">
+          <span class="pl-4 w-16 shrink-0 text-[10px] uppercase text-gray-400"><%= change_side(c) %></span>
+          <div class="flex-1 min-w-0"><%= render "change_link", change: c, frame: frame %></div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <% to_live  = event[:changes].select { |c| c[:direction] == "to_live" } %>
+    <% to_local = event[:changes].select { |c| c[:direction] == "to_local" } %>
+    <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
+      <% [ [ "↑ LOCAL TO LIVE", to_live, "Nothing sent." ], [ "↓ LIVE TO LOCAL", to_local, "Nothing came down." ] ].each do |title, rows, empty| %>
+        <div class="pb-2">
+          <p class="px-4 pt-2 pb-1 text-xs font-bold text-gray-500"><%= title %> · <%= rows.size %></p>
+          <% if rows.empty? %>
+            <p class="px-4 py-1 text-xs text-gray-400 font-sans"><%= empty %></p>
+          <% end %>
+          <% rows.each do |c| %><%= render "change_link", change: c, frame: frame %><% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= turbo_frame_tag frame, data: { history_panel_target: "frame" } %>
+</div>

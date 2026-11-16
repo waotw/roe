@@ -41,12 +41,16 @@ module SiteSync
       # tidy: true pushes even with nothing in the diff, so the purge below
       # still reaches live (SiteSyncTransferJob passes it when live holds
       # video files this computer keeps).
-      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false)
+      # `root:` sends from another folder laid out like /site — a rewind's
+      # saved versions. Nothing else rides along with it.
+      def push_local_to_live!(diff: nil, on_progress: nil, tidy: false, root: nil)
         Rails.logger.info "[SiteSync::HttpTransport] push over HTTP → #{Exchange.peer_url}"
         diff ||= full_diff_for_push
         changed = changed_files(diff)
         deleted = Array(diff[:deleted])
         return if changed.empty? && deleted.empty? && !tidy
+
+        site_root = root || RoeSitePaths::SITE_PATH
 
         # Roe's docs when the setting says local-only. Not part of the diff —
         # both sides exclude them from their manifests, so neither can see what
@@ -58,20 +62,20 @@ module SiteSync
         #
         # Deliberately quiet — the docs ship with Roe, so this can't lose
         # anything, and the setting is the instruction.
-        purge = Ledger.roe_docs_to_purge
+        purge = root ? [] : Ledger.roe_docs_to_purge
         # Video files the live-video setting keeps on this computer — the
         # same reasoning: live can't be asked what it still has (they're out
         # of scope on this side), every one is a file here, and the setting
         # is the instruction. Never part of the diff, so never backed up from
         # live first or listed as a deletion to confirm.
-        video_purge = LiveVideo.to_purge
+        video_purge = root ? [] : LiveVideo.to_purge
         purge += video_purge
         deleted += purge
 
         total = changed.size
         # Bytes as well as files: one 1 GB video is one "file", so a file
         # count alone sits at 0 of 5 for ten minutes and looks stuck.
-        sizes = changed.to_h { |rel| [ rel, File.size?(File.join(RoeSitePaths::SITE_PATH, rel)).to_i ] }
+        sizes = changed.to_h { |rel| [ rel, File.size?(File.join(site_root, rel)).to_i ] }
         bytes_total = sizes.values.sum
         bytes_done  = 0
         done = 0
@@ -89,7 +93,7 @@ module SiteSync
         large, small = changed.partition { |rel| sizes[rel] > PUSH_BATCH_MAX_BYTES }
         large.each do |rel|
           begin
-            Exchange.upload_large_file(rel, on_bytes: ->(sent) { report.call(bytes_done + sent, current: rel) })
+            Exchange.upload_large_file(rel, root: site_root, on_bytes: ->(sent) { report.call(bytes_done + sent, current: rel) })
           rescue Exchange::ChunkedUploadError => e
             raise HttpTransportError, e.message
           end
@@ -104,14 +108,14 @@ module SiteSync
         # independently (transient network blips), peer writes are atomic, and
         # a fresh push recomputes its diff against the peer's current state — so
         # a re-run skips what already landed and converges without corruption.
-        batches = batch_paths(small)
+        batches = batch_paths(small, root: site_root)
         batches << [] if batches.empty? # deletions-only push still needs a call
         last = batches.length - 1
 
         batches.each_with_index do |paths, i|
           # Per-file size+mtime so the peer can restore mtimes after unpack.
-          manifest = Ledger.current.slice(*paths)
-          archive  = TarArchive.pack(root: RoeSitePaths::SITE_PATH, paths: paths)
+          manifest = root ? manifest_of(site_root, paths) : Ledger.current.slice(*paths)
+          archive  = TarArchive.pack(root: site_root, paths: paths)
           del      = (i == last) ? deleted : []
 
           Exchange.with_retries(label: "upload batch #{i + 1}/#{batches.length}") do
@@ -315,8 +319,17 @@ module SiteSync
         batches
       end
 
-      def batch_paths(paths)
-        batch_by_size(paths) { |rel| File.size?(File.join(RoeSitePaths::SITE_PATH, rel)) }
+      def batch_paths(paths, root: RoeSitePaths::SITE_PATH)
+        batch_by_size(paths) { |rel| File.size?(File.join(root, rel)) }
+      end
+
+      # Size and modified time of each path under `root`, shaped like a
+      # Ledger manifest, so live stamps each file with that time.
+      def manifest_of(root, paths)
+        paths.to_h do |rel|
+          stat = File.stat(File.join(root, rel))
+          [ rel, { "size" => stat.size, "mtime" => stat.mtime.to_i } ]
+        end
       end
 
       # Full push with no precomputed diff: diff local against the peer's

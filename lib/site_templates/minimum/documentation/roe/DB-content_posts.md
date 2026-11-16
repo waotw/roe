@@ -155,7 +155,7 @@ Switching a post to `post_type: music` adds these properties to the editor.
 
 You don't have to set up a release first. Roe creates one called `singles` when you enable the Music feature, so a one-off track works straight away.
 
-A track with no `image` of its own uses the cover are from the release in the player. [Settings → Music](/documentation/roe/settings-music) covers defining releases and what each one can set.
+A track with no `image` of its own uses the cover art from the release in the player. [Settings → Music](/documentation/roe/settings-music) covers defining releases and what each one can set.
 
 ### Credits and codes
 
@@ -172,7 +172,7 @@ These live with the track, because they describe this recording:
 
 ### Showing a release
 
-Use a [collection](/documentation/roe/collections) filtered by `release:`, and order it by `track_number` to get the running order. The [`playlist` template](/documentation/roe/collections_templates#when-to-use-the-playlist-template) lays those out as a track list with a player at the top.
+Add `release:` to a page to make it the release's page, with the cover, artist, a player and every track: see [Release and Podcast Pages](/documentation/roe/pages#release-and-podcast-pages). Anywhere else, use a [player card](/documentation/roe/cards#player) and a [collection](/documentation/roe/collections) filtered by `release:` and ordered by `track_number`, with the [`playlist` template](/documentation/roe/collections_templates#when-to-use-the-playlist-template).
 
 A release can also be published as a podcast feed, which is a tick box in [Settings → Music](/documentation/roe/settings-music#releasing-music-as-a-podcast-feed).
 

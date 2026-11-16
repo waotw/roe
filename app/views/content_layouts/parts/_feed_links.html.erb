@@ -1,0 +1,36 @@
+<%# RSS links for this post's feed: the show's for an episode, the release's
+    for a track that has one, the site's for articles and newsletters. The
+    paid feed only for admins and paid, active members. Nothing when there's
+    no feed. %>
+<% if kind == "post" %>
+  <% links = capture do %>
+    <% if record.post_type == "podcast" && record.metadata["podcast"].present? %>
+      <% key = record.metadata["podcast"] %>
+      <%# Same rule the feed itself uses — a paid show with free episodes
+          has a public feed, so it gets a link. %>
+      <% if authenticated? || PodcastConfig.public_feed?(key) %>
+        <a href="/podcast/<%= key %>.xml" class="feed-link" target="_blank" title="RSS Feed">RSS</a>
+      <% end %>
+      <% if authenticated? %>
+        <a href="/podcast/<%= key %>/private.xml" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+      <% elsif current_member&.paid? && current_member&.active? %>
+        <a href="/podcast/<%= key %>/private.xml?token=<%= current_member.media_token %>" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+      <% end %>
+    <% elsif record.post_type == "music" && ReleaseConfig.feed_enabled?(record.metadata["release"]) %>
+      <% release_key = record.metadata["release"] %>
+      <% if authenticated? || !ReleaseFeed.new(release_key).paid? %>
+        <a href="/music/<%= release_key %>.xml" class="feed-link" target="_blank" title="RSS Feed">RSS</a>
+      <% end %>
+      <% if authenticated? %>
+        <a href="/music/<%= release_key %>/private.xml" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+      <% elsif current_member&.paid? && current_member&.active? %>
+        <a href="/music/<%= release_key %>/private.xml?token=<%= current_member.media_token %>" class="feed-link feed-link-private" target="_blank" title="Private RSS Feed (Paid)">RSS (Paid)</a>
+      <% end %>
+    <% elsif record.post_type.in?(%w[newsletter article]) %>
+      <a href="/feed.xml" class="feed-link" target="_blank" title="RSS Feed">RSS</a>
+    <% end %>
+  <% end %>
+  <% if links.present? %>
+    <div class="feed-links"><%= links %></div>
+  <% end %>
+<% end %>

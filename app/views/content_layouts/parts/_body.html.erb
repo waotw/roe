@@ -1,0 +1,21 @@
+<%# The record's own writing. The show page wraps the whole layout in
+    .content, so Markdown styles reach the boxes around it too; this wrapper
+    names the writing alone (.post-content, .page-content,
+    .documentation-content). A product's writing has none: the product grid
+    styles .content's direct children. %>
+<% case kind %>
+<% when "post" %>
+  <div class="post-content">
+    <%= render_post_content(record) %>
+  </div>
+<% when "page" %>
+  <div class="page-content">
+    <%= render_page_content(record, context: context[:page_context]).html_safe %>
+  </div>
+<% when "product" %>
+  <%= product_content(record) %>
+<% when "documentation" %>
+  <div class="documentation-content">
+    <%= record.to_html(static: @static_generation) %>
+  </div>
+<% end %>

@@ -1,0 +1,11 @@
+<%# The `playlist` collection for the podcast or release this post belongs
+    to, or this page is connected to (`podcast:` / `release:`): the same as
+    writing the collection. A [player] (or a player card) plays it — the
+    first playlist after the player, else the first on the page. Episodic
+    shows run newest first, serial shows oldest first, releases in track
+    order. Folded on a post, open on a page. Only for two or more. Skipped
+    when the body has a playlist of its own. %>
+<% connected = kind == "post" ? record.post_type.in?(%w[podcast music]) : kind == "page" %>
+<% if connected && (playlist = record.series_playlist_html).present? %>
+  <%= playlist.html_safe %>
+<% end %>

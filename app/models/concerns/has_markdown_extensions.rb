@@ -289,7 +289,19 @@ module HasMarkdownExtensions
   # same card, drawn with no options, so it plays the post's own audio or
   # video, titled and with artwork from the post: what an author gets by
   # adding the card themselves, which is where players are heading.
+
   def template_player_card_html
+    # A podcast with video and audio shows the video, as its page always has.
+    config = { type: "player" }
+    config[:video] = video.to_s.strip if respond_to?(:template_player_kind) && template_player_kind == :video
+    render_player_card(config).html_safe
+  end
+
+  # A music or podcast page's player (`release:` / `podcast:`): the card with
+  # nothing of its own to play, which plays the playlist after it on the
+  # page. Empty when the theme can't draw the player; each track then plays
+  # by itself.
+  def series_player_card_html
     render_player_card({ type: "player" }).html_safe
   end
 
@@ -1897,18 +1909,12 @@ module HasMarkdownExtensions
     %Q(<nav class="collection-nav"#{aria}>\n#{list}\n</nav>)
   end
 
-  # A single-player playlist over a collection of audio posts — music tracks or
-  # podcast episodes. The template emits every element and its DOM order; the
-  # theme's CSS controls the entire look (symbols, layout, type). Structure:
-  # header (cover/title/artist) ▸ now-playing ▸ transport (toggle/times/playhead)
-  # ▸ the track list. Each row also carries a native <audio controls> as the
-  # no-JS fallback; player.js hides those (adds .is-enhanced) and drives one
-  # active track through the transport, auto-advancing on end.
-  # The track/episode list on its own — `template: playlist`. Each row is a
-  # native <audio controls> (no-JS fallback) plus data attributes (title, image,
-  # url; audio via the <audio> src) so a `player` can adopt it as its queue.
-  # This is the list half of the old combined player; the transport is the
-  # `player` card.
+  # The track/episode list — `template: playlist`, and the layout's
+  # [playlist]. It only lists; a `player` card on the page plays it
+  # (player.js adopts the first playlist after the player). Each row carries
+  # what the player needs (title, image, url; the file in a hidden <audio>,
+  # which older player.js copies read). With no player, each row is a link
+  # to its post with ?play, which starts that post's player.
   def render_playlist(items, config)
     tracks = items.select do |item|
       item.respond_to?(:audio) && item.audio.to_s.strip.present?
@@ -1921,7 +1927,11 @@ module HasMarkdownExtensions
       # but 403s reads as a broken player.
       paid   = playlist_track_paid?(item)
       title  = ERB::Util.html_escape(item.title.presence || "Untitled")
-      number = ERB::Util.html_escape(player_track_number(item).presence || (i + 1).to_s)
+      # Blank without a number of its own: a position would read as one,
+      # and a blank says the episode or track needs its number.
+      number = ERB::Util.html_escape(player_episode_label(item).presence || player_track_number(item).presence || "")
+      episode = ERB::Util.html_escape(player_episode_label(item))
+      current = respond_to?(:url_name) && item.respond_to?(:url_name) && item.url_name == url_name && item.class == self.class
       audio  = ERB::Util.html_escape(item.audio.to_s.strip)
       image  = ERB::Util.html_escape(player_item_image(item))
       url    = ERB::Util.html_escape(item_path(item))
@@ -1931,19 +1941,52 @@ module HasMarkdownExtensions
       lock = paid ? paid_lock_icon : ""
 
       <<~HTML
-        <li class="player-track#{paid ? ' is-paid' : ''}" data-player-track data-paid="#{paid}" data-title="#{title}" data-image="#{image}" data-url="#{url}">
+        <li class="player-track#{paid ? ' is-paid' : ''}#{current ? ' is-current' : ''}" data-player-track data-paid="#{paid}" data-title="#{title}" data-episode="#{episode}" data-image="#{image}" data-url="#{url}"#{current ? ' aria-current="true"' : ''}>
           <div class="player-track-meta" data-player-select>
             <span class="player-track-number">#{number}</span>
             <span class="player-track-title">#{title}#{lock}</span>
-            <a class="player-track-link" href="#{url}" target="_blank" rel="noopener" aria-label="Open #{title}"></a>
+            <a class="player-track-link" href="#{url}?play" aria-label="Open #{title}"></a>
             #{dur_html}
           </div>
-          <audio class="player-track-audio" controls preload="none" src="#{audio}"></audio>
+          <audio class="player-track-audio" preload="none" src="#{audio}" hidden></audio>
         </li>
       HTML
     end.join
 
-    %Q(<ol class="player-tracks" data-playlist>\n#{rows}</ol>)
+    list = %Q(<ol class="player-tracks" data-playlist>\n#{rows}</ol>)
+    return list if tracks.empty?
+
+    # It folds away under "Tracks [9]" / "Episodes [9]". `fold: true` starts
+    # it folded, `false` open. Without either, a music or podcast post's is
+    # folded (the post is about its own track or episode) and anywhere else,
+    # like a release's or podcast's page, it's open.
+    folded = collection_truthy?(config[:fold],
+      default: is_a?(Post) && respond_to?(:post_type) && post_type.in?(%w[music podcast]))
+    noun = tracks.all? { |t| t.respond_to?(:post_type) && t.post_type == "podcast" } ? "Episodes" : "Tracks"
+    series = playlist_series_title(tracks)
+    # Plain text around the name, so a theme that doesn't know the class
+    # still reads "Tracks [2] - Soft Sphinx Energy". The class says what it
+    # names: player-playlist-release or player-playlist-podcast.
+    named = series ? %( - <span class="player-playlist-#{series[:kind]}">#{ERB::Util.html_escape(series[:title])}</span>) : ""
+    %(<details class="player-playlist"#{folded ? "" : " open"}><summary>#{noun} <span class="player-playlist-count">#{tracks.size}</span>#{named}</summary>\n#{list}</details>)
+  end
+
+  # The release's or podcast's title when every track comes from the same
+  # one, as { kind:, title: }, else nil: a list that mixes releases, podcasts,
+  # or the two has no one name.
+  def playlist_series_title(tracks)
+    keys = tracks.map do |t|
+      next unless t.respond_to?(:post_type) && t.respond_to?(:metadata)
+      field = { "music" => "release", "podcast" => "podcast" }[t.post_type]
+      key = field && t.metadata[field].to_s.strip.presence
+      key && [ field, key ]
+    end
+    return nil if keys.empty? || keys.include?(nil) || keys.uniq.size != 1
+
+    kind, key = keys.first
+    config = kind == "release" ? ReleaseConfig.get(key) : PodcastConfig.get(key)
+    title = config.to_h["title"].to_s.strip.presence
+    title && { kind: kind, title: title }
   end
 
   # The release/podcast cover for the player — the artwork fallback when a track
@@ -2001,9 +2044,12 @@ module HasMarkdownExtensions
   # rendered as the browser's own <audio controls> with Roe's transport hidden
   # ([data-player-ui]), and site_js/player.js swaps them when it loads — so a
   # static host, or a page where the script doesn't run, still plays. The list
-  # is a separate `playlist` collection the transport adopts.
+  # is a `playlist` collection the transport adopts: the first one after it on
+  # the page, else the first on the page.
   def render_player_card(config, preview: false)
-    audio_src = config[:audio].presence || (respond_to?(:audio) ? audio.to_s.strip.presence : nil)
+    # A card naming only a video plays that video, not the post's audio.
+    own_audio = config[:video].blank? && respond_to?(:audio) ? audio.to_s.strip.presence : nil
+    audio_src = config[:audio].presence || own_audio
     video_src = config[:video].presence || (respond_to?(:video) ? video.to_s.strip.presence : nil)
 
     if audio_src.blank? && video_src.present?
@@ -2015,7 +2061,7 @@ module HasMarkdownExtensions
         partial: "shared/video_player",
         locals: { src: video_src, label: label, extra_class: "player-video" }
       )
-      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}</div>)
+      return %Q(<div class="card-player card-player-video">#{video}#{player_duration_html(config)}#{player_extras_html(config)}</div>)
     end
 
     card_title  = config[:title].presence || (respond_to?(:title) ? title.to_s : "")
@@ -2031,6 +2077,24 @@ module HasMarkdownExtensions
       else
         ""
       end
+
+    # A theme with no player styles would draw an invisible play button, so
+    # the card is the browser's own controls there (PlayerThemeCheck). No
+    # data-player, so player.js leaves it alone whatever its version. With
+    # nothing of its own to play there's nothing to show: a playlist's rows
+    # each play by themselves.
+    unless PlayerThemeCheck.styled?
+      return "" if audio_src.blank?
+      return <<~HTML
+        <div class="card-player card-player-plain">
+          <div class="player-now">#{player_episode_label_html(config)}<span class="player-now-title">#{title_html}</span></div>
+          <audio class="player-native" controls preload="metadata">#{sources_html}</audio>
+          #{player_duration_html(config)}
+          #{player_chapters_html(config)}
+          #{player_extras_html(config)}
+        </div>
+      HTML
+    end
 
     show_artwork = config[:show_artwork].to_s.strip.downcase != "false"
     cover        = player_cover(config)
@@ -2055,12 +2119,14 @@ module HasMarkdownExtensions
           #{figure_html}
           <div class="player-main">
             <div class="player-now">
-              <span class="player-now-title" data-player-part="title">#{title_html}</span>
+              #{player_episode_label_html(config)}<span class="player-now-title" data-player-part="title">#{title_html}</span>
               <a class="player-now-link" data-player-info href="#{info_url}" target="_blank" rel="noopener" hidden>[info]</a>
             </div>
             <audio class="player-native" data-player-part="media" controls preload="metadata"#{native_hidden}>#{sources_html}</audio>
             <div class="player-transport" data-player-ui hidden>
+              <button type="button" class="player-prev" data-player-part="prev" aria-label="Previous" disabled hidden></button>
               <button type="button" class="player-toggle" data-player-part="play" data-playing="false" aria-label="Play"></button>
+              <button type="button" class="player-next" data-player-part="next" aria-label="Next" disabled hidden></button>
               <span class="player-time player-time-current" data-player-part="current">0:00</span>
               <div class="player-progress" data-player-part="progress" role="slider" aria-label="Seek" tabindex="0">
                 <div class="player-progress-fill" data-player-part="fill"></div>
@@ -2072,8 +2138,135 @@ module HasMarkdownExtensions
           </div>
         </div>
         #{player_duration_html(config)}
+        #{player_chapters_html(config)}
+        #{player_extras_html(config)}
       </div>
     HTML
+  end
+
+  # Under the transport: ⏮ ⏭ to the episodes or tracks either side. A
+  # playlist on the page does the same job, so player.js hides them once it
+  # adopts one.
+  def player_extras_html(config)
+    player_series_nav_html(config)
+  end
+
+  # Does the card play this post's own audio or video? A card with neither
+  # set does; one naming another file is extra, and the post's episode
+  # label, chapters and neighbours aren't about it.
+  def playing_own_media?(config)
+    return false unless is_a?(Post)
+    sources = [ config[:audio], config[:video] ].map(&:to_s).map(&:strip).reject(&:blank?)
+    sources.empty? || sources.any? { |src| own_media?(src) }
+  end
+
+  # S1E10 before the title: a podcast episode's season and number, when it
+  # has a number (a season alone says nothing about which episode).
+  def player_episode_label_html(config)
+    label = playing_own_media?(config) ? player_episode_label(self) : ""
+    return "" if label.blank?
+    %(<span class="player-now-episode" data-player-part="episode">#{ERB::Util.html_escape(label)}</span> )
+  end
+
+  # "S1E10", "E10", or "" — for a podcast episode only.
+  def player_episode_label(item)
+    return "" unless item.respond_to?(:metadata) && item.metadata["post_type"] == "podcast"
+    number = item.metadata["episode_number"].to_s.strip
+    return "" if number.blank?
+    season = item.metadata["season"].to_s.strip
+    season.present? ? "S#{season}E#{number}" : "E#{number}"
+  end
+
+  # The episode's `chapters:` (time in seconds, title), written out so they
+  # read as a list of times without player.js; with it each one seeks.
+  # Only when the card plays the post's own audio.
+  def player_chapters_html(config)
+    return "" unless playing_own_media?(config)
+    chapters = Array(metadata["chapters"]).filter_map do |chapter|
+      next unless chapter.respond_to?(:[])
+      title = (chapter["title"] || chapter[:title]).to_s.strip
+      [ (chapter["time"] || chapter[:time]).to_f, title ] if title.present?
+    end
+    return "" if chapters.empty?
+
+    rows = chapters.map do |time, title|
+      %(<li class="chapter" data-player-chapter data-time="#{time}">) +
+        %(<span class="chapter-time">#{player_time_text(time)}</span> ) +
+        %(<span class="chapter-title">#{ERB::Util.html_escape(title)}</span></li>)
+    end.join
+
+    %(<details class="player-chapters" open><summary>Chapters</summary><ol class="chapter-list">#{rows}</ol></details>)
+  end
+
+  # 0:00 / 1:02:03, the same as player.js formatTime.
+  def player_time_text(seconds)
+    total = seconds.to_f.floor
+    total = 0 if total.negative?
+    hours, rest = total.divmod(3600)
+    minutes, secs = rest.divmod(60)
+    hours.positive? ? format("%d:%02d:%02d", hours, minutes, secs) : format("%d:%02d", minutes, secs)
+  end
+
+  public
+
+  # The layout's [playlist]: the `playlist` collection for this post's
+  # podcast or release, or a page's (`podcast:` / `release:`). The same
+  # markup as writing the collection, so the two look and behave alike. An
+  # episodic show runs newest first, a serial show oldest first, a release
+  # in track order. Empty for fewer than two entries.
+  def series_playlist_html
+    podcast_key = player_context_key("podcast")
+    release_key = player_context_key("release")
+    kind = is_a?(Post) ? post_type : (podcast_key ? "podcast" : "music")
+    key, field =
+      if kind == "podcast" && podcast_key then [ podcast_key, :podcast ]
+      elsif kind == "music" && release_key then [ release_key, :release ]
+      end
+    return "" unless key
+
+    order = default_playlist_order(kind, key)
+    config = { source: "posts", post_type: kind, field => key, template: "playlist",
+               limit: "all", order: order, show_unlisted: "true" }
+    items, total, warning = resolve_collection_items(config)
+    return "" if warning
+    count = items.count { |item| item.respond_to?(:audio) && item.audio.to_s.strip.present? }
+    return "" if count < 2
+
+    render_resolved_collection(config, items, total)
+  end
+
+  private
+
+  def default_playlist_order(kind, key)
+    return "track_number" if kind == "music"
+    PodcastConfig.get(key).to_h["type"].to_s.strip == "serial" ? "date-asc" : "date"
+  end
+
+  # ⏮ ⏭ under a player playing a podcast episode or a music track: links to
+  # the episode or track before and after it (Post#series_neighbours). Only
+  # when the card plays the post's own media — a card playing some other file
+  # isn't this episode's player — and nothing when there's no neighbour.
+  def player_series_nav_html(config)
+    return "" unless is_a?(Post) && post_type.in?(%w[podcast music])
+
+    sources = [ config[:audio], config[:video] ].map(&:to_s).map(&:strip).reject(&:blank?)
+    return "" unless sources.empty? || sources.any? { |src| own_media?(src) }
+
+    previous, following = series_neighbours
+    return "" unless previous || following
+
+    noun = post_type == "music" ? "track" : "episode"
+    link = lambda do |item, rel, label|
+      return "" unless item
+      %(<a class="player-series-#{rel}" rel="#{rel}" href="#{ERB::Util.html_escape(item_path(item))}">) +
+        %(<span class="player-series-label">#{label}</span><br> ) +
+        %(<span class="player-series-title">#{ERB::Util.html_escape(item.title)}</span></a>)
+    end
+
+    %(<nav class="player-series" aria-label="#{noun.capitalize}s">) +
+      link.call(previous, "prev", "⏮ Prev") +
+      link.call(following, "next", "Next ⏭") +
+      "</nav>"
   end
 
   # `show_duration: true` — the length, under the player, before anything

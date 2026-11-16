@@ -1,0 +1,36 @@
+<%# The post's issues and notes, above the editor. Also sent back after every
+    background save (EditorSave#finish_editor_save, issues_html), so the box
+    appears and goes as the post changes, without a reload. %>
+<div id="editor-issues">
+  <% if post.needs_attention? %>
+    <div class="bg-red-50 border border-amber-400 px-3 py-2 mb-5 text-sm">
+      <strong class="text-amber-700">⚠ This post is published but has issues:</strong>
+      <ul class="list-disc ml-5 mt-1 text-amber-700">
+        <% post.missing_type_required_fields.each do |field| %>
+          <% next if field[:name].to_s == 'guid' %>
+          <li>Missing required field: <code><%= field[:name] %></code></li>
+        <% end %>
+        <% post.missing_site_gated_fields.each do |name| %>
+          <li>Missing required field: <code><%= name %></code></li>
+        <% end %>
+        <% post.missing_media_refs.each do |ref| %>
+          <li>File not found: <code><%= ref[:path] %></code> (<%= ref[:field] %>)</li>
+        <% end %>
+        <% if (orphan = post.invalid_podcast_reference) %>
+          <li>
+            Podcast <code><%= orphan %></code> doesn't exist in <code>podcast.yml</code>.
+            Pick a valid podcast in the metadata editor.
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <% if post.informational_notices.any? %>
+    <div class="bg-blue-50 border border-blue-300 px-3 py-2 mb-5 text-sm text-blue-800">
+      <% post.informational_notices.each do |note| %>
+        <p>ℹ︎ <%= note %></p>
+      <% end %>
+    </div>
+  <% end %>
+</div>

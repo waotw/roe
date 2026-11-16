@@ -159,6 +159,15 @@ class SiteConfig < ApplicationRecord
     content("auto_duration").to_s.strip.downcase != "false"
   end
 
+  # Content layouts (content.yml `content_layouts:`). Off unless set: every
+  # page uses Roe's default layouts and looks as it always has. On, the
+  # site's own layouts in site/layout/content/ and `layout:` take effect.
+  # Turning it off leaves those files alone, so turning it back on restores
+  # them as they were.
+  def self.content_layouts?
+    content("content_layouts").to_s.strip.downcase == "true"
+  end
+
   # Get default config (cards, collections)
   def self.default(type, key)
     current("defaults/#{type}")&.config&.[](key.to_s)

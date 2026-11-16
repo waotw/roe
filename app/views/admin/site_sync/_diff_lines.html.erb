@@ -1,0 +1,20 @@
+<%# from_text → to_text as a line diff, for the Site Sync file panels. %>
+<% lines = from_text && to_text && SiteSync::VersionPreview.diff(from_text, to_text) %>
+<% if from_text.nil? || to_text.nil? %>
+  <p class="text-xs text-gray-600 font-sans"><%= local_assigns[:missing_note] || "The other version wasn't kept or can't be shown, so there's nothing to compare. FILE shows this version." %></p>
+<% elsif lines.nil? %>
+  <p class="text-xs text-gray-600 font-sans">The two versions are too different to compare line by line. FILE shows this version.</p>
+<% elsif lines.empty? %>
+  <p class="text-xs text-gray-600 font-sans">No differences in the text.</p>
+<% else %>
+  <div class="max-h-96 overflow-auto border border-gray-200 bg-white text-[11px] leading-5">
+    <% lines.each do |line| %>
+      <% if line.kind == :gap %>
+        <div class="px-2 text-gray-400 bg-gray-50 select-none">…</div>
+      <% else %>
+        <% tone = { removed: "bg-red-50 text-red-800", added: "bg-green-50 text-green-800" }.fetch(line.kind, "text-gray-700") %>
+        <div class="flex <%= tone %>"><span class="w-8 shrink-0 pr-1 text-right text-gray-400 select-none"><%= line.old_no %></span><span class="w-8 shrink-0 pr-1 text-right text-gray-400 select-none"><%= line.new_no %></span><span class="w-4 shrink-0 select-none"><%= { removed: "-", added: "+" }[line.kind] %></span><span class="whitespace-pre"><%= line.text %></span></div>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

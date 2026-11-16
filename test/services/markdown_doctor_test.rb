@@ -332,6 +332,41 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     assert_not MarkdownDoctor.diagnose("1. a\n  1. b\n").first[:fixable]
   end
 
+  # From site/documentation/roe/DB-content_posts.md. Soft line breaks switch
+  # Roe to Kramdown's GFM parser, which nests bullets under a number at two
+  # spaces; plain kramdown folds them into the item's text. Each claim below is
+  # checked against the real renderer, so the rule can't drift from it.
+  SHALLOW_MIXED = "1. Click `NEW POST`\n  - Add `title` and choose a `post_type`.\n  - Fill in the properties\n2. Write content\n"
+
+  def rendered(content, gfm:)
+    Kramdown::Document.new(content, input: gfm ? "GFM" : "kramdown", hard_wrap: gfm).to_html
+  end
+
+  test "bullets two spaces under a number nest with GFM, so only kramdown is warned" do
+    assert_match %r{<li>Click <code>NEW POST</code>\s*<ul>}, rendered(SHALLOW_MIXED, gfm: true)
+    assert_no_match %r{<ul>}, rendered(SHALLOW_MIXED, gfm: false)
+
+    assert_empty MarkdownDoctor.diagnose(SHALLOW_MIXED, gfm: true)
+    assert_equal %i[list_indent_too_shallow list_indent_too_shallow],
+      MarkdownDoctor.diagnose(SHALLOW_MIXED, gfm: false).map { |i| i[:type] }
+  end
+
+  test "the same kind of list one space in stays a sibling with GFM too, and is still warned" do
+    content = "- a\n - b\n"
+    assert_no_match %r{<ul>\s*<li>b}, rendered(content, gfm: true).sub(/\A<ul>/, "")
+    assert_equal [ :list_indent_too_shallow ], MarkdownDoctor.diagnose(content, gfm: true).map { |i| i[:type] }
+  end
+
+  # From 0C-roe-application-commands.md: the list ends at a paragraph, so the
+  # fences after it break nothing, and the list further down is a new one.
+  test "a paragraph after a blank line ends the list; fences after it aren't breaking it" do
+    content = "- one\n- two\n\nA paragraph.\n\n```bash\nroe start\n```\n\nMore text.\n\n```\nroe start --all\n```\n\n- three\n"
+    [ true, false ].each do |gfm|
+      assert_equal 2, rendered(content, gfm: gfm).scan("<ul>").size, "two separate lists"
+      assert_empty MarkdownDoctor.diagnose(content, gfm: gfm), "gfm: #{gfm}"
+    end
+  end
+
   test "list nesting that works says nothing" do
     assert_empty MarkdownDoctor.diagnose("- a\n  - b\n")
     assert_empty MarkdownDoctor.diagnose("1. a\n   1. b\n")

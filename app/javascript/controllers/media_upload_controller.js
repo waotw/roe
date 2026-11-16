@@ -10,15 +10,8 @@ export default class extends Controller {
 
   connect() {
     this.token = document.querySelector('meta[name="csrf-token"]')?.content;
-    // Live-update any card whose variants are still processing on load, so the
-    // ⏳ badge isn't stuck until a manual refresh (cap to avoid a poll storm).
-    if (this.hasGridTarget) {
-      Array.from(
-        this.gridTarget.querySelectorAll('[data-variants-pending="true"]'),
-      )
-        .slice(0, 24)
-        .forEach((card) => this.watchVariants(card));
-    }
+    // Cards whose previews are still being made are polled by media-lazy
+    // once they're on screen (it calls watchVariants), not all at load.
   }
 
   // Bound to the file input's change event.
@@ -40,7 +33,10 @@ export default class extends Controller {
     if (progress) progress.startUpload(file.name);
 
     try {
-      const data = await this.postFile(file, progress ? (f) => progress.uploadProgress(f) : null);
+      const data = await this.postFile(
+        file,
+        progress ? (f) => progress.uploadProgress(f) : null,
+      );
       if (data && data.success) {
         this.resolvePlaceholder(placeholder, data.card_html, data.message);
         if (progress) {
@@ -84,7 +80,8 @@ export default class extends Controller {
       xhr.setRequestHeader("Accept", "application/json");
       xhr.setRequestHeader("X-CSRF-Token", this.token || "");
       if (onProgress) {
-        xhr.upload.onprogress = (e) => onProgress(e.lengthComputable ? e.loaded / e.total : null);
+        xhr.upload.onprogress = (e) =>
+          onProgress(e.lengthComputable ? e.loaded / e.total : null);
       }
       xhr.onload = () => {
         try {
@@ -93,7 +90,8 @@ export default class extends Controller {
           resolve({ success: false, error: "Upload failed." });
         }
       };
-      xhr.onerror = () => resolve({ success: false, error: "Upload failed — please try again." });
+      xhr.onerror = () =>
+        resolve({ success: false, error: "Upload failed — please try again." });
       xhr.send(body);
     });
   }
@@ -139,7 +137,10 @@ export default class extends Controller {
       ? this.element
       : this.element.querySelector('[data-controller~="media-filter"]');
     if (!host) return;
-    const filter = app.getControllerForElementAndIdentifier(host, "media-filter");
+    const filter = app.getControllerForElementAndIdentifier(
+      host,
+      "media-filter",
+    );
     if (filter && typeof filter.applyFilters === "function") {
       filter.applyFilters();
     }
@@ -185,7 +186,10 @@ export default class extends Controller {
   openFromCard(event) {
     const thumb = event.currentTarget.querySelector("[data-video-progress-id]");
     if (!thumb || thumb.dataset.videoState !== "optimizing") return;
-    this.openVideoProgress(thumb.dataset.videoProgressId, thumb.dataset.videoProgressName);
+    this.openVideoProgress(
+      thumb.dataset.videoProgressId,
+      thumb.dataset.videoProgressName,
+    );
   }
 
   // Poll the card endpoint while its variants are processing, swapping the
@@ -203,13 +207,19 @@ export default class extends Controller {
     const id = card.dataset.mediaId;
     if (!id) return;
     const video = card.dataset.mediaType === "video";
-    const interval = video ? 4000 : 1500;
-    const maxAttempts = video ? Infinity : 8;
+    // An image preview is usually ready in a second, but behind a queue of
+    // others (a page of new images, a just-deployed site) it can take
+    // minutes. Check often at first, then less often, for about four
+    // minutes; after that the box says there's no preview and offers a
+    // retry, rather than looking busy forever.
+    const interval = (n) =>
+      video ? 4000 : Math.min(1500 * 1.5 ** Math.max(n - 1, 0), 15000);
+    const maxAttempts = video ? Infinity : 22;
 
     let attempts = 0;
     const retry = () => {
       if (attempts < maxAttempts && document.contains(this.element)) {
-        setTimeout(poll, interval * 2);
+        setTimeout(poll, interval(attempts) * 2);
       }
     };
     const poll = () => {
@@ -234,19 +244,33 @@ export default class extends Controller {
             // type. Re-run the active filter so the swapped card obeys it.
             this.reapplyFilters();
           }
-          if (
-            data.pending &&
-            attempts < maxAttempts &&
-            document.contains(this.element)
-          ) {
-            setTimeout(poll, interval);
-          } else if (video && !data.pending) {
-            this.refreshNotices();
+          if (!data.pending) {
+            if (video) this.refreshNotices();
+          } else if (attempts >= maxAttempts) {
+            this.previewGaveUp(fresh || current);
+          } else if (document.contains(this.element)) {
+            setTimeout(poll, interval(attempts));
           }
         })
         .catch(retry);
     };
-    setTimeout(poll, interval);
+    setTimeout(poll, interval(0));
+  }
+
+  // The preview box of a card whose preview never arrived. Retrying polls
+  // the card again, which queues the preview again (MediumController#card).
+  previewGaveUp(card) {
+    const box = card?.querySelector("[data-preview-box]");
+    if (!box) return;
+    box.innerHTML = `no preview <button type="button" class="underline hover:text-gray-700" data-action="click->media-upload#retryPreview">retry</button>`;
+  }
+
+  retryPreview(event) {
+    event.stopPropagation();
+    const card = event.target.closest("[data-media-id]");
+    const box = card?.querySelector("[data-preview-box]");
+    if (box) box.textContent = "preview…";
+    this.watchVariants(card);
   }
 
   errorPlaceholder(placeholder, name, error) {

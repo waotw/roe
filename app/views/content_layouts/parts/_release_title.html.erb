@@ -1,0 +1,5 @@
+<%# A page connected to a release (`release: <key>`) leads with the
+    release's name. Nothing on any other page. %>
+<% if kind == "page" && (config = context[:release_config]).present? && config["title"].present? %>
+  <h1 class="release-page-title"><%= config["title"] %></h1>
+<% end %>

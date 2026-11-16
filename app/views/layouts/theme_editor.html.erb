@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for?(:title) ? yield(:title) : "Roe - Admin" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%# The theme editor fills the window: the code, the sections list and the
+        preview each scroll on their own, so the page itself never does. A
+        Turbo snapshot of it would bring back old text on Back, hence
+        no-cache. %>
+    <meta name="turbo-cache-control" content="no-cache">
+    <% if SiteConfig.get('favicon').present? %>
+      <link rel="icon" type="image/x-icon" href="<%= config_image_path(SiteConfig.get('favicon')) %>">
+    <% end %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+  <body class="bg-white h-screen overflow-hidden min-w-185.5">
+    <% if flash.any? %>
+      <% flash.each do |type, message| %>
+        <% next unless ['notice', 'alert', 'error', 'success', 'warning'].include?(type.to_s) %>
+        <div data-flash-message class="flash-floating <%= type %>" title="Click to dismiss">
+          <span class="flash-message"><%= message %></span>
+          <span class="flash-close" aria-hidden="true">×</span>
+        </div>
+      <% end %>
+    <% end %>
+    <%= yield %>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+post-header:
+  post-header-top: [title] [feed links]
+  [subtitle]
+  post-meta: [date] [artist]
+  [image]
+
+[player]
+[playlist]
+[body]

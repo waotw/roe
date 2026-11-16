@@ -2673,6 +2673,75 @@
         79
       ],
       "note": "Handled in the model. item.url comes from Snipcart's payload, so SnipcartOrder#items keeps it only when it matches LINKABLE_URL (http(s):// or a same-site path, not // or /\\); anything else, javascript: included, becomes nil and the view shows plain text. Tested in test/models/snipcart_order_test.rb and test/controllers/admin/orders_controller_test.rb. Brakeman can't see the model, so it still flags the view."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "cdfb8e8ea3f4d85e9a7ac9c3b8aca74fb4daa7964db57a622fd227d2d762ca7a",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/content_layouts_controller.rb",
+      "line": 54,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.delete(ContentLayout.site_path(params[:name].to_s))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ContentLayoutsController",
+        "method": "destroy"
+      },
+      "user_input": "ContentLayout.site_path(params[:name].to_s)",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": "The layout name is checked against ContentLayout::NAME_RE (letters, digits, - and _ only) in set_name before any file access, so it can't leave site/layout/content/ or lib/site_templates/layouts/content/."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "eb09eecc11b872be15faeaf5df7ac95eb4cd16715fdf226116b7457f23ffab42",
+      "check_name": "FileAccess",
+      "message": "Model attribute used in file name",
+      "file": "app/controllers/admin/content_layouts_controller.rb",
+      "line": 26,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "File.read((if File.file?(ContentLayout.site_path(params[:name].to_s)) then\n  ContentLayout.site_path(params[:name].to_s)\nelse\n  ContentLayout.roe_default_path(params[:name].to_s)\nend))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::ContentLayoutsController",
+        "method": "edit"
+      },
+      "user_input": "ContentLayout.site_path(params[:name].to_s)",
+      "confidence": "Medium",
+      "cwe_id": [
+        22
+      ],
+      "note": "The layout name is checked against ContentLayout::NAME_RE (letters, digits, - and _ only) in set_name before any file access, so it can't leave site/layout/content/ or lib/site_templates/layouts/content/."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "53589b9fd1e059a2bc5746453dbfc0f1fd772b7f267af8e7d09ad990bb5e1cae",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/site_sync_controller.rb",
+      "line": 371,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(SiteSync::VersionPreview.source((SiteSync::Versions.change(params[:id])[:before_sha] or SiteSync::Versions.change(params[:id])[:after_sha]), SiteSync::Versions.change(params[:id])[:path]), :filename => File.basename(SiteSync::Versions.change(params[:id])[:path]), :type => Rack::Mime.mime_type(File.extname(SiteSync::Versions.change(params[:id])[:path]), \"application/octet-stream\"), :disposition => (if params[:inline].present? and SiteSync::VersionPreview.image?(SiteSync::Versions.change(params[:id])[:path]) then\n  \"inline\"\nelse\n  \"attachment\"\nend))",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::SiteSyncController",
+        "method": "history_version"
+      },
+      "user_input": "params[:id]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "The path comes from SiteSync::VersionPreview.source: a stored object named by a validated SHA-256, or the /site file whose contents match that SHA. params[:id] only picks a recorded change; no request value reaches the path."
     }
   ],
   "brakeman_version": "8.1.0"

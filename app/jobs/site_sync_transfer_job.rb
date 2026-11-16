@@ -25,17 +25,21 @@ class SiteSyncTransferJob < ApplicationJob
   STEPS = {
     starting:            "Starting…",
     computing_diff:      "Computing what changed…",
-    backing_up_live:     "Backing up live (only the files about to change)…",
+    backing_up_live:     "Saving live versions about to change…",
     pushing_to_live:     "Pushing changed files to live…",
     pushing_to_live_full: "Pushing to live (full tree)…",
-    backing_up_local:    "Backing up local…",
+    backing_up_local:    "Saving local versions about to change…",
     pulling_from_live:   "Pulling changed files from live…",
     pulling_from_live_full: "Pulling from live (full tree)…",
     refreshing_baseline: "Refreshing sync baseline…",
     realigning_mtimes:   "Aligning file timestamps…",
     reconciling_content: "Updating the database to match new files…",
     notifying_peer:      "Notifying peer to refresh its ledger…",
-    backing_up_database: "Backing up live database (encrypted)…"
+    backing_up_database: "Backing up live database (encrypted)…",
+    # SiteSyncRewindJob, which shares this status.
+    saving_versions:     "Saving the current versions…",
+    rewinding_live:      "Rewinding files on live…",
+    rewinding_local:     "Rewinding files on local…"
   }.freeze
 
   # Raised when the three-way reconcile finds files changed on BOTH sides
@@ -65,7 +69,9 @@ class SiteSyncTransferJob < ApplicationJob
     # What moved, in each direction, for the history log. Set by each
     # perform_* method so the record reflects what was actually planned.
     @to_live = @to_local = { modified: [], added: [], deleted: [] }
-    @local_snapshot = nil
+    # Every version this run replaces or deletes, saved before it's touched
+    # (SiteSync::Versions). Saving failing stops the run before the transfer.
+    @versions = SiteSync::Versions::Recorder.new
     update_step(:starting)
 
     case kind
@@ -102,6 +108,26 @@ class SiteSyncTransferJob < ApplicationJob
       ContentSync.sync_all if @pulled
     end
 
+    # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
+    # config file re-serialized by ContentSync) can leave a file byte-identical
+    # but with a fresher mtime — which the size+mtime drift check reads as a
+    # phantom "ledgers diverged" even though the content matches. Stamp the
+    # local mtime to the peer's for any such byte-identical file so the two
+    # fingerprints end genuinely equal and the sync finishes green. Only the
+    # side that can reach the peer runs this (production never initiates).
+    #
+    # This has to run before the peer refreshes its ledger below. The peer
+    # records a file as agreed only when our copy has the same size and
+    # mtime as its own; a byte-identical file with a different mtime is left
+    # out. When the realignment ran after, it fixed the mtime and our
+    # baseline, but the peer's baseline still lacked the file, so live
+    # reported it as "added" and the page asked to pull a file both sides
+    # already held.
+    if SiteSync::Exchange.can_call_peer?
+      update_step(:realigning_mtimes)
+      realign_phantom_mtimes!
+    end
+
     # Tell the peer to refresh its ledger too — for both push and
     # pull. The motivations differ slightly:
     #   - Push: peer's /site changed (we wrote to it). Without a
@@ -114,18 +140,6 @@ class SiteSyncTransferJob < ApplicationJob
     #     sides agree they're in sync now.
     update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
-
-    # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
-    # config file re-serialized by ContentSync) can leave a file byte-identical
-    # but with a fresher mtime — which the size+mtime drift check reads as a
-    # phantom "ledgers diverged" even though the content matches. Stamp the
-    # local mtime to the peer's for any such byte-identical file so the two
-    # fingerprints end genuinely equal and the sync finishes green. Only the
-    # side that can reach the peer runs this (production never initiates).
-    if SiteSync::Exchange.can_call_peer?
-      update_step(:realigning_mtimes)
-      realign_phantom_mtimes!
-    end
 
     # Phase ②: pull a fresh encrypted copy of the live database so the
     # local /site always carries a current, restorable DB blob. Distinct
@@ -151,6 +165,7 @@ class SiteSyncTransferJob < ApplicationJob
     )
 
     record_history(:completed)
+    @versions.finish!(kind: @kind, outcome: :completed, at: @started_at)
 
     # Once more, now that nothing else is going to touch /site.
     #
@@ -205,6 +220,10 @@ class SiteSyncTransferJob < ApplicationJob
     # UI an accurate picture instead of a generic "failed."
     reassessment = reassess_after_failure rescue nil
 
+    # Whatever this run saved before it failed is still worth keeping: it
+    # may be the only copy of what a half-finished transfer replaced.
+    @versions&.finish!(kind: @kind || kind, outcome: :failed, at: @started_at || Time.current)
+
     write_status(
       state:         :failed,
       kind:          kind,
@@ -242,7 +261,8 @@ class SiteSyncTransferJob < ApplicationJob
 
     files_to_back_up = diff[:added] + diff[:deleted]
     update_step(:backing_up_live)
-    SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
+    live_backup = SiteSync.transport.backup_live_to_local!(files: files_to_back_up, on_progress: progress_proc)
+    @versions.save_live!(files_to_back_up, from: live_backup, peer: @peer_manifest["files"], deleted: diff[:deleted])
 
     update_step(:pushing_to_live)
     SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
@@ -262,10 +282,11 @@ class SiteSyncTransferJob < ApplicationJob
       return
     end
 
-    # Local backup is fast (no network), so always do the full
-    # snapshot — it's a complete restore point.
+    # The local versions the pull replaces or deletes go into the version
+    # store. No full snapshot of /site: that's the Site Backups tab's job
+    # (BACK UP NOW), not every sync's.
     update_step(:backing_up_local)
-    @local_snapshot = SiteSync::BackupManager.create
+    @versions.save_local!(diff[:added] + diff[:deleted], deleted: diff[:deleted])
 
     update_step(:pulling_from_live)
     SiteSync.transport.pull_live_to_local!(diff: diff, on_progress: progress_proc)
@@ -294,7 +315,8 @@ class SiteSyncTransferJob < ApplicationJob
 
     if @pushed
       update_step(:backing_up_live)
-      SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
+      live_backup = SiteSync.transport.backup_live_to_local!(files: push_diff[:added] + push_diff[:deleted], on_progress: progress_proc)
+      @versions.save_live!(push_diff[:added] + push_diff[:deleted], from: live_backup, peer: @peer_manifest["files"], deleted: push_diff[:deleted])
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: push_diff, on_progress: progress_proc)
     elsif tidy_live?
@@ -304,7 +326,7 @@ class SiteSyncTransferJob < ApplicationJob
 
     if @pulled
       update_step(:backing_up_local)
-      @local_snapshot = SiteSync::BackupManager.create
+      @versions.save_local!(pull_diff[:added] + pull_diff[:deleted], deleted: pull_diff[:deleted])
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: pull_diff, on_progress: progress_proc)
     end
@@ -339,7 +361,8 @@ class SiteSyncTransferJob < ApplicationJob
     # pull the whole tree. On a fresh peer that's near-empty; on a retry it
     # shrinks as files converge (already-mirrored files leave the diff).
     update_step(:backing_up_live)
-    SiteSync.transport.backup_live_to_local!(files: diff[:modified] + diff[:deleted], on_progress: progress_proc)
+    live_backup = SiteSync.transport.backup_live_to_local!(files: diff[:modified] + diff[:deleted], on_progress: progress_proc)
+    @versions.save_live!(diff[:added] + diff[:modified] + diff[:deleted], from: live_backup, peer: peer["files"] || {}, deleted: diff[:deleted])
 
     update_step(:pushing_to_live_full)
     SiteSync.transport.push_local_to_live!(diff: diff, on_progress: progress_proc)
@@ -476,7 +499,6 @@ class SiteSyncTransferJob < ApplicationJob
       outcome:  outcome,
       to_live:  @to_live,
       to_local: @to_local,
-      snapshot: @local_snapshot,
       error:    error,
       at:       @started_at || Time.current
     )

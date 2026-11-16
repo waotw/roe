@@ -1,0 +1,154 @@
+<%# The reference bar is Roe's admin, drawn over the site in the site's own
+    layout. Its styles are scoped under #theme-reference-bar, an id, so they
+    win over the theme's element and class rules, and `all: revert` drops
+    whatever the theme set on the bar's elements first. It's fixed to the top
+    rather than in the page's flow: a theme with a sidebar lays body out as a
+    grid, and an extra child of body would take a grid cell. The page is
+    pushed down by the bar's height instead. %>
+<%# In the theme editor's preview (?in_editor=1) the editor's own page menu
+    does the bar's job, so the bar is left out. The script that stops sample
+    links and forms going anywhere is outside it and always runs. %>
+<% content_for :admin_bar do %>
+<% unless params[:in_editor].present? %>
+  <style>
+    #theme-reference-bar, #theme-reference-bar * { all: revert; box-sizing: border-box; }
+    #theme-reference-bar {
+      display: grid; align-items: center; gap: 4px 12px;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas: "start nav end";
+      padding: 6px 12px; background: #111827; color: #e5e7eb;
+      font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      text-transform: uppercase; letter-spacing: 0.02em;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+    }
+    html {
+      padding-top: var(--theme-reference-bar-height, 32px);
+      scroll-padding-top: var(--theme-reference-bar-height, 32px);
+    }
+    <%# The site's search and account icons, and the search panel they open,
+        sit at the top of the window too; move them down out from under the
+        bar. A margin, so the theme's own `top` still applies. Not `translate`
+        or `transform`: on .site-actions either one makes the search panel
+        inside it (position: fixed) place itself against .site-actions instead
+        of the window, and it lands in the wrong place. %>
+    .site-actions, .site-search-overlay { margin-top: var(--theme-reference-bar-height, 32px); }
+    #theme-reference-bar a { color: #e5e7eb; text-decoration: none; }
+    <%# One row when everything fits. When the tabs don't, two: back, label,
+        theme menu and EDIT CSS on top, the tabs under them, starting 8px left
+        so their text lines up with the back button's. The script below
+        switches between the two. %>
+    #theme-reference-bar.is-stacked {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-areas: "start end" "nav nav";
+    }
+    #theme-reference-bar .trb-start { grid-area: start; display: flex; align-items: center; gap: 12px; }
+    #theme-reference-bar .trb-label { color: #9ca3af; font-weight: bold; white-space: nowrap; }
+    #theme-reference-bar nav { grid-area: nav; display: flex; gap: 2px; overflow: hidden; }
+    #theme-reference-bar.is-stacked nav { flex-wrap: wrap; margin-left: -8px; }
+    #theme-reference-bar nav a { white-space: nowrap; }
+    #theme-reference-bar nav a { padding: 3px 8px; }
+    #theme-reference-bar nav a:hover { background: #374151; }
+    #theme-reference-bar nav a[aria-current="page"] { background: #fff; color: #111827; }
+    #theme-reference-bar .trb-end { grid-area: end; justify-self: end; display: flex; align-items: center; gap: 8px; }
+    #theme-reference-bar details { position: relative; }
+    #theme-reference-bar summary {
+      list-style: none; cursor: pointer; padding: 3px 8px;
+      background: #1f2937; border: 1px solid #4b5563; color: #f9fafb;
+    }
+    #theme-reference-bar summary::-webkit-details-marker { display: none; }
+    #theme-reference-bar details ul {
+      position: absolute; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px 0;
+      list-style: none; min-width: 220px; background: #fff; border: 1px solid #d1d5db;
+      box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+    }
+    #theme-reference-bar details li a { display: block; padding: 4px 10px; color: #111827; text-transform: none; }
+    #theme-reference-bar details li a:hover { background: #f3f4f6; }
+    #theme-reference-bar details li a[aria-current="true"] { background: #dbeafe; color: #1e3a8a; }
+    #theme-reference-bar .trb-button {
+      padding: 3px 8px; background: #bfdbfe; color: #111827; border: 1px solid #1f2937; white-space: nowrap;
+    }
+    #theme-reference-bar .trb-back { padding: 3px 8px; background: #111827; color: #bfdbfe; border: 1px solid #bfdbfe; white-space: nowrap; }
+    #theme-reference-bar summary { white-space: nowrap; }
+  </style>
+  <div id="theme-reference-bar">
+    <div class="trb-start">
+      <%# COPY: back button and bar label %>
+      <span class="trb-label">Theme reference</span>
+      <%= link_to "← Themes", admin_themes_path, class: "trb-back" %>
+    </div>
+    <div class="trb-end">
+      <% active = SiteConfig.get("theme.active") || "default" %>
+      <details>
+        <%# COPY: theme picker; "(active)" marks the site's active theme %>
+        <summary>Theme: <%= @reference_theme %>.css<%= " (active)" if @reference_theme == active %> ▾</summary>
+        <ul>
+          <% @reference_themes.each do |name| %>
+            <li>
+              <%= link_to "#{name}.css#{' (active)' if name == active}",
+                    admin_theme_reference_path(@reference_page.slug, preview_theme: (name == active ? nil : name)),
+                    "aria-current": (name == @reference_theme ? "true" : nil) %>
+            </li>
+          <% end %>
+        </ul>
+      </details>
+      <%# COPY: button %>
+      <%= link_to "Edit CSS", edit_admin_theme_path(@reference_theme), class: "trb-button" %>
+    </div>
+    <nav aria-label="Theme reference pages">
+      <% ThemeReference::PAGES.each do |entry| %>
+        <%= link_to entry.title,
+              admin_theme_reference_path(entry.slug, preview_theme: params[:preview_theme].presence),
+              "aria-current": (entry == @reference_page ? "page" : nil) %>
+      <% end %>
+    </nav>
+  </div>
+  <script nonce="<%= safe_csp_nonce %>">
+    (() => {
+      const bar = document.getElementById("theme-reference-bar");
+      const nav = bar.querySelector("nav");
+      const menu = bar.querySelector("details");
+      let width = 0;
+      const fit = () => {
+        // Try one row; stack when the tabs don't fit in it.
+        if (bar.clientWidth !== width) {
+          width = bar.clientWidth;
+          bar.classList.remove("is-stacked");
+          bar.classList.toggle("is-stacked", nav.scrollWidth > nav.clientWidth);
+        }
+        document.documentElement.style.setProperty("--theme-reference-bar-height", `${bar.offsetHeight}px`);
+      };
+      new ResizeObserver(fit).observe(bar);
+      fit();
+
+      // The theme menu closes on a click anywhere outside it, or on Escape.
+      document.addEventListener("click", (event) => {
+        if (menu.open && !menu.contains(event.target)) menu.open = false;
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && menu.open) {
+          menu.open = false;
+          menu.querySelector("summary").focus();
+        }
+      });
+    })();
+  </script>
+<% end %>
+  <%# Forms and buy buttons look real but do nothing here: a sign-up would
+      sign someone up, and Add to Cart would fill the real cart. Links to the
+      sample posts and products would 404, since those only exist while the
+      page renders. %>
+  <script nonce="<%= safe_csp_nonce %>">
+    window.addEventListener("submit", (event) => {
+      if (event.target.closest("main")) event.preventDefault();
+    }, true);
+    window.addEventListener("click", (event) => {
+      const el = event.target.closest(".snipcart-add-item, main a[href*='/<%= ThemeReference::SAMPLE_PREFIX %>']");
+      if (el) { event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
+  </script>
+<% end %>
+<article class="page page-<%= @page.url_name %>">
+  <div class="content">
+    <%= render_content_layout(@page) %>
+  </div>
+</article>

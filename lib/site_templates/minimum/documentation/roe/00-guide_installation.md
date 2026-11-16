@@ -28,13 +28,17 @@ Roe will install the tools it needs to run. It only does this once. After that, 
 
  open Terminal and run:
 
-`cd ~ && curl -fsSL https://go-roe.com/install | bash`
+```bash
+cd ~ && curl -fsSL https://go-roe.com/install | bash
+```
 
 ### Windows
 
 Open PowerShell as Administrator and run:
 
-`irm https://go-roe.com/install.ps1 | iex`
+```bash
+irm https://go-roe.com/install.ps1 | iex
+```
 
 Then follow the prompts. Details for each operating system below: [macOS](#macos), [Linux](#linux) and [Windows](#windows).
 

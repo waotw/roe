@@ -1,0 +1,10 @@
+<%# A text file with line numbers, for the Site Sync file panels. %>
+<% all_lines = text.to_s.lines %>
+<div class="max-h-96 overflow-auto border border-gray-200 bg-white text-[11px] leading-5">
+  <% all_lines.first(2_000).each_with_index do |line, i| %>
+    <div class="flex"><span class="w-10 shrink-0 pr-2 text-right text-gray-400 select-none"><%= i + 1 %></span><span class="whitespace-pre text-gray-800"><%= line.chomp %></span></div>
+  <% end %>
+</div>
+<% if all_lines.size > 2_000 %>
+  <p class="text-xs text-gray-600 font-sans">Showing the first 2,000 of <%= number_with_delimiter(all_lines.size) %> lines. DOWNLOAD this file to see the whole thing.</p>
+<% end %>

@@ -1,0 +1,180 @@
+posts:
+  - title: "A Week on the Coast"
+    url_name: "a-week-on-the-coast"
+    subtitle: "Notes from a slow trip north"
+    date: "2026-03-14T09:00Z"
+    post_type: "article"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference"]
+    image: "/admin/themes/reference/media/sample-1.jpg"
+    excerpt: "Seven days, three towns and one very patient car. What I packed, what I didn't need and where the coffee was good."
+    body: |
+      A sample article for the theme reference pages.
+  - title: "How the Garden Grew"
+    url_name: "how-the-garden-grew"
+    subtitle: "A season in photographs"
+    date: "2026-02-02T09:00Z"
+    post_type: "article"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference"]
+    image: "/admin/themes/reference/media/sample-2.jpg"
+    excerpt: "From bare soil in March to more tomatoes than anyone could eat. A year of the vegetable patch."
+    body: |
+      A sample article for the theme reference pages.
+  - title: "Letters I Never Sent"
+    url_name: "letters-i-never-sent"
+    date: "2026-01-09T09:00Z"
+    post_type: "article"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference"]
+    image: "/admin/themes/reference/media/sample-3.jpg"
+    excerpt: "A short essay on drafts, second thoughts and the ones that stayed in the drawer."
+    body: |
+      A sample article for the theme reference pages.
+  - title: "Field Notes 3 - Listening Back"
+    url_name: "field-notes-3"
+    date: "2026-03-01T09:00Z"
+    post_type: "podcast"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference", "theme-reference-podcast"]
+    image: "/admin/themes/reference/media/sample-5.jpg"
+    audio: "/admin/themes/reference/media/sample-audio.mp3"
+    duration: "0:24"
+    episode_number: 3
+    season: 1
+    excerpt: "What changed after a year of recording, and what didn't."
+    body: |
+      A sample podcast episode for the theme reference pages.
+  - title: "Field Notes 2 - The Long Way Round"
+    url_name: "field-notes-2"
+    date: "2026-02-15T09:00Z"
+    post_type: "podcast"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference", "theme-reference-podcast"]
+    image: "/admin/themes/reference/media/sample-5.jpg"
+    audio: "/admin/themes/reference/media/sample-audio.mp3"
+    duration: "0:24"
+    episode_number: 2
+    season: 1
+    excerpt: "Detours, wrong turns and the best interview of the year."
+    body: |
+      A sample podcast episode for the theme reference pages.
+  - title: "Field Notes 1 - Starting Out"
+    url_name: "field-notes-1"
+    date: "2026-02-01T09:00Z"
+    post_type: "podcast"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference", "theme-reference-podcast"]
+    image: "/admin/themes/reference/media/sample-5.jpg"
+    audio: "/admin/themes/reference/media/sample-audio.mp3"
+    duration: "0:24"
+    episode_number: 1
+    season: 1
+    excerpt: "Why a podcast, why now, and what to expect."
+    body: |
+      A sample podcast episode for the theme reference pages.
+  - title: "Morning Song"
+    url_name: "morning-song"
+    date: "2026-01-20T09:00Z"
+    post_type: "music"
+    status: "published"
+    author: "Sample Artist"
+    tags: ["theme-reference", "theme-reference-music"]
+    image: "/admin/themes/reference/media/sample-4.jpg"
+    audio: "/admin/themes/reference/media/sample-audio.mp3"
+    duration: "0:24"
+    track_number: 1
+    excerpt: "The first track."
+    body: |
+      A sample music track for the theme reference pages.
+  - title: "Evening Song"
+    url_name: "evening-song"
+    date: "2026-01-19T09:00Z"
+    post_type: "music"
+    status: "published"
+    author: "Sample Artist"
+    tags: ["theme-reference", "theme-reference-music"]
+    image: "/admin/themes/reference/media/sample-4.jpg"
+    audio: "/admin/themes/reference/media/sample-audio.mp3"
+    duration: "0:24"
+    track_number: 2
+    excerpt: "The second track."
+    body: |
+      A sample music track for the theme reference pages.
+  - title: "A Short Film"
+    url_name: "a-short-film"
+    date: "2026-01-05T09:00Z"
+    post_type: "video"
+    status: "published"
+    author: "Sample Author"
+    tags: ["theme-reference"]
+    image: "/admin/themes/reference/media/sample-6.jpg"
+    video: "/admin/themes/reference/media/sample-video.mp4"
+    duration: "0:06"
+    excerpt: "Six seconds of test pattern."
+    body: |
+      A sample video post for the theme reference pages.
+products:
+  - title: "Sample Print"
+    url_name: "sample-print"
+    status: "published"
+    price: 25.0
+    sku: "THEME-REFERENCE-PRINT"
+    image: "/admin/themes/reference/media/sample-4.jpg"
+    description: "A single product with a portrait image."
+    tags: ["theme-reference"]
+    body: |
+      A sample product for the theme reference pages.
+  - title: "Sample Book (Paperback)"
+    url_name: "sample-book-paperback"
+    status: "published"
+    price: 18.0
+    sku: "THEME-REFERENCE-BOOK-PB"
+    image: "/admin/themes/reference/media/sample-1.jpg"
+    description: "A book sold in three formats: one product group with three variants."
+    tags: ["theme-reference"]
+    group: "theme-reference-book"
+    variant: "Paperback"
+    primary: true
+    body: |
+      A sample product for the theme reference pages.
+  - title: "Sample Book (Hardback)"
+    url_name: "sample-book-hardback"
+    status: "published"
+    price: 30.0
+    sku: "THEME-REFERENCE-BOOK-HB"
+    image: "/admin/themes/reference/media/sample-1.jpg"
+    description: "A book sold in three formats: one product group with three variants."
+    tags: ["theme-reference"]
+    group: "theme-reference-book"
+    variant: "Hardback"
+    body: |
+      A sample product for the theme reference pages.
+  - title: "Sample Book (Ebook)"
+    url_name: "sample-book-ebook"
+    status: "published"
+    price: 9.0
+    sku: "THEME-REFERENCE-BOOK-EB"
+    image: "/admin/themes/reference/media/sample-1.jpg"
+    description: "A book sold in three formats: one product group with three variants."
+    tags: ["theme-reference"]
+    group: "theme-reference-book"
+    variant: "Ebook"
+    body: |
+      A sample product for the theme reference pages.
+  - title: "Sample Tote"
+    url_name: "sample-tote"
+    status: "published"
+    price: 15.0
+    sku: "THEME-REFERENCE-TOTE"
+    image: "/admin/themes/reference/media/sample-2.jpg"
+    description: "A second single product, so the grid has a full row."
+    tags: ["theme-reference"]
+    body: |
+      A sample product for the theme reference pages.

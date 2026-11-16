@@ -1,0 +1,5 @@
+<%# A page connected to a podcast (`podcast: <key>`) leads with the show's
+    name. Nothing on any other page. %>
+<% if kind == "page" && (config = context[:podcast_config]).present? %>
+  <h1 class="podcast-page-title"><%= config["title"] %></h1>
+<% end %>

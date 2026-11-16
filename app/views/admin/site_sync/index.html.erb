@@ -7,6 +7,20 @@
     </p>
   </div>
 
+  <%# Live is being asked again in the background (Exchange.refresh_if_stale):
+      redraw when it answers. If something on the page has been edited by
+      then, say so instead of reloading over it. %>
+  <% if @peer_answer_coming %>
+    <div data-controller="site-sync-refresh"
+         data-site-sync-refresh-url-value="<%= admin_site_sync_peer_status_path %>"
+         data-site-sync-refresh-since-value="<%= @peer_state&.dig(:received_at).to_i %>"
+         data-site-sync-refresh-target="note" hidden
+         class="mb-4 px-3 py-2 text-sm border border-amber-300 bg-amber-50 text-amber-900">
+      <%# COPY: live answered while the page was being edited %>
+      Live has sent a newer sync status. Reload the page to see it.
+    </div>
+  <% end %>
+
   <%# ─── Post-restore recovery banner (production only) ───────────── %>
   <%= render "restore_recovery" %>
 
@@ -256,7 +270,7 @@
       kicking one off. Cache-backed (see SiteSyncTransferJob); cleared
       via the Dismiss button or auto-expires after the cache TTL. %>
   <% if @transfer_status %>
-    <% kind_label = { push: "Push to live", pull: "Pull from live", clone: "Clone to live", resolve: "Conflict resolution" }[@transfer_status[:kind]] || "Sync" %>
+    <% kind_label = { push: "Push to live", pull: "Pull from live", clone: "Clone to live", resolve: "Conflict resolution", rewind: "Rewind" }[@transfer_status[:kind]] || "Sync" %>
     <% case @transfer_status[:state] %>
       <% when :running %>
         <% progress = @transfer_status[:progress] %>
@@ -305,9 +319,24 @@
                         class: "inline-flex items-center px-3 py-1 border border-blue-700 bg-blue-100 hover:bg-blue-200 text-blue-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
           </div>
         </div>
-      <%# :completed intentionally renders nothing — the always-on status
+      <%# :completed renders nothing for a sync — the always-on status
           panel above ("in sync · last synced …") is the success signal, so
-          there's no transient banner to dismiss. %>
+          there's no transient banner to dismiss. A rewind leaves the sites
+          out of sync on purpose, so it says so. %>
+      <% when :completed %>
+        <% if @transfer_status[:kind] == :rewind %>
+          <div class="bg-blue-50 border border-blue-200 rounded-xs p-4 mb-6 flex items-start justify-between gap-4" id="rewind-finished">
+            <p class="text-sm text-blue-900">
+              Rewound the <%= @transfer_status[:event_at] ? sync_time(@transfer_status[:event_at]) : "last" %> sync. Live and local are out
+              of sync. Before you sync again, make changes to the live or local site as needed, then sync.
+            </p>
+            <div class="flex gap-2 shrink-0">
+              <%= link_to "SYNC HISTORY", admin_site_sync_history_path, class: history_button_class %>
+              <%= button_to "Dismiss", admin_dismiss_site_transfer_status_path, method: :post,
+                    class: "inline-flex items-center px-3 py-1 border border-blue-700 bg-blue-100 hover:bg-blue-200 text-blue-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+            </div>
+          </div>
+        <% end %>
       <% when :conflicts %>
         <%# Deletions and edits are different questions and get asked
             separately — deletions first, because they're the ones that
@@ -344,9 +373,10 @@
               <div class="space-y-2 mb-5">
                 <% deletions.each do |c| %>
                   <% deleted_on = c["peer"].nil? ? "live" : "local" %>
-                  <div class="flex items-center justify-between gap-3 bg-white border border-red-300 rounded-xs px-3 py-2">
+                  <div class="bg-white border border-red-300 rounded-xs px-3 py-2" data-controller="history-panel">
+                  <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
+                      <%= render "conflict_file_link", path: c["path"] %>
                       <p class="text-[11px] text-red-700">This file was deleted on <%= deleted_on %></p>
                     </div>
                     <%# Keep defaults to the side that still has the file, so
@@ -362,37 +392,41 @@
                       </label>
                     </div>
                   </div>
+                  <%= turbo_frame_tag conflict_frame_id(c["path"]), data: { history_panel_target: "frame" } %>
+                  </div>
                 <% end %>
               </div>
             <% end %>
 
             <% if edits.any? %>
               <p class="text-sm text-amber-800 mb-3">
-                These files changed on <strong>both</strong> this machine and live since the last sync,
-                so nothing was overwritten. Pick which version wins for each, then apply.
+                These files changed on <strong>both</strong> local and live since the last sync. Click a file to compare the two versions, pick which one you'd like to keep, then apply.
               </p>
 
               <div class="space-y-2 mb-4">
                 <% edits.each do |c| %>
-                  <% type_label = { "edit_edit" => "edited on both sides",
-                                    "edit_delete" => "edited here, deleted on live",
-                                    "delete_edit" => "deleted here, edited on live" }[c["type"]] || c["type"] %>
-                  <div class="flex items-center justify-between gap-3 bg-white border border-amber-200 rounded-xs px-3 py-2">
+                  <% type_label = { "edit_edit" => "changed on both sides",
+                                    "edit_delete" => "changed on local, deleted on live",
+                                    "delete_edit" => "deleted on local, changed on live" }[c["type"]] || c["type"] %>
+                  <div class="bg-white border border-amber-200 rounded-xs px-3 py-2" data-controller="history-panel">
+                  <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="font-mono text-xs text-gray-800 truncate" title="<%= c["path"] %>"><%= c["path"] %></p>
+                      <%= render "conflict_file_link", path: c["path"] %>
                       <p class="text-[11px] text-gray-500">
                         <%= type_label %><%
-                          %><% if c["newer"] == "local" %> · yours is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
+                          %><% if c["newer"] == "local" %> · local is newer<% elsif c["newer"] == "live" %> · live is newer<% end %>
                       </p>
                     </div>
                     <div class="flex gap-3 shrink-0 text-xs">
                       <label class="flex items-center gap-1 cursor-pointer">
-                        <input type="radio" name="resolutions[<%= c["path"] %>]" value="local" <%= "checked" if c["newer"] != "live" %>> Keep mine
+                        <input type="radio" name="resolutions[<%= c["path"] %>]" value="local" <%= "checked" if c["newer"] != "live" %>> Keep local
                       </label>
                       <label class="flex items-center gap-1 cursor-pointer">
                         <input type="radio" name="resolutions[<%= c["path"] %>]" value="live" <%= "checked" if c["newer"] == "live" %>> Keep live
                       </label>
                     </div>
+                  </div>
+                  <%= turbo_frame_tag conflict_frame_id(c["path"]), data: { history_panel_target: "frame" } %>
                   </div>
                 <% end %>
               </div>
@@ -401,14 +435,14 @@
             <div class="flex flex-wrap gap-2">
               <button type="submit"
                       class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs rounded-xs cursor-pointer">
-                APPLY CHOICES
+                APPLY CHOICES &amp; SYNC
               </button>
               <%# Most-recent is meaningless for a deletion — there's only one
                   side — so it's offered only when there's an edit to judge. %>
               <% if edits.any? %>
                 <button type="submit" name="resolve_all" value="recent"
                         class="inline-flex items-center px-3 py-1.5 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-800 font-mono text-xs rounded-xs cursor-pointer">
-                  RESOLVE ALL BY MOST-RECENT
+                  RESOLVE ALL BY MOST-RECENT &amp; SYNC
                 </button>
               <% end %>
             </div>
@@ -432,7 +466,24 @@
         <% reassessment = @transfer_status[:reassessment] %>
         <% step_label = SiteSyncTransferJob::STEPS[@transfer_status[:step]] || @transfer_status[:step] %>
 
-        <% if reassessment && reassessment[:in_sync] %>
+        <% if @transfer_status[:kind] == :rewind %>
+          <%# A rewind stops before changing anything when it can — live
+              unreachable, a saved copy missing — so its message is the
+              whole story. No Retry: open Sync History and press REWIND
+              again once the cause is fixed. %>
+          <div class="bg-red-50 border border-red-200 rounded-xs p-6 mb-6 flex items-start justify-between gap-4" id="rewind-failed">
+            <div>
+              <h3 class="text-sm font-semibold text-red-900 mb-1">❌ Rewind didn't complete</h3>
+              <p class="text-sm text-red-700"><%= @transfer_status[:error] %></p>
+              <p class="mt-1 text-xs text-red-700">During <code class="text-xs"><%= step_label %></code>. Every version replaced so far is in Sync History.</p>
+            </div>
+            <div class="flex flex-col gap-2 items-end">
+              <%= link_to "SYNC HISTORY", admin_site_sync_history_path, class: history_button_class %>
+              <%= button_to "Dismiss", admin_dismiss_site_transfer_status_path, method: :post,
+                    class: "inline-flex items-center px-3 py-1 border border-red-700 bg-red-100 hover:bg-red-200 text-red-800 font-mono text-xs rounded-xs cursor-pointer whitespace-nowrap" %>
+            </div>
+          </div>
+        <% elsif reassessment && reassessment[:in_sync] %>
           <%# Bookkeeping-only failure — content is actually synced. %>
           <div class="bg-amber-50 border border-amber-200 rounded-xs p-6 mb-6">
             <div class="flex items-start justify-between gap-4 mb-3">
@@ -519,7 +570,7 @@
                 </summary>
                 <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
                   <% [
-                  [ "Modified", reassessment[:pending_modified] ],
+                  [ "Changed", reassessment[:pending_modified] ],
                   [ "Added",    reassessment[:pending_added] ],
                   [ "Deleted",  reassessment[:pending_deleted] ]
                 ].each do |label, list| %>
@@ -621,9 +672,9 @@
 
           <% if SiteSync::Exchange.can_call_peer? %>
             <div class="mt-6 pt-4 border-t border-amber-200">
-              <h3 class="text-sm font-semibold text-amber-900 mb-2">Sync with live</h3>
+              <h3 class="text-sm font-semibold text-amber-900 mb-2">Sync with live site</h3>
               <p class="text-sm text-amber-800 mb-3">
-                Syncs changes both ways. Any file changed on <em>both</em> sides pauses for you to resolve — nothing is overwritten — and both sides are backed up first.
+                Any file changed on <em>both</em> live and local pauses the sync so you can resolve. All changes are saved before sync and can be rewound in SYNC HISTORY.
               </p>
               <%= button_to "SYNC WITH LIVE",
                             admin_sync_site_path,
@@ -648,9 +699,9 @@
         <h2 class="text-lg font-semibold text-gray-900">Public/Local Site Sync</h2>
         <%# Only once there's something to read — a link to an empty page is
             just a dead end on a screen that already has plenty on it. %>
-        <% if SiteSync::History.exist? %>
-          <%= link_to "View sync history →", admin_site_sync_history_path,
-                class: "text-xs text-blue-600 hover:text-blue-900 font-sans" %>
+        <% if SiteSync::History.exist? || File.exist?(SiteSync::Versions.db_path) %>
+          <%= link_to "SYNC HISTORY", admin_site_sync_history_path,
+                class: "mt-2 uppercase inline-flex items-center px-3 py-1.5 border border-gray-600 bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono text-xs rounded-xs whitespace-nowrap" %>
         <% end %>
       </div>
       <%# Synchronous exchange ping — handy for testing without
@@ -797,8 +848,9 @@
         <div class="p-4 bg-amber-50 border border-amber-300 rounded-xs mb-2">
           <h3 class="text-sm font-semibold text-amber-900 mb-3">Changes to sync</h3>
 
-          <%# ── Live changes (from the peer's drift payload) ── %>
-          <% if @peer_drift %>
+          <%# ── Live changes: live's own report, or this computer's record
+              when live's misses them (live_sync_overview) ── %>
+          <% if @peer_drift || live_changes %>
             <div class="mb-3">
               <p class="text-sm text-amber-800 mb-1">
                 ⬇️ <strong><%= SiteSync::Exchange.peer_label %></strong> has changes to pull in.
@@ -809,7 +861,7 @@
                     truncated one keeps its "first N per group" note below. %>
                 <% live_display = { modified: collapse_sync_paths(live_changes[:modified]), added: collapse_sync_paths(live_changes[:added]), deleted: collapse_sync_paths(live_changes[:deleted]) } %>
                 <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
-                  <% if live_display[:modified].any? %><li><strong><%= live_display[:modified].size %></strong> modified</li><% end %>
+                  <% if live_display[:modified].any? %><li><strong><%= live_display[:modified].size %></strong> changed</li><% end %>
                   <% if live_display[:added].any? %><li><strong><%= live_display[:added].size %></strong> added</li><% end %>
                   <% if live_display[:deleted].any? %><li><strong><%= live_display[:deleted].size %></strong> deleted</li><% end %>
                 </ul>
@@ -818,15 +870,7 @@
                     Show live changes<% if live_changes[:truncated] %> <span class="font-normal text-amber-700">(first <%= SiteSync::Exchange::DRIFT_LIST_CAP %> per group)</span><% end %>
                   </summary>
                   <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                    <% [ [ "Modified", live_display[:modified] ], [ "Added", live_display[:added] ], [ "Deleted", live_display[:deleted] ] ].each do |label, list| %>
-                      <% next if list.blank? %>
-                      <div>
-                        <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
-                        <ul class="text-xs font-mono text-amber-800 space-y-1">
-                          <% list.each do |path| %><li><%= path %></li><% end %>
-                        </ul>
-                      </div>
-                    <% end %>
+                    <%= render "pending_list", changes: live_changes, side: "live" %>
                   </div>
                 </details>
               <% end %>
@@ -841,22 +885,14 @@
               </p>
               <% local_display = { modified: collapse_sync_paths(local_changes[:modified]), added: collapse_sync_paths(local_changes[:added]), deleted: collapse_sync_paths(local_changes[:deleted]) } %>
               <ul class="list-disc ml-6 text-sm text-amber-800 space-y-1">
-                <% if local_display[:modified].any? %><li><strong><%= local_display[:modified].size %></strong> modified</li><% end %>
+                <% if local_display[:modified].any? %><li><strong><%= local_display[:modified].size %></strong> changed</li><% end %>
                 <% if local_display[:added].any? %><li><strong><%= local_display[:added].size %></strong> added</li><% end %>
                 <% if local_display[:deleted].any? %><li><strong><%= local_display[:deleted].size %></strong> deleted</li><% end %>
               </ul>
               <details class="mt-1">
                 <summary class="text-xs font-semibold text-amber-900 cursor-pointer hover:text-amber-700">Show local changes</summary>
                 <div class="mt-2 ml-4 space-y-3 max-h-96 overflow-y-auto">
-                  <% [ [ "Modified", local_display[:modified] ], [ "Added", local_display[:added] ], [ "Deleted", local_display[:deleted] ] ].each do |label, list| %>
-                    <% next if list.empty? %>
-                    <div>
-                      <h4 class="text-xs font-semibold text-amber-900 mb-1"><%= label %> (<%= list.size %>)</h4>
-                      <ul class="text-xs font-mono text-amber-800 space-y-1">
-                        <% list.each do |path| %><li><%= path %></li><% end %>
-                      </ul>
-                    </div>
-                  <% end %>
+                  <%= render "pending_list", changes: local_changes, side: "local" %>
                 </div>
               </details>
             </div>

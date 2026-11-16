@@ -1,0 +1,60 @@
+<%# One value from the record's release (music.yml) or podcast
+    (podcast.yml): a music or podcast post's, or a page's with `release:` or
+    `podcast:`. Nothing when there's no release or podcast, or it has no value.
+
+    Each reuses the classes of the part it's like, plus its own, so a theme
+    that styles authors, dates, images and excerpts styles these too:
+    [artist] and [creator] are authors, [release date] a date, [cover] and
+    [artwork] images, [synopsis] and [description] excerpts. The rest
+    ([genre], [label], [copyright], [category], [podcast link]) are fields:
+    <kind>-field <kind>-field-<name>, like any metadata field. %>
+<% series = context[:series] || {} %>
+<% release = series[:release] || {} %>
+<% podcast = series[:podcast_settings] || {} %>
+<% music = series[:music] %>
+<% show = series[:podcast] %>
+<% text = ->(value) { value.to_s.strip.presence } %>
+<% css = ->(*names) { names.map { |n| "#{kind}-#{n}" }.join(" ") } %>
+<% case name %>
+<% when "artist" %>
+  <%# The track's own `artist:`, then the release's, then music.yml's, then
+      the site author (ReleaseConfig.artist_for). %>
+  <% if music && (artist = text.(record.metadata["artist"]) || text.(ReleaseConfig.artist_for(series[:release_key]))) %>
+    <span class="<%= css.("author", "artist") %>"><%= " • " if kind == "post" %><%= artist %></span>
+  <% end %>
+<% when "creator" %>
+  <% if show && (creator = text.(podcast["author"])) %>
+    <span class="<%= css.("author", "creator") %>"><%= " • " if kind == "post" %><%= creator %></span>
+  <% end %>
+<% when "release_date" %>
+  <% date = (Date.parse(release["release_date"].to_s) rescue nil) if music %>
+  <% if date %>
+    <time class="<%= css.("date", "release-date") %>" datetime="<%= date.iso8601 %>"><%= date.strftime("%B %d, %Y") %></time>
+  <% end %>
+<% when "cover", "artwork" %>
+  <% raw = name == "cover" ? (music && release["cover"]) : (show && podcast["artwork"]) %>
+  <% if (src = text.(raw)) && src != "none" %>
+    <%= ResponsiveImageRenderer.render(config_image_path(src), alt: (name == "cover" ? release["title"] : podcast["title"]).to_s, class: css.("image", name)) %>
+  <% end %>
+<% when "synopsis", "description" %>
+  <% value = name == "synopsis" ? (music && text.(release["synopsis"])) : (show && text.(podcast["description"])) %>
+  <% if value %>
+    <p class="<%= css.("excerpt", name) %>"><%= value %></p>
+  <% end %>
+<% when "podcast_link" %>
+  <% url = show && text.(podcast["link"]) %>
+  <% if url&.match?(%r{\Ahttps?://}i) %>
+    <p class="<%= css.("field", "field-podcast-link") %>"><a href="<%= url %>" rel="noopener"><%= url.sub(%r{\Ahttps?://}i, "").chomp("/") %></a></p>
+  <% end %>
+<% else %>
+  <%# genre, label (a release's), category (a podcast's), copyright (either). %>
+  <% value =
+       case name
+       when "genre", "label" then music && text.(release[name])
+       when "category"       then show && text.(podcast["category"])
+       when "copyright"      then (music && text.(release["copyright"])) || (show && text.(podcast["copyright"]))
+       end %>
+  <% if value %>
+    <p class="<%= css.("field", "field-#{name.dasherize}") %>"><%= value %></p>
+  <% end %>
+<% end %>

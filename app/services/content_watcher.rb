@@ -52,6 +52,13 @@ class ContentWatcher
       puts "⚠️  ContentWatcher skipping missing paths: #{missing.join(', ')}"
     end
 
+    # A start loads every file again (ContentSync), so earlier errors are
+    # settled; anything still wrong is recorded again when it changes.
+    write_errors({})
+    # Anything the listen gem catches itself goes to the Rails log too, not
+    # only to the background log.
+    Listen.logger = Rails.logger
+
     listener = Listen.to(*paths, ignore: /\/variants\//) do |modified, added, removed|
       handle_changes(modified, added, removed)
     end
@@ -95,7 +102,7 @@ class ContentWatcher
       puts "\n" + "=" * 60
       puts "🔄 Renamed: #{File.basename(old_path)} → #{File.basename(new_path)}"
       puts "=" * 60
-      handle_rename(old_path, new_path)
+      handling(new_path) { handle_rename(old_path, new_path) }
       puts ""
     end
 
@@ -105,7 +112,7 @@ class ContentWatcher
       puts "\n" + "=" * 60
       puts "✨ New file: #{File.basename(file)}"
       puts "=" * 60
-      process_file(file)
+      handling(file) { process_file(file) }
       puts ""
     end
 
@@ -114,7 +121,7 @@ class ContentWatcher
       puts "\n" + "=" * 60
       puts "📝 Modified: #{File.basename(file)}"
       puts "=" * 60
-      process_file(file)
+      handling(file) { process_file(file) }
       puts ""
     end
 
@@ -124,7 +131,7 @@ class ContentWatcher
       puts "\n" + "=" * 60
       puts "🗑️  Removed: #{File.basename(file)}"
       puts "=" * 60
-      remove_file(file)
+      handling(file) { remove_file(file) }
       puts ""
     end
 
@@ -274,9 +281,7 @@ class ContentWatcher
 
       # Handle symlinks - resolve to real path before substitution
       # In production, /rails/site is a symlink to /data/site
-      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-      real_file_path = File.realpath(absolute_file)
-      web_path = real_file_path.sub(real_site_path, "")
+      web_path = media_web_path(absolute_file)
       puts "DEBUG: Web path: #{web_path}"
 
       if Medium.exists?(file_path: web_path)
@@ -340,6 +345,72 @@ class ContentWatcher
     renames
   end
 
+  # A media file's address in the media table: "/media/video/a.mp4". The
+  # site folder is resolved (production's /rails/site is a symlink to
+  # /data/site) and so is the file's folder, but never the file itself: a
+  # removed or renamed-away file is gone, and File.realpath on it raised
+  # ENOENT — so a deleted video's record was never removed.
+  def self.media_web_path(absolute_file)
+    site = File.realpath(RoeSitePaths::SITE_PATH.to_s)
+    dir = File.dirname(absolute_file)
+    path = File.directory?(dir) ? File.join(File.realpath(dir), File.basename(absolute_file)) : File.expand_path(absolute_file)
+    [ site, File.expand_path(RoeSitePaths::SITE_PATH.to_s) ].each do |root|
+      return path.delete_prefix(root) if path.start_with?("#{root}/")
+    end
+    path
+  end
+
+  # One file's change, on its own: an error loading it is logged and
+  # recorded for `roe status` (bin/roe-watch-check), and the other files in
+  # the same batch still load. Before, the first error ended the batch, and
+  # the listen gem wrote it only to the background log.
+  ERRORS_FILE = Rails.root.join("tmp", Rails.env.test? ? "content_watcher-test.errors" : "content_watcher.errors")
+
+  def self.handling(file)
+    yield
+    clear_error(file)
+  rescue StandardError => e
+    Rails.logger.error("[ContentWatcher] couldn't load #{file}: #{e.class}: #{e.message}\n#{Array(e.backtrace).first(5).join("\n")}")
+    puts "   ✗ Couldn't load #{File.basename(file)}: #{e.class}: #{e.message}"
+    record_error(file, e)
+  end
+
+  def self.watcher_errors
+    File.file?(ERRORS_FILE) ? JSON.parse(File.read(ERRORS_FILE)) : {}
+  rescue JSON::ParserError, SystemCallError
+    {}
+  end
+
+  def self.record_error(file, error)
+    errors = watcher_errors
+    errors[relative_site_path(file)] = { "error" => "#{error.class}: #{error.message}".truncate(300), "at" => Time.current.to_i }
+    write_errors(errors)
+  end
+
+  def self.clear_error(file)
+    errors = watcher_errors
+    write_errors(errors) if errors.delete(relative_site_path(file))
+  end
+
+  def self.write_errors(errors)
+    if errors.empty?
+      FileUtils.rm_f(ERRORS_FILE)
+    else
+      FileUtils.mkdir_p(File.dirname(ERRORS_FILE))
+      File.write(ERRORS_FILE, JSON.generate(errors.sort_by { |_, v| -v["at"] }.first(20).to_h))
+    end
+  rescue SystemCallError => e
+    Rails.logger.warn("ContentWatcher couldn't write #{ERRORS_FILE}: #{e.message}")
+  end
+
+  def self.relative_site_path(file)
+    path = File.expand_path(file.to_s)
+    [ File.expand_path(RoeSitePaths::SITE_PATH.to_s), (File.realpath(RoeSitePaths::SITE_PATH.to_s) rescue nil) ].compact.each do |root|
+      return path.delete_prefix("#{root}/") if path.start_with?("#{root}/")
+    end
+    path
+  end
+
   def self.handle_rename(old_path, new_path)
     # Old path no longer exists (normalize falls back to expand_path).
     # New path exists, so it'll resolve through realpath cleanly.
@@ -370,9 +441,8 @@ class ContentWatcher
     elsif absolute_old.include?("site/media")
       # Media files are stored with web paths like "/media/images/file.jpg"
       # Handle symlinks - resolve to real path before substitution
-      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-      old_web_path = File.realpath(absolute_old).sub(real_site_path, "")
-      new_web_path = File.realpath(absolute_new).sub(real_site_path, "")
+      old_web_path = media_web_path(absolute_old)
+      new_web_path = media_web_path(absolute_new)
 
       medium = Medium.find_by(file_path: old_web_path)
       if medium
@@ -402,10 +472,7 @@ class ContentWatcher
       Documentation.remove_by_file_path(absolute_file)
       puts "   Removed documentation from database"
     elsif absolute_file.include?("site/media")
-      # Handle symlinks - resolve to real path before substitution
-      real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
-      web_path = File.realpath(absolute_file).sub(real_site_path, "")
-      Medium.remove_by_file_path(web_path)
+      Medium.remove_by_file_path(media_web_path(absolute_file))
       puts "   Removed media file from database"
     end
   end

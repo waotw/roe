@@ -10,10 +10,11 @@ class SiteSync::ConfirmDeletionsSettingTest < ActiveSupport::TestCase
     SiteConfig.stubs(:get).with("sync_confirm_deletions_over").returns(value)
   end
 
-  test "unset falls back to the safe default" do
+  # Every deleted file is saved first, so only a bulk deletion asks.
+  test "unset falls back to asking only over 20" do
     [ nil, "", "   " ].each do |blank|
       set(blank)
-      assert_equal 0, SiteSync::Reconciler.confirm_deletions_over, "#{blank.inspect} should fall back"
+      assert_equal 20, SiteSync::Reconciler.confirm_deletions_over, "#{blank.inspect} should fall back"
     end
   end
 
@@ -42,7 +43,7 @@ class SiteSync::ConfirmDeletionsSettingTest < ActiveSupport::TestCase
 
   test "nonsense falls back rather than crashing a sync" do
     set("twenty")
-    assert_equal 0, SiteSync::Reconciler.confirm_deletions_over
+    assert_equal 20, SiteSync::Reconciler.confirm_deletions_over
   end
 
   test "the setting is offered in the Site Sync section of the admin form" do

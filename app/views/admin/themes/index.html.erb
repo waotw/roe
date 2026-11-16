@@ -35,126 +35,117 @@
       To create your own theme, install and edit any theme and
     </p>
 
-    <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="py-2 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 uppercase">Name</th>
-            <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Size</th>
-            <th scope="col" class="px-1.5 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
-            <th scope="col" class="relative py-1.5 pl-3 pr-4 sm:pr-6">
-              <span class="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @available_themes.each do |theme| %>
-            <tr class="hover:bg-gray-50">
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
-                <%= theme[:display_name] %>
-                <span class="ml-1 text-xs font-normal text-gray-400">
-                  (<%= theme[:name] %>.css)
-                </span>
-                <% if theme[:installed_version] || theme[:bundled_version] %>
-                  <span class="ml-1 text-xs font-normal text-gray-400">
-                    v<%= theme[:installed_version] || theme[:bundled_version] %>
+    <%# One row per theme: name, file, version, size and badges on the first
+        line, every action on the second. The actions wrap at any width, so a
+        theme with many of them never pushes its buttons out of view. %>
+    <ul class="ring-1 ring-black ring-opacity-5 divide-y divide-gray-200 bg-white">
+      <% @available_themes.each do |theme| %>
+        <% is_active = theme[:name] == @active_theme %>
+        <% is_installed = theme[:installed] %>
+        <% is_master = theme[:master] %>
+        <li class="px-4 py-3 hover:bg-gray-50">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span class="text-sm font-semibold text-gray-900 font-sans"><%= theme[:display_name] %></span>
+            <span class="text-xs text-gray-400">
+              <%= theme[:name] %>.css<% if theme[:installed_version] || theme[:bundled_version] %> · v<%= theme[:installed_version] || theme[:bundled_version] %><% end %> · <%= number_to_human_size(theme[:size]) %>
+            </span>
+            <div class="flex gap-1 flex-wrap">
+              <% if is_active %>
+                <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">ACTIVE</span>
+              <% end %>
+              <% if is_installed %>
+                <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800">Installed</span>
+              <% end %>
+              <% unless is_master %>
+                <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800">Custom</span>
+              <% end %>
+              <% if is_master && !is_installed %>
+                <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-500">Available</span>
+              <% end %>
+
+              <%# Update-related badges only apply to installed bundled themes. %>
+              <% if is_installed && is_master %>
+                <% case theme[:status] %>
+                <% when :tracked_outdated %>
+                  <span class="inline-flex bg-amber-100 px-2 text-xs font-semibold leading-5 text-amber-800" title="Bundled v<%= theme[:bundled_version] %> available">
+                    Update to v<%= theme[:bundled_version] %>
+                  </span>
+                  <% if theme[:edited] %>
+                    <%# COPY placeholder %>
+                    <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800" title="Theme updated since it was installed — choose Preserve when updating to keep your version">Edited</span>
+                  <% end %>
+                <% when :tracked_ahead %>
+                  <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-600" title="Installed version is ahead of bundled — usually means Roe was downgraded">
+                    Newer than bundled
+                  </span>
+                <% when :custom %>
+                  <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800" title="Header missing or theme name changed — treated as custom">
+                    Custom
                   </span>
                 <% end %>
-              </td>
-              <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
-                <%= number_to_human_size(theme[:size]) %>
-              </td>
-              <td class="whitespace-nowrap px-1.5 py-4 text-sm text-gray-500">
-                <% is_active = theme[:name] == @active_theme %>
-                <% is_installed = theme[:installed] %>
-                <% is_master = theme[:master] %>
+              <% end %>
+            </div>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <%= link_to "Preview",
+                        root_path(preview_theme: theme[:name]),
+                        target: "_blank",
+                        class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
 
-                <div class="flex gap-1 flex-wrap">
-                  <% if is_active %>
-                    <span class="inline-flex bg-green-100 px-2 text-xs font-semibold leading-5 text-green-800">ACTIVE</span>
-                  <% end %>
-                  <% if is_installed %>
-                    <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800">Installed</span>
-                  <% end %>
-                  <% unless is_master %>
-                    <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800">Custom</span>
-                  <% end %>
-                  <% if is_master && !is_installed %>
-                    <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-500">Available</span>
-                  <% end %>
+            <% if !is_active %>
+              <%= button_to "Activate",
+                            activate_admin_theme_path(theme[:name]),
+                            method: :post,
+                            class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
+            <% end %>
 
-                  <%# Update-related badges only apply to installed bundled themes. %>
-                  <% if is_installed && is_master %>
-                    <% case theme[:status] %>
-                    <% when :tracked_outdated %>
-                      <span class="inline-flex bg-amber-100 px-2 text-xs font-semibold leading-5 text-amber-800" title="Bundled v<%= theme[:bundled_version] %> available">
-                        Update to v<%= theme[:bundled_version] %>
-                      </span>
-                      <% if theme[:edited] %>
-                        <%# COPY placeholder %>
-                        <span class="inline-flex bg-blue-100 px-2 text-xs font-semibold leading-5 text-blue-800" title="Theme updated since it was installed — choose Preserve when updating to keep your version">Edited</span>
-                      <% end %>
-                    <% when :tracked_ahead %>
-                      <span class="inline-flex bg-gray-100 px-2 text-xs font-semibold leading-5 text-gray-600" title="Installed version is ahead of bundled — usually means Roe was downgraded">
-                        Newer than bundled
-                      </span>
-                    <% when :custom %>
-                      <span class="inline-flex bg-purple-100 px-2 text-xs font-semibold leading-5 text-purple-800" title="Header missing or theme name changed — treated as custom">
-                        Custom
-                      </span>
-                    <% end %>
-                  <% end %>
-                </div>
-              </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
-                <div class="flex gap-2 justify-end">
-                  <%= link_to "Preview",
-                              root_path(preview_theme: theme[:name]),
-                              target: "_blank",
-                              class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+            <% if is_installed %>
+              <%= link_to "Edit CSS",
+                          edit_admin_theme_path(theme[:name]),
+                          class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+            <% end %>
 
-                  <% if !is_active %>
-                    <%= button_to "Activate",
-                                  activate_admin_theme_path(theme[:name]),
-                                  method: :post,
-                                  class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs" %>
-                  <% end %>
+            <% if is_installed && is_master && theme[:status] == :tracked_outdated %>
+              <%# Opens the shared update-theme modal (rendered once
+                  at the bottom of this template). The modal lets the
+                  user pick between Overwrite and Preserve-and-update;
+                  both submit to the `reset` action with the
+                  appropriate reset_type. %>
+              <button type="button"
+                      data-update-theme-trigger
+                      data-theme-name="<%= theme[:name] %>"
+                      data-display-name="<%= theme[:display_name] %>"
+                      data-installed-version="<%= theme[:installed_version] %>"
+                      data-bundled-version="<%= theme[:bundled_version] %>"
+                      data-suggested-name="<%= theme[:display_name] %> v<%= theme[:installed_version] %>"
+                      class="uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs">
+                Update to v<%= theme[:bundled_version] %>
+              </button>
+            <% end %>
 
-                  <% if is_installed && is_master && theme[:status] == :tracked_outdated %>
-                    <%# Opens the shared update-theme modal (rendered once
-                        at the bottom of this template). The modal lets the
-                        user pick between Overwrite and Preserve-and-update;
-                        both submit to the `reset` action with the
-                        appropriate reset_type. %>
-                    <button type="button"
-                            data-update-theme-trigger
-                            data-theme-name="<%= theme[:name] %>"
-                            data-display-name="<%= theme[:display_name] %>"
-                            data-installed-version="<%= theme[:installed_version] %>"
-                            data-bundled-version="<%= theme[:bundled_version] %>"
-                            data-suggested-name="<%= theme[:display_name] %> v<%= theme[:installed_version] %>"
-                            class="uppercase text-xs px-2 py-1 border border-amber-700 bg-amber-100 hover:bg-amber-200 text-amber-900 font-mono rounded-xs">
-                      Update to v<%= theme[:bundled_version] %>
-                    </button>
-                  <% end %>
+            <%# Every element the theme styles, drawn in this theme. Only
+                for an installed theme: the pages show the copy in
+                site/theme/. %>
+            <% if is_installed %>
+              <%= link_to "Reference",
+                          admin_theme_reference_path(preview_theme: (is_active ? nil : theme[:name])),
+                          class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs" %>
+            <% end %>
 
-                  <% if is_installed && !is_active %>
-                    <button type="button"
-                            data-action="delete"
-                            data-resource-id="<%= theme[:name] %>"
-                            data-resource-title="<%= theme[:name].capitalize %>"
-                            data-resource-type="theme"
-                            class="uppercase text-xs px-2 py-1 border border-gray-800 bg-red-100 hover:bg-red-200 text-red-800 font-mono rounded-xs">
-                      Uninstall
-                    </button>
-                  <% end %>
-                </div>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+            <% if is_installed && !is_active %>
+              <button type="button"
+                      data-action="delete"
+                      data-resource-id="<%= theme[:name] %>"
+                      data-resource-title="<%= theme[:name].capitalize %>"
+                      data-resource-type="theme"
+                      class="uppercase text-xs px-2 py-1 border border-gray-800 bg-red-100 hover:bg-red-200 text-red-800 font-mono rounded-xs">
+                Uninstall
+              </button>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
   </div>
 
   <%# ── Site scripts ──────────────────────────────────────────────────────

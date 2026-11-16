@@ -18,6 +18,18 @@
 #      last commit without a Version bump; otherwise stamps the
 #      Fingerprint in site/ so it and the copy in current/ agree.
 #
+#   1c. Edits made in current/ — a shipped file changed by hand in
+#      current/app/themes or current/app/site_js since the last sync (its
+#      body no longer matches the Fingerprint this script stamped) would be
+#      overwritten by the copy below. Those files are skipped and listed at
+#      the end with the command that shows the difference.
+#
+#   1d. Docs that went backwards — a doc in site/ that is an exact copy of
+#      an older committed version of Roe's copy is held back from the docs
+#      mirror and listed at the end, with the command that shows what it
+#      would undo. (Twice a Site Sync pull put old docs back into site/ and
+#      the sync committed them over newer rewrites.)
+#
 #   2. Themes — update-only. site/theme/ → current/app/themes/.
 #      --existing flag means files that exist in BOTH places are updated
 #      from /site; files only in /site are ignored (you wanted to add a
@@ -79,6 +91,29 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   BOLD='\033[1m'
   NC='\033[0m'
 fi
+# Docs that went backwards (see 1d above). Read-only, so it runs in a dry
+# run too. Each held-back file is excluded from the mirror below; an rsync
+# exclude also protects it from --delete, so Roe's copy stays as committed.
+echo "→ Docs that went backwards (read-only check, before the copy):"
+REVERTED_DOCS="$(cd current && bin/rails runner '
+  DocsRevertCheck.new(
+    site_dir: File.join(RoeSitePaths::SITE_PATH, "documentation", "roe"),
+    app_rel:  "lib/site_templates/minimum/documentation/roe",
+    repo:     Rails.root
+  ).findings.each { |f| $stdout.puts "::REVERTED::#{f.rel}|#{f.commit}|#{f.date}" }
+' 2>/dev/null | sed -n 's/^::REVERTED:://p' || true)"
+DOC_EXCLUDES=()
+if [[ -n "$REVERTED_DOCS" ]]; then
+  while IFS='|' read -r rel commit date; do
+    [[ -z "$rel" ]] && continue
+    echo "    site/documentation/roe/$rel matches $commit ($date) — held back"
+    DOC_EXCLUDES+=(--exclude="/$rel")
+  done <<< "$REVERTED_DOCS"
+else
+  echo "    none"
+fi
+echo ""
+
 echo "→ Docs (exact mirror, --delete on):"
 echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/documentation/roe/"
 # _versions.yml is excluded: it isn't content, it's release metadata that
@@ -86,7 +121,7 @@ echo "    site/documentation/roe/  →  current/lib/site_templates/minimum/docum
 # site/'s copy over it put back stale versions after every bump — 0.3.0's
 # stamps were lost that way. An excluded file is also protected from
 # --delete, so current/'s copy stays put.
-rsync -avc $DRY_RUN --delete --exclude=_versions.yml \
+rsync -avc $DRY_RUN --delete --exclude=_versions.yml ${DOC_EXCLUDES[@]+"${DOC_EXCLUDES[@]}"} \
   site/documentation/roe/ \
   current/lib/site_templates/minimum/documentation/roe/
 echo ""
@@ -111,12 +146,18 @@ echo "→ Shipped site files (version check + fingerprint, in site/, before the 
 # with a stale file.
 echo "    site/theme/*.css, site/javascript/*.js"
 FAILED_FILES=""
+APP_EDITED_FILES=""
 if [[ -z "$DRY_RUN" ]]; then
-  check_out="$(cd current && bin/rails runner 'failed = ShippedFileInspector.check_release!(site_root: RoeSitePaths::SITE_PATH); failed.each { |rel| $stdout.puts "::FAILED::#{rel}" }' 2>/dev/null)"
-  echo "$check_out" | grep -v '^::FAILED::' || true
+  # edited_in_app runs first: it reads current/'s fingerprints, before
+  # check_release! stamps anything.
+  check_out="$(cd current && bin/rails runner 'ShippedFileInspector.edited_in_app(site_root: RoeSitePaths::SITE_PATH).each { |rel| $stdout.puts "::APPEDIT::#{rel}" }; failed = ShippedFileInspector.check_release!(site_root: RoeSitePaths::SITE_PATH); failed.each { |rel| $stdout.puts "::FAILED::#{rel}" }' 2>/dev/null)"
+  echo "$check_out" | grep -v '^::FAILED::\|^::APPEDIT::' || true
   FAILED_FILES="$(printf '%s\n' "$check_out" | sed -n 's/^::FAILED:://p')"
+  APP_EDITED_FILES="$(printf '%s\n' "$check_out" | sed -n 's/^::APPEDIT:://p')"
 else
   echo "    (skipped in dry run)"
+  # Read-only, so a dry run still warns about edits made in current/.
+  APP_EDITED_FILES="$(cd current && bin/rails runner 'ShippedFileInspector.edited_in_app(site_root: RoeSitePaths::SITE_PATH).each { |rel| $stdout.puts "::APPEDIT::#{rel}" }' 2>/dev/null | sed -n 's/^::APPEDIT:://p' || true)"
 fi
 echo ""
 
@@ -126,7 +167,7 @@ echo ""
 # array from tripping `set -u`.)
 THEME_EXCLUDES=()
 JS_EXCLUDES=()
-if [[ -n "$FAILED_FILES" ]]; then
+if [[ -n "$FAILED_FILES$APP_EDITED_FILES" ]]; then
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
     base="$(basename "$rel")"
@@ -134,7 +175,7 @@ if [[ -n "$FAILED_FILES" ]]; then
       app/themes/*)  THEME_EXCLUDES+=(--exclude="$base") ;;
       app/site_js/*) JS_EXCLUDES+=(--exclude="$base") ;;
     esac
-  done <<< "$FAILED_FILES"
+  done <<< "$(printf '%s\n%s\n' "$FAILED_FILES" "$APP_EDITED_FILES")"
 fi
 
 echo "→ Themes (update existing files only, --existing on, --delete off):"
@@ -291,6 +332,55 @@ else
 fi
 echo ""
 
+# The site/ path a shipped file in current/ is synced from.
+site_path_of() {
+  case "$1" in
+    app/themes/*)  echo "site/theme/$(basename "$1")" ;;
+    app/site_js/*) echo "site/javascript/$(basename "$1")" ;;
+    *)             echo "$1" ;;
+  esac
+}
+
+if [[ -n "$REVERTED_DOCS" ]]; then
+  echo -e "  ${ROE_ORANGE}================================================================"
+  echo -e "  ${BOLD}!!  DOCS THAT WENT BACKWARDS  —  NOT SYNCED${NC}"
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  while IFS='|' read -r rel commit date; do
+    [[ -z "$rel" ]] && continue
+    echo "      - site/documentation/roe/$rel"
+    echo "        Identical to Roe's copy in $commit ($date). See what syncing would undo:"
+    echo "          diff current/lib/site_templates/minimum/documentation/roe/$rel site/documentation/roe/$rel"
+  done <<< "$REVERTED_DOCS"
+  echo ""
+  echo "      Each is a byte-for-byte copy of an older version, which usually"
+  echo "      means something put it back (a Site Sync pull, a restored backup)."
+  echo "      Roe's newer copy was kept. Lines starting with < in the diff are"
+  echo "      the newer ones. To put Roe's copy back in site/:"
+  echo "        cp current/lib/site_templates/minimum/documentation/roe/<file> site/documentation/roe/<file>"
+  echo "      If you meant the old wording, change anything in it and run again."
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  echo ""
+fi
+
+if [[ -n "$APP_EDITED_FILES" ]]; then
+  echo -e "  ${ROE_ORANGE}================================================================"
+  echo -e "  ${BOLD}!!  EDITED IN current/  —  NOT SYNCED${NC}"
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  while IFS= read -r rel; do
+    [[ -z "$rel" ]] && continue
+    echo "      - current/$rel"
+    echo "        See what syncing would remove:"
+    echo "          git diff --no-index current/$rel $(site_path_of "$rel")"
+  done <<< "$APP_EDITED_FILES"
+  echo ""
+  echo "      These were changed in current/ since the last sync, and"
+  echo "      syncing would overwrite those changes. Add the changes you want"
+  echo "      to keep to the site/ file, then run again. Lines starting with"
+  echo "      - in the diff are the ones only current/ has."
+  echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  echo ""
+fi
+
 if [[ -n "$DRY_RUN" ]]; then
   echo "Dry run complete. Re-run without --dry-run to apply."
 elif [[ -n "$FAILED_FILES" ]]; then
@@ -313,6 +403,8 @@ elif [[ -n "$FAILED_FILES" ]]; then
   echo "      else synced. Bump Version: in the header of the site/ files"
   echo "      above and run again to ship them."
   echo -e "  ${ROE_ORANGE}================================================================${NC}"
+  exit 1
+elif [[ -n "$APP_EDITED_FILES$REVERTED_DOCS" ]]; then
   exit 1
 else
   echo "Done."

@@ -5,6 +5,10 @@ require "test_helper"
 # unreachable peer refuses to sync blind; a clean run pushes only the
 # safe local-only changes.
 class SiteSyncTransferConflictTest < ActiveSupport::TestCase
+  # A completed push records an event in the version store; left behind, it
+  # shows up on Sync History in tests that run later.
+  teardown { FileUtils.rm_rf(SiteSync::Versions.root) }
+
   def e(size, mtime)
     { "size" => size, "mtime" => mtime }
   end
@@ -145,8 +149,10 @@ class SiteSyncTransferConflictTest < ActiveSupport::TestCase
     })
 
     backed_up = nil
+    live_copy = Dir.mktmpdir
+    %w[mod.md del.md].each { |rel| File.write(File.join(live_copy, rel), "live's #{rel}") }
     transport = mock("transport")
-    transport.stubs(:backup_live_to_local!).with { |files:, on_progress:| backed_up = files; true }
+    transport.stubs(:backup_live_to_local!).with { |files:, on_progress:| backed_up = files; true }.returns(live_copy)
     transport.stubs(:push_local_to_live!)
     SiteSync.stubs(:transport).returns(transport)
 
@@ -154,5 +160,91 @@ class SiteSyncTransferConflictTest < ActiveSupport::TestCase
 
     assert_equal %w[del.md mod.md], backed_up.sort, "only overwritten + deleted peer files"
     refute_includes backed_up, "added.md"
+  ensure
+    FileUtils.rm_rf(live_copy) if live_copy
+    FileUtils.rm_rf(SiteSync::Versions.root)
+  end
+
+  # The peer records a file as agreed only when our copy has its size and
+  # mtime. Realigning a byte-identical file's mtime after the peer had
+  # refreshed its ledger left that file out of live's baseline, and live
+  # then reported it as "added": a pull for a file both sides held.
+  test "phantom mtimes are realigned before the peer refreshes its ledger" do
+    base = { "a.md" => e(1, 100) }
+    SiteSync::Ledger.stubs(:recorded).returns("files" => base)
+    SiteSync::Ledger.stubs(:current).returns(base)
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => base)
+    SiteSync::Ledger.stubs(:write_confirmed!)
+    SiteSync::Exchange.stubs(:can_call_peer?).returns(true)
+    SiteSync::Exchange.stubs(:call_peer)
+    SiteSync::DatabaseBackup.stubs(:pull!)
+    SiteSync.stubs(:transport).returns(stub_everything("transport"))
+    SiteSyncTransferJob.any_instance.stubs(:tidy_live?).returns(false)
+
+    order = sequence("bookkeeping")
+    SiteSyncTransferJob.any_instance.expects(:realign_phantom_mtimes!).in_sequence(order)
+    SiteSync::Exchange.expects(:refresh_peer_ledger!).in_sequence(order)
+
+    SiteSyncTransferJob.perform_now(:sync)
+
+    assert_equal :completed, status[:state]
+  end
+
+  # SiteSync::Versions: what a sync replaces is saved before it's touched.
+  test "a sync saves the local version a pull replaces, and live's a push replaces" do
+    pulled = "zz-versions-job/pulled.md"
+    pushed = "zz-versions-job/pushed.md"
+    FileUtils.mkdir_p(File.join(RoeSitePaths::SITE_PATH, "zz-versions-job"))
+    File.write(File.join(RoeSitePaths::SITE_PATH, pulled), "mine before the pull")
+    File.write(File.join(RoeSitePaths::SITE_PATH, pushed), "my new words")
+
+    SiteSync::Ledger.stubs(:recorded).returns("files" => { pulled => e(1, 100), pushed => e(1, 100) })
+    SiteSync::Ledger.stubs(:current).returns(pulled => e(1, 100), pushed => e(2, 200)) # pushed edited here
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => { pulled => e(3, 300), pushed => e(1, 100) }) # pulled edited live
+
+    live_copy = Dir.mktmpdir
+    FileUtils.mkdir_p(File.join(live_copy, "zz-versions-job"))
+    File.write(File.join(live_copy, pushed), "live's old words")
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!).returns(live_copy)
+    transport.expects(:push_local_to_live!).once
+    transport.stubs(:pull_live_to_local!).with { |**| File.write(File.join(RoeSitePaths::SITE_PATH, pulled), "live's new words"); true }
+    SiteSync.stubs(:transport).returns(transport)
+    SiteSyncTransferJob.any_instance.stubs(:tidy_live?).returns(false)
+    # The version store holds what the pull replaced; a full snapshot of
+    # /site is the Site Backups tab's job, not every sync's.
+    SiteSync::BackupManager.expects(:create).never
+
+    SiteSyncTransferJob.perform_now(:sync)
+
+    assert_equal :completed, status[:state]
+    read = ->(sha) { File.read(SiteSync::Versions.object_path(sha)) }
+    assert_equal "mine before the pull", read.(SiteSync::Versions.history_of(pulled).first[:before_sha])
+    assert_equal "live's old words", read.(SiteSync::Versions.history_of(pushed).first[:before_sha])
+  ensure
+    FileUtils.rm_rf(live_copy) if live_copy
+    FileUtils.rm_rf(File.join(RoeSitePaths::SITE_PATH, "zz-versions-job"))
+    FileUtils.rm_rf(SiteSync::Versions.root)
+  end
+
+  # No saved copy, no deletion: when live's copy can't be kept, nothing is pushed.
+  test "a push stops before sending when live's copy couldn't be saved" do
+    rel = "zz-versions-job/gone.md"
+    SiteSync::Ledger.stubs(:recorded).returns("files" => { rel => e(1, 100) })
+    SiteSync::Ledger.stubs(:current).returns({}) # deleted here
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => { rel => e(1, 100) })
+    # Past the delete warning (confirmed), so the deletion goes ahead.
+    planned = SiteSync::Reconciler.reconcile(baseline: { rel => e(1, 100) }, local: {}, peer: { rel => e(1, 100) })
+    SiteSync::Reconciler.stubs(:require_delete_confirmation).returns(planned)
+
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!).returns(Dir.mktmpdir) # came back empty
+    transport.expects(:push_local_to_live!).never
+    SiteSync.stubs(:transport).returns(transport)
+
+    assert_raises(SiteSync::Versions::SaveFailed) { SiteSyncTransferJob.perform_now(:push) }
+    assert_equal :failed, status[:state]
+  ensure
+    FileUtils.rm_rf(SiteSync::Versions.root)
   end
 end

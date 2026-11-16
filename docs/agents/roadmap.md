@@ -132,10 +132,14 @@ The UI is a single "Sync with live" button. A real conflict raises
 `ConflictsDetected` and the status becomes `:conflicts` with no overwrite and no
 retry; an unreachable peer raises `PeerUnreachable` rather than syncing blind.
 
-**Two follow-ups that remain open:** keep-both-renamed is deferred, since
-most-recent plus keep-mine/keep-live cover the core; and resolution applies only
-the conflicted files, so the sync needs running again afterwards to flow the safe
-push and pull sets that the block skipped.
+**Follow-ups:** keep-both-renamed is deferred, since most-recent plus
+keep local/keep live cover the core. Resolution used to apply only the
+conflicted files, leaving the rest for another sync; since 0.5.0 it carries on
+with the sync in the same run (APPLY CHOICES & SYNC).
+
+What 0.5.0 added on top — the version store, Sync History, REWIND, opening a
+change before syncing, comparing both versions in a conflict, the bulk-only
+deletion guard, and no snapshot per sync — is in [site-sync.md](site-sync.md).
 
 ---
 

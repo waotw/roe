@@ -186,3 +186,47 @@ This is a beta rule, not the finished design. Before 1.0 the answer is a
 pattern like the theme update system's — Roe notices a shipped file has
 changed, tells the user, and lets them choose — rather than moving things
 underneath a running site. Until that exists, the rule stands as written.
+
+---
+
+## 9. Never remove or rename a site class that has shipped
+
+A class on the public site that was in a stable release stays, on the same
+element, with the same meaning. New classes follow one naming pattern.
+
+**Why:** people write their own themes against the site's markup, and those
+themes aren't in this repository. Removing or moving a class silently breaks
+them, and nothing tells the site's owner why their page changed. The shipped
+themes are ours to tidy; the markup isn't.
+
+**How to apply:**
+
+- "Shipped" means it's in the last stable tag's public markup: views, helpers,
+  Markdown extensions, content layout parts, site JS. Check with
+  `git show v<last>:<path>`. A class added since then can still change.
+- When a shipped class has to go (the markup it described is gone, as with the
+  old podcast player in 0.5.0), say so in the release notes, by name.
+- Dead selectors may be removed from the shipped themes, with a version bump.
+- The inventory and its reasoning are in [site-classes.md](site-classes.md).
+
+New classes:
+
+- `<area>-<thing>`, lowercase, words joined with single dashes: `player-series-title`,
+  `feed-links`. No camelCase, no underscores, no `__` or `--`. A setting
+  value that goes into a class is dasherized.
+- Content layout parts are `<kind>-<part>` (`post-image`, `page-tags`). A
+  metadata field is `<kind>-field <kind>-field-<name>`, so it can never take a
+  structural name such as `post-header`. A new part's class goes in
+  `ContentLayout::PART_CLASS_NAMES`, since `page-<url_name>` shares the prefix;
+  `content_layout_part_classes_test.rb` checks it.
+- A state is `is-<state>` (`is-playing`, `is-current`), or an attribute the
+  markup already has (`[open]`, `[data-playing]`).
+- A variant is a dash suffix (`collection-grid-3`, `share-small`), not a bare
+  word.
+- A container of several things is the plural (`post-tags`, `player-tracks`);
+  each thing is the singular.
+- Titles are `-title`, not `-heading`; metadata rows are `-meta`.
+- No utility-framework names (`flex`, `w-5`) in public markup.
+
+The shipped names that break these rules (`alert--error`, `card-metadata`,
+`collection-page-heading`, `btn-*` next to `*-button`) stay as they are.

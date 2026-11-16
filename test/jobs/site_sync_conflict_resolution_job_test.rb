@@ -12,6 +12,8 @@ class SiteSyncConflictResolutionJobTest < ActiveSupport::TestCase
     SiteSync::Exchange.stubs(:can_call_peer?).returns(false)
     ContentSync.stubs(:sync_all)
     SiteSync::BackupManager.stubs(:create)
+    # Live's file list, read to keep its copies before a push (Versions).
+    SiteSync::Exchange.stubs(:fetch_peer_manifest).returns("files" => {})
     Rails.cache.delete(SiteSyncTransferJob::STATUS_CACHE_KEY)
   end
 
@@ -122,5 +124,77 @@ class SiteSyncConflictResolutionJobTest < ActiveSupport::TestCase
     assert SiteSyncTransferJob::STEPS.key?(before[:step]), "the page looks the label up from STEPS"
     assert_equal({ completed: 0, total: 1, bytes_done: 500, bytes_total: 1000 }, during[:progress])
     assert_equal :running, during[:state]
+  end
+
+  # APPLY CHOICES & SYNC: settling the conflicts used to be the end of it, and
+  # everything else they had held back sat under "Changes to sync" as if the
+  # sync had done nothing. Now the normal two-way sync runs straight after.
+  test "with then_sync, the normal two-way sync runs once the choices are applied" do
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.expects(:push_local_to_live!).once
+    SiteSync.stubs(:transport).returns(transport)
+
+    status_when_sync_started = nil
+    SiteSyncTransferJob.expects(:perform_now).with(:sync).once.with do |*|
+      status_when_sync_started = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+      true
+    end
+
+    SiteSyncConflictResolutionJob.perform_now(
+      { "a.md" => "local" }, [ { "path" => "a.md", "type" => "edit_edit" } ], then_sync: true
+    )
+
+    assert_equal :running, status_when_sync_started[:state],
+      "a 'completed' status in between makes the page reload onto a finished resolve"
+  end
+
+  test "without then_sync, it stops after the choices, as before" do
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.stubs(:push_local_to_live!)
+    SiteSync.stubs(:transport).returns(transport)
+    SiteSyncTransferJob.expects(:perform_now).never
+
+    SiteSyncConflictResolutionJob.perform_now({ "a.md" => "local" }, [ { "path" => "a.md", "type" => "edit_edit" } ])
+
+    assert_equal :completed, Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)[:state]
+  end
+
+  test "a failed resolution doesn't go on to sync" do
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.stubs(:push_local_to_live!).raises(RuntimeError, "live went away")
+    SiteSync.stubs(:transport).returns(transport)
+    SiteSyncTransferJob.expects(:perform_now).never
+
+    assert_raises(RuntimeError) do
+      SiteSyncConflictResolutionJob.perform_now(
+        { "a.md" => "local" }, [ { "path" => "a.md", "type" => "edit_edit" } ], then_sync: true
+      )
+    end
+    status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+    assert_equal [ :failed, :resolve ], [ status[:state], status[:kind] ]
+  end
+
+  # The sync writes its own status: new conflicts to show, or a failure with
+  # what it re-assessed. The resolution mustn't paint over it.
+  test "the follow-on sync's own status is what the page shows" do
+    transport = mock("transport")
+    transport.stubs(:backup_live_to_local!)
+    transport.stubs(:push_local_to_live!)
+    SiteSync.stubs(:transport).returns(transport)
+    SiteSyncTransferJob.stubs(:perform_now).with(:sync).with do |*|
+      Rails.cache.write(SiteSyncTransferJob::STATUS_CACHE_KEY,
+        { state: :conflicts, kind: :sync, conflicts: [ { "path" => "b.md", "type" => "edit_edit" } ] })
+      true
+    end
+
+    SiteSyncConflictResolutionJob.perform_now(
+      { "a.md" => "local" }, [ { "path" => "a.md", "type" => "edit_edit" } ], then_sync: true
+    )
+
+    status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
+    assert_equal [ :conflicts, :sync ], [ status[:state], status[:kind] ]
   end
 end

@@ -1,0 +1,2 @@
+product-top: [image] [title] [buy button]
+[body]

@@ -108,10 +108,10 @@ class Admin::PagesProductsNewFlowTest < ActionDispatch::IntegrationTest
     assert_includes content, "12.00"
     # Snipcart keys on the SKU; without one the buy button can't work.
     assert_match(/sku: ["']?ZINE-/, content, "a SKU is suggested when none is given")
-    # Scaffolded body: image, title, buy button.
-    assert_includes content, "![The Zine](/media/images/zine.jpg)"
-    assert_includes content, "# The Zine"
-    assert_includes content, "```button"
+    # The body is only the writing: the product layout draws the image,
+    # title and buy button from these fields.
+    assert_not_includes content, "# The Zine"
+    assert_not_includes content, "```button"
   end
 
   test "the sku field offers a generator and a collision warning" do

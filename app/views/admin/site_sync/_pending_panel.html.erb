@@ -1,0 +1,80 @@
+<%# A file the next sync will move, opened on the Site Sync page before the
+    sync. `side` is where it changed ("local" or "live"); the sync carries it
+    to the other side. Live's copy is fetched on demand (PendingPreview). %>
+<% target       = side == "local" ? "live" : "local" %>
+<% local_abs    = SiteSync::PendingPreview.local_copy(path) %>
+<% incoming     = side == "local" ? local_abs : live_abs %>
+<% outgoing     = side == "local" ? live_abs : local_abs %>
+<% action       = local_assigns[:action] || "changed" %>
+<% deleted      = action == "deleted" %>
+<% added        = action == "added" %>
+<% shown        = deleted ? outgoing : incoming %>
+<% shown_side   = deleted ? target : side %>
+<% live_needed  = !(side == "local" ? added : deleted) %>
+<% live_missing = live_needed && live_abs.nil? %>
+<% view         = view.presence || (action == "changed" ? "diff" : "file") %>
+<% image        = SiteSync::VersionPreview.image?(path) %>
+<% link_args    = ->(v) { admin_site_sync_pending_change_path(path: path, side: side, change: action, view: v, frame: frame) } %>
+<% tab_class    = ->(on) { "px-2 py-1 font-mono text-xs #{on ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}" } %>
+<%= turbo_frame_tag frame do %>
+  <div class="my-1 bg-gray-50 border border-gray-200 px-3 py-2.5 space-y-2 font-mono" data-change-panel="pending">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-semibold text-gray-900 truncate mr-auto" title="<%= path %>"><%= path %></span>
+      <% unless image %>
+        <span class="inline-flex border border-gray-400 rounded-xs overflow-hidden">
+          <%= link_to "FILE", link_args.("file"), class: tab_class.(view == "file") %>
+          <%= link_to "DIFF", link_args.("diff"), class: tab_class.(view == "diff") %>
+        </span>
+      <% end %>
+      <% if SiteSync::Versions.history_of(path).any? %>
+        <%= link_to "HISTORY", admin_site_sync_history_file_path(path: path), class: history_button_class, data: { turbo_frame: "_top" } %>
+      <% end %>
+      <% if shown %>
+        <%= link_to "DOWNLOAD", admin_site_sync_pending_version_path(path: path, which: shown_side), class: history_button_class, data: { turbo: false } %>
+      <% end %>
+    </div>
+
+    <% if live_missing %>
+      <p class="text-xs text-gray-600 font-sans">
+        Couldn't get the live copy to compare: it's over <%= number_to_human_size(SiteSync::PendingPreview::FETCH_MAX) %>, or the live site didn't answer.
+      </p>
+    <% elsif image %>
+      <p class="text-xs text-gray-600 font-sans">Local and live now. The next sync makes <%= target %> match <%= side %>.</p>
+      <div class="grid grid-cols-2 gap-3">
+        <% [ [ "LOCAL NOW", "local", local_abs ], [ "LIVE NOW", "live", live_abs ] ].each do |label, which, abs| %>
+          <div class="space-y-1">
+            <p class="text-[10px] font-bold text-gray-500"><%= label %></p>
+            <% if abs %>
+              <img src="<%= admin_site_sync_pending_version_path(path: path, which: which, inline: 1) %>" alt="" class="max-h-64 border border-gray-200 bg-white">
+              <p class="text-[10px] text-gray-500"><%= number_to_human_size(File.size(abs)) %></p>
+            <% else %>
+              <p class="text-xs text-gray-500 font-sans">Not there.</p>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <% shown_text = shown && SiteSync::VersionPreview.text_of(shown) %>
+      <% if shown && shown_text.nil? %>
+        <p class="text-xs text-gray-600 font-sans">
+          This file can't be shown here (<%= number_to_human_size(File.size(shown)) %>). Use DOWNLOAD to open it.
+        </p>
+      <% elsif view == "file" %>
+        <p class="text-xs text-gray-600 font-sans">
+          <% if deleted %>
+            FILE: the version <%= target %> will delete on the next sync.
+          <% else %>
+            FILE: the version <%= side %> sends to <%= target %> on the next sync.
+          <% end %>
+        </p>
+        <%= render "file_lines", text: shown_text %>
+      <% else %>
+        <p class="text-xs text-gray-600 font-sans">DIFF: the next site sync will make these changes to the <%= target %> version of this file.</p>
+        <% from_text = outgoing ? SiteSync::VersionPreview.text_of(outgoing) : "" %>
+        <% to_text   = incoming ? SiteSync::VersionPreview.text_of(incoming) : "" %>
+        <%= render "diff_lines", from_text: from_text, to_text: to_text,
+              missing_note: "The #{target} version can't be shown, so there's nothing to compare. FILE shows the #{side} version." %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

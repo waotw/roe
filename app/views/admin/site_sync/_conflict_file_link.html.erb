@@ -1,0 +1,9 @@
+<%# A file in the conflict list: click to open both versions under the row
+    (_conflict_panel), click again to close. data-turbo on the link itself,
+    because the resolutions form around it turns Turbo off. %>
+<%= link_to admin_site_sync_pending_change_path(path: path, change: "conflict", frame: conflict_frame_id(path)),
+      data: { turbo: true, turbo_frame: conflict_frame_id(path), history_panel_target: "link", action: "history-panel#toggle" },
+      aria: { expanded: false }, title: path,
+      class: "inline-flex max-w-full items-center gap-1.5 font-mono text-xs text-gray-800 hover:underline" do %>
+  <span class="transition-transform" data-arrow>▸</span><span class="truncate"><%= path %></span>
+<% end %>

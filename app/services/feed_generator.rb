@@ -274,12 +274,19 @@ class FeedGenerator
   #
   # Without this, every RSS item carried a 200-character summary and nothing
   # else, so a paid feed gave subscribers the same list of links a free one did.
+  # The item's content: the post's layout without the parts a reader shows
+  # from the item's own fields (title, date, author) — see ContentLayout::Text.
+  # Paid posts are still cut at the paywall; the cut is the body's alone.
   def feed_item_content(post)
     html = post.to_html(feed: true).to_s
-    return gate_free_content(html) unless post.audience == "paid"
-    return gate_free_content(html) if include_paid
+    body =
+      if post.audience != "paid" || include_paid
+        gate_free_content(html)
+      else
+        preview_before_gate(html)
+      end
 
-    preview_before_gate(html)
+    ContentLayout::Text.new(post, mode: :feed, body_html: body).html
   end
 
   # A free post can still carry a paywall block — the author may have written
@@ -511,8 +518,10 @@ class FeedGenerator
       .gsub(/```card\r?\n.*?```/m, "")         # Remove card blocks
       .gsub(/```collection\r?\n.*?```/m, "")   # Remove collection blocks
 
-    # Convert markdown to HTML
-    Kramdown::Document.new(clean_content, input: "GFM").to_html
+    # Convert markdown to HTML, then place it in the episode's layout, as on
+    # its page, less the player (the audio is the enclosure).
+    body = Kramdown::Document.new(clean_content, input: "GFM").to_html
+    ContentLayout::Text.new(post, mode: :podcast_feed, body_html: body).html
   end
 
   def extract_first_sentence(content)

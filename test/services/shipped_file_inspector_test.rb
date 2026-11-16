@@ -182,6 +182,39 @@ class ShippedFileInspectorTest < ActiveSupport::TestCase
     assert_equal :no_header, ShippedFileInspector.stamp!(write("x.js", "console.log(1)"))
   end
 
+  # ── edited_in_app (bin/sync-from-site's guard) ───────────────────────
+
+  test "a copy in current/ that matches its own fingerprint isn't flagged, even if site/ differs" do
+    app  = write("app.js", script(version: "1.0.0"))
+    site = write("site.js", script(version: "1.1.0", body: "console.log('newer');\n"))
+    assert_not ShippedFileInspector.edited_in_app?(app, site)
+  end
+
+  test "a copy edited in current/ after its fingerprint was stamped is flagged" do
+    stamped = ShippedFileInspector.fingerprint_of(script(version: "1.0.0"))
+    app  = write("app.js", script(version: "1.0.0", body: "console.log('hi');\nconsole.log('added by hand');\n", fingerprint: stamped))
+    site = write("site.js", script(version: "1.0.0"))
+    assert ShippedFileInspector.edited_in_app?(app, site)
+  end
+
+  test "an edit in current/ that site/ already has isn't flagged — syncing loses nothing" do
+    body = "console.log('hi');\nconsole.log('in both');\n"
+    stale = ShippedFileInspector.fingerprint_of(script(version: "1.0.0"))
+    app  = write("app.js", script(version: "1.0.0", body: body, fingerprint: stale))
+    site = write("site.js", script(version: "1.0.0", body: body))
+    assert_not ShippedFileInspector.edited_in_app?(app, site)
+  end
+
+  test "no fingerprint to go by, or no site copy, isn't flagged" do
+    app = write("app.js", script(version: "1.0.0", fingerprint: nil))
+    assert_not ShippedFileInspector.edited_in_app?(app, write("site.js", script(version: "1.0.0", body: "x\n")))
+    assert_not ShippedFileInspector.edited_in_app?(write("b.js", script(version: "1.0.0")), File.join(@dir, "missing.js"))
+  end
+
+  test "edited_in_app lists nothing when the shipped files match their fingerprints" do
+    assert_empty ShippedFileInspector.edited_in_app(site_root: site_with)
+  end
+
   # ── pending_updates (nav dot, Updates page note) ─────────────────────
 
   # A site folder holding a copy of every shipped file. `older` names the

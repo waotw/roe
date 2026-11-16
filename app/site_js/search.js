@@ -1,8 +1,8 @@
 /* ============== ROE SCRIPT ================
    Roe Script: search
-   Version: 1.1.1
-   Fingerprint: 4af3392b
-   Bundled with: Roe v0.4.0
+   Version: 1.1.2
+   Fingerprint: afe3ddf4
+   Bundled with: Roe v0.4.2
 
    This file was installed from Roe. Leave this comment in place
    and Admin → Updates will tell you when a newer version ships.
@@ -79,11 +79,19 @@
     function open(event) {
       if (event) event.preventDefault();
       facets = normalizeScope(pageFacets);
+      openedWithScope = false;
       showPanel();
     }
     function openWithScope(scope) {
       facets = normalizeScope(scope || {});
+      openedWithScope = true;
       showPanel();
+    }
+    // Opened from a tag link or ```search block with a tag filter still on.
+    // The header icon's page scope never counts, so it keeps its behaviour.
+    var openedWithScope = false;
+    function openedToTag() {
+      return openedWithScope && facets.tagsInclude.length > 0;
     }
     function showPanel() {
       panel.hidden = false;
@@ -189,8 +197,10 @@
         .filter(Boolean);
 
       // Before anything is typed, show nothing (and no "no results" message)
-      // unless the site opts into results-on-open.
-      if (tokens.length === 0 && !resultsWhenOpened) {
+      // unless the site opts into results-on-open — or the search was opened
+      // to a tag (a tag link, or a ```search block naming tags): then the
+      // tag is the question, so its matches show straight away.
+      if (tokens.length === 0 && !resultsWhenOpened && !openedToTag()) {
         results.innerHTML = "";
         activeIndex = -1;
         if (empty) empty.hidden = true;

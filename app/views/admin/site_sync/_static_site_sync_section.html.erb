@@ -215,7 +215,7 @@
             <% end %>
             <% if @static_site_sync_diff.modified.any? %>
               <div>
-                <p class="text-blue-700 font-semibold mb-1">Modified (<%= @static_site_sync_diff.modified.size %>)</p>
+                <p class="text-blue-700 font-semibold mb-1">Changed (<%= @static_site_sync_diff.modified.size %>)</p>
                 <ul class="space-y-0.5 pl-3">
                   <% @static_site_sync_diff.modified.first(50).each do |path| %>
                     <li class="text-gray-700">~ <%= path %></li>

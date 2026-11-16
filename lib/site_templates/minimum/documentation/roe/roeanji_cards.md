@@ -396,19 +396,29 @@ style: medium
 
 ## Player
 
-<mark>Music only:</mark> Player cards need the **Music** feature turned on. Until then `player` won't appear in the `CARD ▼` menu.
+A Player card puts an audio or video player in your writing. With no `audio` or `video` it plays the post's own, so on a podcast episode or music track the card is all you need:
 
-A Player card puts a single audio player in the middle of your writing — a track you want someone to hear at that point, rather than a whole release.
+````markdown
+```card
+type: player
+```
+````
+
+Audio, music and podcast posts already get this player at the top from their [content layout](/documentation/roe/layouts#content-layouts) (`[player]`). Add a card to the body when you want it somewhere else, or with different options. The card in the body is used instead of the layout's.
 
 ### Options
 
 | Option | Required | Description |
 |--------|----------|-------------|
 | `type` | Yes | Must be `player` |
-| `audio` | Yes | Path to the audio file |
-| `title` | No | Shown beside the player |
-| `image` | No | Artwork to show with it |
-| `show_artwork` | No | `false` hides the artwork |
+| `audio` | No | An audio file to play. Blank plays the post's own audio |
+| `video` | No | A video file or YouTube link. Blank plays the post's own video. If both are set, audio plays |
+| `title` | No | Shown in the player. Defaults to the post's title |
+| `image` | No | Audio only. Artwork for the player. Defaults to the post's `image`, then the release cover or podcast artwork |
+| `show_artwork` | No | Audio only. `false` hides the artwork |
+| `show_duration` | No | `true` shows the length under the player, from the post's `duration` |
+
+A track you want someone to hear in the middle of an article:
 
 ````markdown
 ```card
@@ -419,4 +429,38 @@ image: /media/images/quiet-hours.jpg
 ```
 ````
 
-For a whole release, use the [`playlist` collection template](/documentation/roe/collections_templates#when-to-use-the-playlist-template) instead — it gives you one player and a track list rather than a player per track.
+### What the player shows
+
+When it plays the post's own audio:
+
+- **Episode label.** A podcast episode with an `episode_number` shows it before the title: `E10`, or `S1E10` with a `season`.
+- **Chapters.** An episode with `chapters:` in its metadata lists them under the player. Click one to jump to it.
+- **Previous and next.** ⏮ ⏭ go to the episodes or tracks either side, when there are any. With a playlist on the page they're hidden, since the list does the same job.
+
+### A player and a playlist
+
+A player plays a [`playlist` collection](/documentation/roe/collections_templates#when-to-use-the-playlist-template): the first one after it on the page, or the first on the page if there's none after it. Clicking a row plays it, and playback runs on down the list.
+
+Put the collection straight after the card and they join into one box:
+
+````markdown
+```card
+type: player
+```
+
+```collection
+source: posts
+post_type: music
+release: the-quiet-hours
+order: track_number
+template: playlist
+```
+````
+
+A card with no `audio` or `video` on a page starts on the playlist's first track. A page can have more than one pair; each playlist plays in the nearest player above it.
+
+A playlist with no player links each row to its post. The post opens and starts its player, if the browser allows a page to start sound by itself. If not, the player is ready on that track for one tap.
+
+### On older themes
+
+The player's look comes from your theme. A theme without the player styles gets the browser's own audio controls instead, so the audio still plays. Update the theme in [Admin → Updates](/admin/updates) to get the full player.

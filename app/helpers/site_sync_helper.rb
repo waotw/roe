@@ -46,6 +46,11 @@ module SiteSyncHelper
   # rails_subdir synced over the handshake (SyncConfig#peer_*). The user first
   # navigates to the Roe folder (see the _restart_instructions partial); this
   # is step 2 — cd into the app subdir, then boot.
+  # The turbo frame a conflict's two versions open into, one per path.
+  def conflict_frame_id(path)
+    "conflict_#{Digest::SHA1.hexdigest(path.to_s)[0, 12]}"
+  end
+
   def restore_restart_command(config)
     base = config&.peer_deploy_target == "fly" ? "fly deploy" : "kamal app boot"
     subdir = config&.peer_rails_subdir.presence

@@ -1,6 +1,6 @@
 # Parked designs
 
-Two designs that were agreed in detail and deliberately not built. They are
+Designs that were agreed in detail and deliberately not built. They are
 recorded here so the thinking is not lost and so nobody redesigns them from
 scratch.
 
@@ -197,3 +197,49 @@ from that scope is lost.
 - Idempotency stays uniform across adapters via
   `json_extract(metadata,'$.<source_id_field>')` skip checks.
 - Import as drafts. Skip by guid.
+
+---
+
+# 3. Sync History per-file restore and FIND A FILE
+
+**Status: designed, partly built, shelved for 0.5.0 (2026-11-11).**
+What shipped instead — look-only Sync History plus REWIND of the newest sync
+— is in [site-sync.md](site-sync.md).
+
+Mocked in Figma, file "Roe-UI" (`WQlIVkkULhp0nsJQDONKcD`), page "Sync History
+— flow issues", frames `167:2` (problems), `170:49` (five approaches),
+`172:60` (two tabs), `174:74` and `176:84` (iterations 2 and 3).
+
+## The design
+
+- Two tabs: **SYNC HISTORY** (one card per sync) and **FIND A FILE** (search
+  any path, open its dated log).
+- In a sync, checkboxes only on files that can still be acted on — a file's
+  latest change. SELECT ALL; several files restore straight away after one
+  confirm ("Restore 3 files?"); one file opens a review panel with its diff
+  and RESTORE THIS FILE.
+- A file's log: DATE | WHAT HAPPENED | VERSION, with NOW marking the local
+  file and USE THIS VERSION on older lines.
+- Copy rules from the review: "local" and "live", no "yours", no
+  possessives.
+
+## Why it was shelved
+
+Restoring a file that went LOCAL → LIVE changes only local; live changes on
+the next sync. Every variant needed people to hold several states at once:
+which side was restored, whether the other side has it yet, what the next
+sync will do. It isn't yet known how people use Site Sync (live only, local
+then push, as a backup), and it should feel like one site unless something
+goes wrong. The records the store keeps make this buildable later without
+losing anything.
+
+## If it comes back
+
+- Build on `SiteSync::VersionRestore` (restore changes, or restore to a
+  point; writes local with a new modified time so the next sync pushes it).
+  Its routes and views were removed; the service and its tests stayed.
+- Keep "only a file's latest change can be acted on" on the server, not just
+  in the page.
+- Decide first how it sits beside REWIND: a per-file restore after a rewind,
+  or a rewind after a per-file restore, are the states that made it hard.
+

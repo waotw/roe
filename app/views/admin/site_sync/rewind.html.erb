@@ -1,0 +1,85 @@
+<%# What rewinding the newest sync will do, side by side, before it's done.
+    Built from live's file list, so it needs live; without it nothing can be
+    planned and there's no REWIND button. %>
+<div class="px-4 sm:px-0 font-mono">
+  <div class="flex items-center justify-between">
+    <h1 class="text-3xl font-semibold text-gray-900 font-sans">Sync History</h1>
+    <%= link_to "← Back to Sync History", admin_site_sync_history_path,
+          class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs text-nowrap" %>
+  </div>
+
+  <div class="mt-6 max-w-2xl bg-white border border-gray-400 rounded-xs shadow-sm">
+    <div class="px-5 pt-4">
+      <h2 class="text-lg font-semibold text-gray-900 font-sans">Rewind the sync?</h2>
+      <p class="mt-1 text-xs text-gray-500"><%= sync_time(@event[:at]) %> · <%= @event[:kind] %></p>
+    </div>
+
+    <% if !@rewindable %>
+      <p class="px-5 py-4 text-sm text-gray-700 font-sans">
+        Only the newest sync can be rewound. To go back further, rewind the most recent unrewound sync, one at a time.
+      </p>
+    <% elsif @unreachable %>
+      <p class="px-5 py-4 text-sm text-gray-700 font-sans">
+        Couldn't reach the live site. A rewind changes files on live and local, so it can't start until live is reachable.
+      </p>
+    <% else %>
+      <p class="px-5 pt-3 text-sm text-gray-700 font-sans">
+        The live and local site files will return to exactly as they were before this sync. Live and local will be out of sync after the
+        rewind. Before you sync again, make changes to the live or local site as needed, then sync.
+      </p>
+
+      <% if @plan.changed_since.any? %>
+        <div class="mx-5 mt-3 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xs text-sm text-amber-900 font-sans" id="changed-since">
+          <p class="font-semibold">Changed since this sync:</p>
+          <ul class="mt-1 space-y-0.5">
+            <% @plan.changed_since.each do |step| %>
+              <li><span class="font-mono text-xs"><%= step.path %></span> on <%= step.side %></li>
+            <% end %>
+          </ul>
+          <p class="mt-1">
+            <% if @plan.changed_since.size == 1 %>
+              Rewinding replaces that change. It will be available in the file's history.
+            <% else %>
+              Rewinding replaces those changes. They will be available in each file's history.
+            <% end %>
+          </p>
+        </div>
+      <% end %>
+
+      <% if @plan.missing.any? %>
+        <div class="mx-5 mt-3 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xs text-sm text-red-900 font-sans">
+          No saved copy of <span class="font-mono text-xs"><%= @plan.missing.map(&:path).to_sentence %></span>, so this sync can't be rewound.
+        </div>
+      <% end %>
+
+      <% [ [ "ON LOCAL", @plan.local ], [ "ON LIVE", @plan.live ] ].each do |title, steps| %>
+        <div class="px-5 pt-3">
+          <p class="text-xs font-bold text-gray-500"><%= title %></p>
+          <% if steps.empty? %>
+            <p class="text-xs text-gray-400 font-sans py-0.5">No changes.</p>
+          <% end %>
+          <% steps.each do |step| %>
+            <div class="flex items-center gap-2 py-0.5 text-xs">
+              <span class="w-28 shrink-0 text-gray-500 text-nowrap"><%= step.remove? ? "removed" : (step.change[:action] == "deleted" ? "put back" : "rewind") %></span>
+              <span class="truncate text-gray-900" title="<%= step.path %>"><%= step.path %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if @plan.remade.any? %>
+        <p class="px-5 pt-3 text-xs text-gray-500 font-sans">
+          Left as they are: <%= @plan.remade.size %> video web version<%= "s" if @plan.remade.size != 1 %>. Roe can make these again from the original.
+        </p>
+      <% end %>
+    <% end %>
+
+    <div class="px-5 py-4 flex justify-end gap-2">
+      <%= link_to "CANCEL", admin_site_sync_history_path, class: history_button_class %>
+      <% if @rewindable && @plan&.possible? %>
+        <%= button_to "REWIND", admin_site_sync_rewind_path(@event[:id]), method: :post, form: { data: { turbo: false } },
+              class: history_button_class(primary: true) %>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -10,7 +10,23 @@ class SiteSyncConflictResolutionJob < ApplicationJob
   # resolutions: { "path" => "local" | "live" }
   # conflicts:   the serialized conflicts from the blocked status (each has
   #              "path" and "type"), so we know the right action per path.
-  def perform(resolutions, conflicts)
+  # then_sync:   run the normal two-way sync straight after, so everything
+  #              else the conflicts held back goes across in the same run.
+  #              Without it, the page showed the rest still waiting and the
+  #              sync looked as if it had done nothing.
+  #
+  # The sync runs outside resolve!'s rescue: it writes its own status (new
+  # conflicts, a failure and what it re-assessed), and resolve! catching its
+  # error would overwrite that with a plain "resolution failed". New
+  # conflicts stop there and are shown as usual; nothing here runs again.
+  def perform(resolutions, conflicts, then_sync: false)
+    resolve!(resolutions, conflicts, then_sync: then_sync)
+    SiteSyncTransferJob.perform_now(:sync) if then_sync
+  end
+
+  private
+
+  def resolve!(resolutions, conflicts, then_sync:)
     @started_at = started_at = Time.current
     resolutions = resolutions.to_h
     plan = build_plan(resolutions, conflicts)
@@ -24,11 +40,16 @@ class SiteSyncConflictResolutionJob < ApplicationJob
 
     pushed = plan[:push_add].any? || plan[:push_delete].any?
     pulled = plan[:pull_add].any? || plan[:pull_delete].any?
+    # Every version this replaces or deletes, saved before it's touched.
+    @versions = SiteSync::Versions::Recorder.new
 
     # Keep-mine files flow local → live.
     if pushed
       update_step(:backing_up_live)
-      SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete], on_progress: progress_proc)
+      live_backup = SiteSync.transport.backup_live_to_local!(files: plan[:push_add] + plan[:push_delete], on_progress: progress_proc)
+      peer_files = SiteSync::Exchange.fetch_peer_manifest&.dig("files")
+      raise SiteSync::Versions::SaveFailed, "Couldn't get the file list from live, so the live versions couldn't be saved. Nothing was sent to live." if peer_files.nil?
+      @versions.save_live!(plan[:push_add] + plan[:push_delete], from: live_backup, peer: peer_files, deleted: plan[:push_delete])
       update_step(:pushing_to_live)
       SiteSync.transport.push_local_to_live!(diff: { modified: [], added: plan[:push_add], deleted: plan[:push_delete] }, on_progress: progress_proc)
     end
@@ -36,7 +57,7 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     # Keep-live files flow live → local.
     if pulled
       update_step(:backing_up_local)
-      @local_snapshot = SiteSync::BackupManager.create
+      @versions.save_local!(plan[:pull_add] + plan[:pull_delete], deleted: plan[:pull_delete])
       update_step(:pulling_from_live)
       SiteSync.transport.pull_live_to_local!(diff: { modified: [], added: plan[:pull_add], deleted: plan[:pull_delete] }, on_progress: progress_proc)
     end
@@ -74,19 +95,23 @@ class SiteSyncConflictResolutionJob < ApplicationJob
       outcome:  :completed,
       to_live:  { added: plan[:push_add], deleted: plan[:push_delete] },
       to_local: { added: plan[:pull_add], deleted: plan[:pull_delete] },
-      snapshot: @local_snapshot,
       at:       started_at
     )
+    @versions.finish!(kind: :resolve, outcome: :completed, at: started_at)
+
+    # With a sync to follow, the status stays "running" so the page keeps
+    # polling instead of reloading onto a finished resolve, and the sync
+    # tells the peer when it's done.
+    return if then_sync
 
     write_status(state: :completed, kind: :resolve, started_at: started_at, completed_at: Time.current)
     SiteSync::Exchange.call_peer if SiteSync::Exchange.can_call_peer?
   rescue => e
     Rails.logger.error "[SiteSyncConflictResolutionJob] #{e.class}: #{e.message}"
+    @versions&.finish!(kind: :resolve, outcome: :failed, at: @started_at || Time.current)
     write_status(state: :failed, kind: :resolve, error: e.message, completed_at: Time.current)
     raise
   end
-
-  private
 
   # The baseline means "the state both sides are known to hold". Only paths
   # this run actually transferred or deleted qualify; everything else keeps

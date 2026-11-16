@@ -69,6 +69,13 @@ class Admin::SiteSyncController < Admin::BaseController
     # push/pull buttons. nil when nothing has happened recently.
     @transfer_status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
 
+    # refresh_if_stale (above) asked live again in the background: the page
+    # waits for the answer and redraws (site_sync_refresh_controller.js), so
+    # nobody has to press REFRESH SYNC STATUS. Not while a transfer runs —
+    # site_sync_controller.js reloads the page when that finishes.
+    @peer_answer_coming = @peer_call_configured && SiteSync::Exchange.peer_state_stale?(@peer_state) &&
+                          @transfer_status&.dig(:state).to_s != "running"
+
     # Static Site Sync section state — only computed when SSG is
     # enabled to keep the page render cheap for everyone else. Diff is
     # only computed when the user has actually configured the sync;
@@ -319,11 +326,143 @@ class Admin::SiteSyncController < Admin::BaseController
   # Bi-directional sync: reconcile with live and apply the safe changes
   # both ways in one pass. Conflicts stop it (nothing overwritten), so no
   # typed confirmation is needed — both sides are backed up first anyway.
-  # A read-only record of what past syncs moved. Its own page because the Site
-  # Sync screen is already dense, and because this is something you go looking
-  # for after the fact rather than something you watch.
+  # What past syncs did, newest first: look at any file a sync moved (the
+  # version it left, or what changed), and rewind the newest sync. Its own
+  # page because the Site Sync screen is already dense, and because this is
+  # something you go looking for after the fact rather than something you
+  # watch.
   def history
+    # Syncs since the version store began come from it; earlier ones from
+    # the old log, restorable only from a snapshot.
+    @version_events = SiteSync::Versions.events(limit: 100)
+    @rewind_candidate = SiteSync::Rewind.candidate(@version_events)
+    @latest_rewind = @version_events.first if @version_events.first&.dig(:kind) == "rewind"
     @events = SiteSync::History.recent
+    if (oldest = @version_events.last)
+      @events = @events.select { |e| e.at && e.at < oldest[:at] - 1.second }
+    end
+  end
+
+  # One file a sync moved, opened in place: the version it left (FILE), what
+  # changed (DIFF), or that version against the file now (CURRENT).
+  def history_change
+    @change = SiteSync::Versions.change(params[:id])
+    raise ActiveRecord::RecordNotFound unless @change
+
+    @view = %w[file diff current].include?(params[:view]) ? params[:view] : nil
+    frame = params[:frame].to_s.match?(/\A[\w-]{1,64}\z/) ? params[:frame] : nil
+    render partial: "change_panel", locals: { change: @change, view: @view, frame: frame, in_log: params[:in_log].present? }
+  end
+
+  # Every recorded version of one file, as a dated log.
+  def history_file
+    @path = params[:path].to_s
+    @changes = SiteSync::Versions.history_of(@path)
+    raise ActiveRecord::RecordNotFound if @changes.empty?
+
+    @current_sha = current_sha(@path)
+  end
+
+  # The contents of one version a change recorded: `version=before|after`.
+  # Images open in the page (the before/after preview); everything else
+  # downloads, so nothing stored is ever run in the admin.
+  def history_version
+    change = SiteSync::Versions.change(params[:id])
+    raise ActiveRecord::RecordNotFound unless change
+
+    sha = params[:version] == "before" ? change[:before_sha] : change[:after_sha]
+    abs = SiteSync::VersionPreview.source(sha, change[:path])
+    raise ActiveRecord::RecordNotFound unless abs
+
+    inline = params[:inline].present? && SiteSync::VersionPreview.image?(change[:path])
+    send_file abs, filename: File.basename(change[:path]),
+                   type: Rack::Mime.mime_type(File.extname(change[:path]), "application/octet-stream"),
+                   disposition: inline ? "inline" : "attachment"
+  end
+
+  # A file the next sync will move, opened on the Site Sync page before the
+  # sync: FILE, or DIFF of live now against local now. `side` is where it
+  # changed. Live's copy is fetched for the look and never written to /site.
+  def pending_change
+    path = pending_path!
+    side = params[:side] == "live" ? "live" : "local"
+    action = %w[added changed deleted conflict].include?(params[:change]) ? params[:change] : "changed"
+    frame = params[:frame].to_s.match?(/\A[\w-]{1,64}\z/) ? params[:frame] : "pending_panel"
+    live_size = SiteSync::Exchange.fetch_peer_file_states([ path ]).dig(path, "size")
+
+    SiteSync::PendingPreview.with_live_copy(path, size: live_size) do |live_abs|
+      if action == "conflict"
+        # A file changed on both sides (or changed on one, deleted on the
+        # other): the two versions to choose between, side by side.
+        view = %w[local live diff].include?(params[:view]) ? params[:view] : nil
+        render partial: "conflict_panel", locals: { path: path, view: view, frame: frame, live_abs: live_abs }
+      else
+        view = %w[file diff].include?(params[:view]) ? params[:view] : nil
+        render partial: "pending_panel",
+               locals: { path: path, side: side, action: action, view: view, frame: frame, live_abs: live_abs }
+      end
+    end
+  end
+
+  # One side's copy of a pending file: `which=local|live`. Images open in
+  # the page; everything else downloads.
+  def pending_version
+    path = pending_path!
+    inline = params[:inline].present? && SiteSync::VersionPreview.image?(path)
+    options = { filename: File.basename(path), disposition: inline ? "inline" : "attachment",
+                type: Rack::Mime.mime_type(File.extname(path), "application/octet-stream") }
+
+    if params[:which] == "live"
+      live_size = SiteSync::Exchange.fetch_peer_file_states([ path ]).dig(path, "size")
+      body = SiteSync::PendingPreview.with_live_copy(path, size: live_size) { |abs| abs && File.binread(abs) }
+      raise ActiveRecord::RecordNotFound unless body
+
+      send_data body, **options
+    else
+      abs = SiteSync::PendingPreview.local_copy(path)
+      raise ActiveRecord::RecordNotFound unless abs
+
+      send_file abs, **options
+    end
+  end
+
+  # What rewinding a sync would do, before it's done. Needs live: the plan
+  # says what changes there, and whether live has changed since.
+  def rewind
+    @event = SiteSync::Versions.event(params[:id])
+    raise ActiveRecord::RecordNotFound unless @event
+
+    @rewindable = SiteSync::Rewind.rewindable?(@event)
+    return unless @rewindable
+
+    peer = SiteSync::Exchange.fetch_peer_manifest
+    @unreachable = peer.nil?
+    @plan = SiteSync::Rewind.plan(@event, peer: peer["files"] || {}) if peer
+  end
+
+  def perform_rewind
+    event = SiteSync::Versions.event(params[:id])
+    raise ActiveRecord::RecordNotFound unless event
+
+    if transfer_in_progress?
+      flash[:alert] = "A sync is already running. Wait for it to finish."
+      redirect_to admin_site_sync_history_path
+      return
+    end
+    unless SiteSync::Rewind.rewindable?(event)
+      flash[:alert] = "Only the newest sync can be rewound."
+      redirect_to admin_site_sync_history_path
+      return
+    end
+
+    Rails.cache.write(
+      SiteSyncTransferJob::STATUS_CACHE_KEY,
+      { state: :running, kind: :rewind, started_at: Time.current, event_at: event[:at] },
+      expires_in: SiteSyncTransferJob::STATUS_TTL
+    )
+    SiteSyncRewindJob.perform_later(event[:id])
+    flash[:notice] = "Rewinding the #{event[:at].in_time_zone.strftime('%B %-d, %-I:%M %p')} sync."
+    redirect_to admin_site_sync_path
   end
 
   # Take specific files back out of the snapshot a sync took before it wrote.
@@ -430,8 +569,8 @@ class Admin::SiteSyncController < Admin::BaseController
     end
 
     seed_running_status(:resolve)
-    SiteSyncConflictResolutionJob.perform_later(resolutions, conflicts)
-    flash[:notice] = "Applying #{resolutions.size} resolution(s) in the background. Refresh to check progress."
+    SiteSyncConflictResolutionJob.perform_later(resolutions, conflicts, then_sync: true)
+    flash[:notice] = "Applying #{resolutions.size} resolution(s), then syncing everything else."
     redirect_to admin_site_sync_path
   end
 
@@ -451,6 +590,11 @@ class Admin::SiteSyncController < Admin::BaseController
   # `progress` is populated by SiteSyncTransferJob during rsync steps:
   # { completed: 5, total: 12 }. Absent for non-rsync steps, in which
   # case the UI just hides the progress line.
+  # When live last answered, for a page waiting on a background exchange.
+  def peer_status
+    render json: { received_at: SiteSync::Exchange.last_contact_at&.to_i }
+  end
+
   def transfer_status
     status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
     if status.nil?
@@ -556,7 +700,17 @@ class Admin::SiteSyncController < Admin::BaseController
 
     local = @status[:state] == :local_drift ? @status[:local] : nil
     live  = @peer_drift ? (@peer_state&.dig(:drift) || {}) : nil
-    differs = (Array(@sync_conclusion.agreement&.differing) if local.nil? && live.nil? && @sync_conclusion.out_of_sync?)
+    differs = nil
+    if local.nil? && live.nil? && @sync_conclusion.out_of_sync?
+      # Neither side's own record shows a change, yet the files differ. This
+      # computer's record (the one a sync goes by) can usually say which side
+      # changed — after a rewind, live's own record still matches live.
+      agreement = @sync_conclusion.agreement
+      live  = agreement&.on_live&.merge(truncated: false)
+      local = agreement&.on_local
+      differs = Array(agreement&.differing)
+      differs = nil if differs.empty? && (live || local)
+    end
 
     paths = [ local, live ].compact.flat_map { |c| Array(c[:modified]) + Array(c[:added]) + Array(c[:deleted]) }
     paths += Array(differs)
@@ -573,6 +727,18 @@ class Admin::SiteSyncController < Admin::BaseController
 
   def transfer_in_progress?
     Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)&.dig(:state) == :running
+  end
+
+  def pending_path!
+    path = params[:path].to_s
+    raise ActiveRecord::RecordNotFound unless SiteSync::PendingPreview.trackable?(path)
+
+    path
+  end
+
+  def current_sha(path)
+    abs = File.join(RoeSitePaths::SITE_PATH, path)
+    File.file?(abs) ? Digest::SHA256.file(abs).hexdigest : nil
   end
 
   # Write the running status synchronously before enqueueing so

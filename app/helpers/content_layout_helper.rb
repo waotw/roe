@@ -1,0 +1,136 @@
+# Draws a record's content layout (ContentLayout): its blocks in order, each
+# as the element its place gives it.
+#
+#   header   <header class="…">   the first block before the content
+#   group    <div class="…">      blocks between header, content and footer
+#   content  the writing and the boxes grouped with it; wrapped in a
+#            <div class="…"> only when the block is named
+#   footer   <footer class="…">   the last block after the content
+#
+# A block or row gets the classes written in the layout; without any, a
+# group is .layout-group and a row of several boxes .layout-row. A row of one
+# box with no classes is the part alone. Roe's default layouts write out the
+# classes themes already use (.post-header, .post-header-top, .post-meta,
+# .podcast-episode, .product-top), so they draw what the post-type templates
+# did — and an edited layout draws only what it says.
+#
+# Each part is a partial in app/views/content_layouts/parts/. A name with no
+# partial is shown as a metadata field when the record has a value for it,
+# and skipped otherwise. A part the body already has is skipped (BodyCheck).
+# Blocks and rows left with nothing to show are dropped.
+module ContentLayoutHelper
+  def render_content_layout(record, layout: ContentLayout.for(record), **locals)
+    kind = layout_kind(record)
+    context = layout_context(record, kind, layout, locals)
+    body_check = ContentLayout::BodyCheck.new(record)
+
+    blocks = layout.blocks.filter_map do |block|
+      rows = block.rows.filter_map do |row|
+        parts = row.parts.filter_map do |name|
+          next if body_check.has?(name)
+          render_layout_part(name, record, kind, context).to_s.presence&.html_safe
+        end
+        layout_row_html(row, parts) if parts.any?
+      end
+      layout_block_html(block, rows) if rows.any?
+    end
+    safe_join(blocks, "\n")
+  end
+
+  # The layout editor's textarea is at least as wide as its longest line
+  # plus two characters, so a layout opens without wrapping; wider than
+  # that, it takes the spare room and the side panel shrinks first. The
+  # textarea's own font sets `ch`. Kept between 24 and 80 characters so a
+  # stray long line can't push the panel off the page.
+  # Same sum as layout_explain_controller.js#fitWidth, which keeps it up to
+  # date while typing.
+  def layout_textarea_min_width(text)
+    longest = text.to_s.split("\n").map { |line| line.gsub("\t", "  ").length }.max || 0
+    "min-width: calc(#{longest.clamp(24, 80) + 2}ch + 1rem);"
+  end
+
+  # Partials are rendered by name only from the fixed list, so a layout file
+  # can't reach any other template.
+  def render_layout_part(name, record, kind, context)
+    if ContentLayout::SERIES_PARTS.include?(name)
+      render(partial: "content_layouts/parts/series", locals: { name: name, record: record, kind: kind, context: context })
+    elsif ContentLayout::BUILT_PARTS.include?(name)
+      render(partial: "content_layouts/parts/#{name}", locals: { record: record, kind: kind, context: context })
+    else
+      render_layout_field(name, record, kind)
+    end
+  end
+
+  private
+
+  def layout_kind(record)
+    case record
+    when Post          then "post"
+    when Page          then "page"
+    when Product       then "product"
+    when Documentation then "documentation"
+    else "post"
+    end
+  end
+
+  # What several parts need, worked out once per page: the record's podcast
+  # or release settings (pages, and a podcast episode's show), and for the
+  # release and podcast boxes the keys and settings of either.
+  def layout_context(record, kind, layout, locals)
+    podcast_key = record.respond_to?(:metadata) ? record.metadata["podcast"].to_s.presence : nil
+    episode = kind == "post" && record.post_type == "podcast" && podcast_key
+    podcast_config =
+      if kind == "page"
+        (podcast_enabled? && podcast_key) ? PodcastConfig.get(podcast_key) : nil
+      elsif episode
+        PodcastConfig.get(podcast_key)
+      end
+
+    release_key = kind == "page" ? record.metadata["release"].to_s.strip.presence : nil
+    release_config = release_key && SiteFeature.music_enabled? ? ReleaseConfig.get(release_key) : nil
+
+    series_release = record.respond_to?(:metadata) && (kind == "page" || (kind == "post" && record.post_type == "music")) ?
+      record.metadata["release"].to_s.strip.presence : nil
+    series_podcast = record.respond_to?(:metadata) && (kind == "page" || (kind == "post" && record.post_type == "podcast")) ?
+      podcast_key : nil
+
+    {
+      podcast_config: podcast_config,
+      release_config: release_config,
+      series: {
+        music: kind == "post" ? record.post_type == "music" : series_release.present?,
+        podcast: kind == "post" ? record.post_type == "podcast" : series_podcast.present?,
+        release_key: series_release,
+        release: (series_release && SiteFeature.music_enabled? ? ReleaseConfig.get(series_release) : nil).to_h,
+        podcast_settings: (series_podcast && podcast_enabled? ? PodcastConfig.get(series_podcast) : nil).to_h
+      },
+      layout_parts: layout.parts
+    }.merge(locals)
+  end
+
+  def layout_block_html(block, rows)
+    inner = safe_join(rows, "\n")
+    css = block.classes.join(" ").presence
+    case block.role
+    when :header  then content_tag(:header, inner, class: css)
+    when :footer  then content_tag(:footer, inner, class: css)
+    when :content then css ? content_tag(:div, inner, class: css) : inner
+    else               content_tag(:div, inner, class: css || "layout-group")
+    end
+  end
+
+  def layout_row_html(row, parts)
+    return parts.first if row.parts.length == 1 && row.classes.empty?
+
+    content_tag(:div, safe_join(parts, "\n"), class: row.classes.join(" ").presence || "layout-row")
+  end
+
+  # A part named after a metadata field the record has: its value, plainly.
+  def render_layout_field(name, record, kind)
+    value = record.respond_to?(:metadata) ? record.metadata[name] : nil
+    value = value.join(", ") if value.is_a?(Array)
+    return nil if value.blank? || value.is_a?(Hash)
+
+    content_tag(:p, value.to_s, class: "#{kind}-field #{kind}-field-#{name.dasherize}")
+  end
+end

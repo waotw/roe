@@ -1,0 +1,5 @@
+<%# The product's price, when it sets one. The buy button shows the price
+    beside it too, unless the layout has this part. %>
+<% if kind == "product" && record.metadata["price"].to_s.strip.present? %>
+  <p class="product-price"><%= store_currency_symbol %><%= sprintf("%.2f", record.price) %></p>
+<% end %>

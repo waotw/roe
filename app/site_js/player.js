@@ -1,7 +1,7 @@
 /* ============== ROE SCRIPT ================
    Roe Script: player
-   Version: 1.0
-   Fingerprint: eeb47f48
+   Version: 1.5
+   Fingerprint: c81998b7
    Bundled with: Roe v0.4.0
 
    This file was installed from Roe. Leave this comment in place
@@ -31,7 +31,21 @@
 //   [data-player-ui]                  hidden until this script shows it
 //   [data-player-chapter][data-time]  a chapter row; clicking seeks there
 //   [data-player-info]                the [info] link, shown for a playlist
-//   [data-playlist] .player-track     a `playlist` collection's rows
+//   [data-playlist] .player-track     a `playlist` collection's rows. A
+//     playlist belongs to the nearest player above it; a player with no
+//     playlist anywhere below it takes the first on the page
+//   .player-series                    ⏮ ⏭ links, hidden once a playlist is
+//     adopted, since the list does the same job
+//   .player-track-link                a row's link to its post. Without a
+//     player it's the row's way in (same tab, with ?play); once a player
+//     adopts the list it opens the post in a new tab, without ?play
+//   ?play in the page's address       start this page's player on arrival,
+//     where the browser allows it
+//   [data-player-part="prev" | "next"] ⏮ ⏭ in the transport. Hidden until
+//     this file shows them, and only on a theme that styles them (it sets
+//     --player-nav: 1 on .card-player). They step through the playlist when
+//     the player has one, else open the episode or track either side (the
+//     .player-series links) with ?play. Disabled at either end.
 (function () {
   "use strict";
 
@@ -156,6 +170,7 @@
 
     this.setupChapters();
     this.setupPlaylist();
+    this.setupNav();
   };
 
   Player.prototype.on = function (name, event, fn) {
@@ -339,7 +354,7 @@
   };
 
   Player.prototype.highlightChapter = function (current) {
-    if (!this.chapters.length) return;
+    if (!this.chapters.length || this.chaptersOff) return;
     var active = 0;
     for (var i = 0; i < this.chapters.length; i++) {
       if (current >= this.chapters[i]) active = i;
@@ -355,18 +370,40 @@
 
   // ── playlist ─────────────────────────────────────────────────────────
   //
-  // A `playlist` collection elsewhere on the page becomes this player's
-  // queue: choosing a row loads it here, and playback runs on down the list.
-  // One player and one playlist per page for now. Without this file every
-  // row plays on its own, in its own browser controls.
+  // A `playlist` collection on the page becomes this player's queue:
+  // choosing a row loads it here, and playback runs on down the list. A
+  // playlist belongs to the nearest player above it, so a page can pair
+  // several ([player] then [playlist], or a card then a collection) and a
+  // player higher up the page never takes a list meant for the one beside
+  // it. A player with no playlist anywhere below it takes the first on the
+  // page. A playlist has one player. Without this file every row plays on
+  // its own, in its own browser controls.
+
+  // The last player that comes before `list` on the page, or null.
+  function nearestPlayerAbove(list) {
+    var nearest = null;
+    Array.prototype.slice.call(document.querySelectorAll("[data-player]")).forEach(function (el) {
+      if (!el.contains(list) && (el.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING)) nearest = el;
+    });
+    return nearest;
+  }
 
   Player.prototype.setupPlaylist = function () {
     var self = this;
     var info = this.root.querySelector("[data-player-info]");
-    var playlist = document.querySelector("[data-playlist]");
-    if (!playlist || this.root.contains(playlist)) return;
-    // The first player on the page owns the playlist.
-    if (playlist._playerOwner && playlist._playerOwner !== this && document.contains(playlist._playerOwner.root)) return;
+    var root = this.root;
+    var all = Array.prototype.slice.call(document.querySelectorAll("[data-playlist]"));
+    var taken = function (list) {
+      return list._playerOwner && list._playerOwner !== self && document.contains(list._playerOwner.root);
+    };
+    var after = all.filter(function (list) {
+      return !root.contains(list) && (root.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    var mine = after.filter(function (list) {
+      return !taken(list) && nearestPlayerAbove(list) === root;
+    })[0];
+    var playlist = root.querySelector("[data-playlist]") || mine || (after.length ? null : all[0]);
+    if (!playlist || taken(playlist)) return;
     playlist._playerOwner = this;
 
     this.info = info;
@@ -377,6 +414,18 @@
     this.tracks.forEach(function (row, i) {
       var rowAudio = row.querySelector(".player-track-audio");
       if (rowAudio) rowAudio.hidden = true;
+      // The row plays here now, so its link opens the post alongside,
+      // without starting a second player there.
+      var link = row.querySelector(".player-track-link");
+      if (link) {
+        link.target = "_blank";
+        link.rel = "noopener";
+        try {
+          var url = new URL(link.href);
+          url.searchParams.delete("play");
+          link.href = url.toString();
+        } catch (e) { /* leave it */ }
+      }
       var select = row.querySelector("[data-player-select]");
       if (!select) return;
       select.addEventListener("click", function (e) {
@@ -385,9 +434,95 @@
       });
     });
 
-    var hasOwn = !!(this.media.getAttribute("src") || this.media.querySelector("source[src]"));
-    if (!hasOwn && this.tracks.length) this.selectTrack(0, false);
+    // The playlist steps through the episodes, so ⏮ ⏭ would only repeat it.
+    Array.prototype.slice.call(this.root.querySelectorAll(".player-series")).forEach(function (nav) {
+      nav.hidden = true;
+    });
+
+    var ownSource = this.media.querySelector("source[src]");
+    var own = this.media.getAttribute("src") || (ownSource && ownSource.getAttribute("src")) || "";
+    this.ownSrc = own;
+    if (own) {
+      // Playing this post's own episode: its row is the current one, so
+      // playback runs on from there.
+      var ownPath = pathOf(own);
+      this.tracks.forEach(function (row, i) {
+        if (self.currentIndex < 0 && pathOf(self.trackSrc(row)) === ownPath) self.currentIndex = i;
+      });
+    } else if (this.tracks.length) {
+      this.selectTrack(0, false);
+    }
   };
+
+  // ── ⏮ ⏭ ──────────────────────────────────────────────────────────────
+
+  Player.prototype.setupNav = function () {
+    var self = this;
+    var buttons = this.parts("prev").concat(this.parts("next"));
+    if (!buttons.length) return;
+    // An older theme has no look for these; showing them there would put
+    // two empty buttons in the player.
+    var styled = window.getComputedStyle(this.root).getPropertyValue("--player-nav").trim() === "1";
+    if (!styled) return;
+    buttons.forEach(function (b) {
+      b.hidden = false;
+    });
+    this.root.setAttribute("data-player-nav", "");
+    this.on("prev", "click", function () {
+      self.step(-1);
+    });
+    this.on("next", "click", function () {
+      self.step(1);
+    });
+    this.updateNav();
+  };
+
+  Player.prototype.seriesLink = function (rel) {
+    return this.root.querySelector(".player-series-" + rel);
+  };
+
+  Player.prototype.step = function (dir) {
+    if (this.tracks.length) {
+      var i = this.currentIndex < 0 ? 0 : this.currentIndex + dir;
+      if (i >= 0 && i < this.tracks.length) this.selectTrack(i, true);
+      return;
+    }
+    var link = this.seriesLink(dir < 0 ? "prev" : "next");
+    if (!link) return;
+    var url;
+    try {
+      url = new URL(link.href);
+      url.searchParams.set("play", "");
+    } catch (e) {
+      return;
+    }
+    if (window.Turbo && window.Turbo.visit) {
+      window.Turbo.visit(url.toString());
+    } else {
+      window.location.href = url.toString();
+    }
+  };
+
+  Player.prototype.updateNav = function () {
+    var n = this.tracks.length;
+    var i = this.currentIndex;
+    var hasPrev = n ? i > 0 : !!this.seriesLink("prev");
+    var hasNext = n ? i + 1 < n : !!this.seriesLink("next");
+    this.parts("prev").forEach(function (b) {
+      b.disabled = !hasPrev;
+    });
+    this.parts("next").forEach(function (b) {
+      b.disabled = !hasNext;
+    });
+  };
+
+  function pathOf(src) {
+    try {
+      return decodeURI(new URL(src, window.location.href).pathname);
+    } catch (e) {
+      return src;
+    }
+  }
 
   Player.prototype.trackSrc = function (row) {
     var a = row.querySelector(".player-track-audio");
@@ -410,6 +545,17 @@
     this.media.load();
 
     this.setText("title", row.getAttribute("data-title") || "");
+    var episode = row.getAttribute("data-episode") || "";
+    this.parts("episode").forEach(function (el) {
+      el.textContent = episode;
+      el.hidden = !episode;
+    });
+    // Chapters belong to this post's own episode; another one has none here.
+    var isOwn = !!this.ownSrc && pathOf(src) === pathOf(this.ownSrc);
+    this.chaptersOff = !isOwn;
+    Array.prototype.slice.call(this.root.querySelectorAll(".player-chapters")).forEach(function (el) {
+      el.hidden = !isOwn;
+    });
     var image = row.getAttribute("data-image") || this.fallbackCover;
     this.parts("artwork").forEach(function (img) {
       if (image) {
@@ -428,7 +574,12 @@
 
     this.tracks.forEach(function (t, j) {
       t.classList.toggle("is-playing", j === index);
+      t.classList.toggle("is-current", j === index);
+      if (j === index) t.setAttribute("aria-current", "true");
+      else t.removeAttribute("aria-current");
     });
+
+    if (this.root.hasAttribute("data-player-nav")) this.updateNav();
 
     if (autoplay) {
       var p = this.media.play();
@@ -510,6 +661,42 @@
     }
   }
 
+  // ── ?play ────────────────────────────────────────────────────────────
+  //
+  // A playlist with no player links each row to its post with ?play: start
+  // that post's player when it opens. Browsers decide whether a page may
+  // start sound itself; when one says no, the player is left ready on the
+  // track, in view, for one tap. The ?play comes off the address either way,
+  // so a refresh doesn't start it again.
+
+  function playOnArrival() {
+    var params;
+    try { params = new URLSearchParams(window.location.search); } catch (e) { return; }
+    if (!params.has("play")) return;
+
+    var own = players.filter(function (p) {
+      return p.media.getAttribute("src") || p.media.querySelector("source[src]");
+    })[0] || players[0];
+
+    params.delete("play");
+    var query = params.toString();
+    var clean = window.location.pathname + (query ? "?" + query : "") + window.location.hash;
+    try { window.history.replaceState(window.history.state, "", clean); } catch (e) { /* leave it */ }
+    if (!own) return;
+
+    var ready = function () {
+      if (own.root.scrollIntoView) own.root.scrollIntoView({ block: "nearest" });
+      var play = own.part("play");
+      if (play && play.focus) play.focus({ preventScroll: true });
+    };
+    var p = own.media.play();
+    if (p && p.then) {
+      p.then(ready, ready);
+    } else {
+      ready();
+    }
+  }
+
   // ── start ────────────────────────────────────────────────────────────
 
   function init() {
@@ -527,6 +714,7 @@
       players.push(player);
       player.enhance();
     });
+    playOnArrival();
   }
 
   if (document.readyState === "loading") {

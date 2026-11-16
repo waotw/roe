@@ -194,3 +194,4 @@ static:
 - [Extending](./09-extending.md) - What to update when adding features
 - [Media System](./17-media-system.md) - Media handling during sync and generation
 - [Deployment](./20-deployment.md) - Production deployment of static sites
+- Site Sync (local ↔ live) is a separate system: [how it decides what to move](./agents/roadmap.md#site-sync-over-http--shipped) and [history, rewind, conflicts and deletions](./agents/site-sync.md)

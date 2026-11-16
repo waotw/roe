@@ -2774,6 +2774,19 @@ open_site_in_browser() {
     _open_url "${url}/admin"
 }
 
+# The background log only grows: every server, job and watcher line since
+# the install began. At each start, one over 10 MB becomes roe-daemon.log.1
+# (replacing the last one) and a fresh file begins. A process still writing
+# to the old one keeps doing so harmlessly — it was renamed, not removed.
+DAEMON_LOG_MAX_BYTES=$((10 * 1024 * 1024))
+rotate_daemon_log() {
+    local log_file="$1" size
+    [ -f "$log_file" ] || return 0
+    size="$(wc -c < "$log_file" 2>/dev/null | tr -d ' ')"
+    [ "${size:-0}" -gt "$DAEMON_LOG_MAX_BYTES" ] || return 0
+    mv -f "$log_file" "$log_file.1"
+}
+
 # Background start: Tailwind watcher and Puma both detached from this
 # terminal, output to log/roe-daemon.log, PID files where stop/status
 # already look. Waits until the port answers (or gives up) so the caller
@@ -2781,6 +2794,7 @@ open_site_in_browser() {
 start_daemon() {
     local log_file="$APP_DIR/log/roe-daemon.log"
     mkdir -p "$APP_DIR/log" "$APP_DIR/tmp/pids"
+    rotate_daemon_log "$log_file"
 
     # Marks where this start's output begins, with the time: Rails' own
     # boot lines have none. bin/roe-logs (roe logs) reads back to the last
@@ -3021,12 +3035,16 @@ check_content_watcher() {
     [ -f "$APP_DIR/bin/roe-watch-check" ] || return 0
     check_ruby > /dev/null 2>&1 || return 0
 
-    local detail
-    detail="$(cd "$APP_DIR" && ruby "$APP_DIR/bin/roe-watch-check" "$SITE_DIR" 2>/dev/null)" && return 0
-    [ -n "$detail" ] || return 0
+    local detail status=0
+    detail="$(cd "$APP_DIR" && ruby "$APP_DIR/bin/roe-watch-check" "$SITE_DIR" 2>/dev/null)" || status=$?
+    [ "$status" -ne 0 ] && [ -n "$detail" ] || return 0
 
     echo ""
-    log_warning "The ContentWatcher appears to have stopped picking up changes."
+    if [ "$status" -eq 2 ]; then
+        log_warning "The ContentWatcher couldn't load some changed files."
+    else
+        log_warning "The ContentWatcher appears to have stopped picking up changes."
+    fi
     echo "$detail"
 
     # Only ask when someone can answer: piped or scripted, a prompt would

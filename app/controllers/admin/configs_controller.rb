@@ -136,8 +136,15 @@ class Admin::ConfigsController < Admin::BaseController
         "sync_confirm_deletions_over" => {
           type: :text,
           label: "Confirm deletions over",
-          placeholder: "0",
-          hint: "Site Sync deletes files. If a file is deleted on your Live site and you sync the site, it will be deleted locally and vice-versa. This is a threshold for when you will be warned about file deletions. 0 means you'll be warned everytime. '5' means you'll be warned if 6 or more files will be deleted. Set to 'never' to turn off warnings."
+          placeholder: "20",
+          hint: "Site Sync deletes files: a file deleted on live is deleted locally, and vice-versa. Every deleted file is saved first, so REWIND or Sync History can bring it back. You will get a warning if a sync will delete more files than the amount above. Blank warns over 20. 0 warns every time. 'never' turns off this warning entirely."
+        },
+        # COPY: label and hint for how long Site Sync keeps old versions
+        "sync_history_days" => {
+          type: :text,
+          label: "Keep old versions for (days)",
+          placeholder: "30",
+          hint: "Before a sync replaces or deletes a file, on either side, Roe keeps the old version on this computer so you can reverse any changes via Sync History. Blank keeps 30 days. 'forever' or 0 keeps everything, forever."
         },
         # COPY: label, option labels and hint for the live video setting
         "sync_live_video" => {
@@ -305,6 +312,19 @@ class Admin::ConfigsController < Admin::BaseController
           default: true,
           hint: "Puts a player at the top of every audio, music and podcast post. A post with a player card in " \
                 "its body shows the player card instead. Turn off to place audio yourself."
+        }
+      }
+    },
+
+    # COPY: Content Layouts section — label and hint
+    layouts: {
+      label: "Content Layouts",
+      fields: {
+        "content_layouts" => {
+          type: :checkbox,
+          label: "Enable content layouts",
+          hint: "Edit the layouts for posts, pages and products, in Admin → Layouts. Off, Roe's default layouts " \
+                "are used. Turning this off will not delete any layouts you've saved."
         }
       }
     },

@@ -2,25 +2,46 @@
     Grouped by event and split by direction, because "which way did this go?"
     is the first thing you need to know when a file isn't where you left it. %>
 <div class="px-4 sm:px-0 font-mono">
-  <div class="sm:flex sm:items-center sm:justify-between">
+  <div class="flex items-center justify-between">
     <div class="font-sans">
       <h1 class="text-3xl font-semibold text-gray-900">Sync History</h1>
       <p class="mt-2 text-sm text-gray-700">
-        Every change Site Sync has made, newest first. Read-only.
+        Every change Site Sync has made, most recent first. Before a sync replaces or deletes a file, the old version is saved on this computer
+        <% if (days = SiteSync::Versions.keep_days) %>for <%= days %> days<% end %>.
       </p>
     </div>
-    <div class="mt-4 sm:mt-0">
+    <div class="ml-4 mt-0">
       <%= link_to "← Back to Site Sync", admin_site_sync_path,
-            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs" %>
+            class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-gray-100 hover:bg-gray-300 font-mono rounded-xs text-nowrap" %>
     </div>
   </div>
 
-  <% if @events.empty? %>
+  <%# The newest entry is a rewind: say where that leaves the two sites. %>
+  <% if @latest_rewind && (undone = @version_events.find { |e| e[:id] == @latest_rewind[:undoes] }) %>
+    <div class="mt-6 px-4 py-3 bg-blue-50 border border-gray-300 rounded-xs text-sm text-gray-900 font-sans" id="rewound-banner">
+      Rewound the <%= sync_time(undone[:at]) %> sync. Live and local are out of sync. Before you sync again, make changes to the
+      live or local site as needed, then sync.
+    </div>
+  <% end %>
+
+  <% if @version_events.any? %>
+    <% times = @version_events.to_h { |e| [ e[:id], e[:at] ] } %>
+    <div class="mt-8 space-y-4">
+      <% @version_events.each do |event| %>
+        <%= render "version_event", event: event, times: times, rewindable: @rewind_candidate&.dig(:id) == event[:id] %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @events.empty? && @version_events.empty? %>
     <p class="mt-8 text-sm text-gray-500 font-sans">
       No syncs recorded yet. This fills in as you sync.
     </p>
-  <% else %>
-    <div class="mt-8 space-y-4">
+  <% elsif @events.any? %>
+    <% if @version_events.any? %>
+      <h2 class="mt-10 text-sm font-semibold text-gray-700 font-sans">Before versions were kept</h2>
+    <% end %>
+    <div class="mt-4 space-y-4">
       <% @events.each do |event| %>
         <div class="bg-white border border-gray-300 rounded-xs overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-baseline justify-between gap-2">
@@ -75,8 +96,8 @@
               <%= hidden_field_tag :snapshot, event.snapshot_name %>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-200">
-                <%= render "direction", title: "Local → Live", direction: event.to_live, restorable: false, states: {} %>
-                <%= render "direction", title: "Live → Local", direction: event.to_local, restorable: restorable, states: states %>
+                <%= render "direction", title: "↑ LOCAL TO LIVE", direction: event.to_live, restorable: false, states: {} %>
+                <%= render "direction", title: "↓ LIVE TO LOCAL", direction: event.to_local, restorable: restorable, states: states %>
               </div>
 
               <% if restorable %>
@@ -88,7 +109,7 @@
                       ALL CHANGES RESTORED
                     </span>
                     <p class="text-xs text-gray-600 font-sans">
-                      Every file changed by this sync has been restored to it's pre-sync state.
+                      Every file changed by this sync has been restored to its pre-sync state.
                     </p>
                   <% else %>
                     <button type="submit"
@@ -99,8 +120,8 @@
                     <p class="text-xs text-gray-600 font-sans">
                       <%= outstanding %> file<%= "s" if outstanding != 1 %> still
                       <%= outstanding == 1 ? "differs" : "differ" %> from the version before this
-                      sync. Only <strong>Live → Local</strong> can be restored — the snapshot is
-                      of this machine.
+                      sync. Only <strong>LIVE TO LOCAL</strong> can be restored — the snapshot is
+                      of the local site.
                     </p>
                   <% end %>
                 </div>

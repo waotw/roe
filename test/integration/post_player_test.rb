@@ -87,15 +87,24 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
 
   # ── podcast ──
 
-  test "a podcast keeps its full player, unless the body has a player card" do
+  test "the transport carries ⏮ ⏭, hidden and disabled until player.js shows them" do
+    post = media_post("audio", audio: "/media/audio/a.mp3")
+    get post_path(post.url_name)
+    order = css_select(".card-player .player-transport button").map { |b| b["data-player-part"] }
+    assert_equal %w[prev play next speed], order
+    assert_select ".player-transport .player-prev[hidden][disabled][aria-label=Previous]", 1
+    assert_select ".player-transport .player-next[hidden][disabled][aria-label=Next]", 1
+  end
+
+  test "a podcast gets the player card, and only one when the body has its own" do
     post = media_post("podcast", audio: "/media/audio/ep.mp3", duration: "00:30:00")
     get post_path(post.url_name)
-    assert_select ".podcast-hero .audio-player", 1
-    assert_equal 0, card_players
+    assert_select ".post-player .card-player", 1
+    assert_equal 1, card_players
 
     own = media_post("podcast", audio: "/media/audio/ep.mp3", duration: "00:30:00", content: "#{CARD}\n\nNotes.")
     get post_path(own.url_name)
-    assert_select ".podcast-hero", 0
+    assert_select ".post-player", 0
     assert_equal 1, card_players
   end
 
@@ -107,7 +116,7 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     both = { video: "/media/video/ep.mp4", audio: "/media/audio/ep.mp3", duration: "00:30:00" }
 
     get post_path(media_post("podcast", **both).url_name)
-    assert_select ".podcast-hero", 1
+    assert_select ".post-player .card-player-video", 1
     assert_select ".podcast-audio-fallback", 0
     assert_no_match "Audio available", response.body
 
@@ -176,7 +185,7 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     song = "Listen to this:\n\n```card\ntype: player\naudio: /media/audio/song.mp3\n```"
 
     get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", duration: "00:30:00", content: song).url_name)
-    assert_select ".podcast-hero .audio-player", 1
+    assert_select ".post-player .card-player", 1
     assert_select ".post-content .card-player audio source[src='/media/audio/song.mp3']", minimum: 1
 
     get post_path(media_post("audio", audio: "/media/audio/track.mp3", content: song).url_name)
@@ -210,5 +219,19 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     body = "```card\ntype: player\naudio: /media/audio/song.mp3\n```\n\n```card\ntype: player\n```"
     get post_path(media_post("audio", audio: "/media/audio/track.mp3", content: body).url_name)
     assert_equal 2, card_players, "the card standing in for the post, and the song — no third"
+  end
+
+  # ── a theme with no player styles ──
+
+  test "on a theme with no player styles the card is the browser's own controls" do
+    PlayerThemeCheck.stubs(:styled?).returns(false)
+    chapters = [ { "time" => 0, "title" => "Intro" }, { "time" => 75, "title" => "Middle" } ]
+    get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", episode_number: 3, chapters: chapters).url_name)
+
+    assert_select ".card-player.card-player-plain audio[controls]:not([hidden]) source[src='/media/audio/ep.mp3']", minimum: 1
+    assert_select "[data-player]", 0, "player.js must leave it alone, whatever its version"
+    assert_select "[data-player-ui]", 0
+    assert_select ".card-player-plain .player-now-episode", "E3"
+    assert_select ".card-player-plain .chapter", 2
   end
 end

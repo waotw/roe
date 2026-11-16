@@ -29,20 +29,12 @@ class VideoPostPageTest < ActionDispatch::IntegrationTest
     assert_no_match(%r{post-clip\.mov}, response.body.scan(/<video.*?<\/video>/m).join, "the 1 GB original isn't offered, not even as the download link")
   end
 
-  test "a video podcast's player keeps its episode buttons" do
+  test "a video podcast plays in the player card, like a video post" do
     web = fake_variants("pod-clip.mp4")
     post = video_post("podcast", web)
 
     get post_path(post.url_name)
     assert_response :success
-    assert_select "video[data-player-part=media] source[src=?]", "/media/video/variants/pod-clip-720p.mp4"
-    assert_select ".video-player-container .btn-episode-nav", 2
-  end
-
-  test "a plain video post has no episode buttons" do
-    post = video_post("video", fake_variants("plain.mp4"))
-
-    get post_path(post.url_name)
-    assert_select ".video-player-container .btn-episode-nav", 0
+    assert_select ".card-player-video video[data-player-part=media] source[src=?]", "/media/video/variants/pod-clip-720p.mp4"
   end
 end

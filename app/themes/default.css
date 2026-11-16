@@ -1,8 +1,8 @@
-/* ============== THEME INFO ================
+/* ==== THEME INFO ====
    Roe Theme: Default
-   Version: 1.5
-   Fingerprint: b8d0511a
-   Bundled with: Roe v0.4.0
+   Version: 1.6.16
+   Fingerprint: cbfe4e27
+   Bundled with: Roe v0.4.5
 
    This theme was installed from Roe. Leave this comment
    in place and the admin will detect when a new version
@@ -16,7 +16,7 @@
    You can always download a fresh copy of the newest version of any built in theme.
 */
 
-/* ============ THEME VARIABLES ============ */
+/* ==== THEME VARIABLES ==== */
 
 :root {
   /* Light/Dark Mode */
@@ -83,20 +83,13 @@
   --color-highlight-text: #bfe3ff;
 
   /* Player tokens (used by audio + video players) */
-  --player-bg: #f5f5f5;
   --player-border: #dddddd;
-  --player-track: #cccccc;
-  --player-accent: #333333;
-  --player-accent-hover: #000000;
   --player-btn-color: #333333;
-  --player-btn-play-color: #ffffff;
   --player-btn-hover-bg: rgba(0, 0, 0, 0.07);
   --player-meta-color: #888888;
-  --player-overlay-bg: rgba(255, 255, 255, 0.75);
-  --player-chapter-active-bg: rgba(0, 0, 0, 0.05);
 }
 
-/* ============ DARK MODE ============ */
+/* ==== DARK MODE ==== */
 
 @media (prefers-color-scheme: dark) {
   :root {
@@ -124,21 +117,14 @@
     --color-highlight-text: #bfe3ff;
 
     /* Player tokens — same surfaces inverted, hover rgba flipped */
-    --player-bg: #1e1e1e;
     --player-border: #2e2e2e;
-    --player-track: #3a3a3a;
-    --player-accent: #e8e8e8;
-    --player-accent-hover: #ffffff;
     --player-btn-color: #e8e8e8;
-    --player-btn-play-color: #121212;
     --player-btn-hover-bg: rgba(255, 255, 255, 0.08);
     --player-meta-color: #e8e8e8;
-    --player-overlay-bg: rgba(0, 0, 0, 0.75);
-    --player-chapter-active-bg: rgba(255, 255, 255, 0.08);
   }
 }
 
-/* ============== BASE STYLES =============== */
+/* ==== BASE ==== */
 
 /* The `hidden` attribute must win over component display rules (e.g.
    .btn-primary { display: inline-block }), so JS that toggles [hidden] to
@@ -240,7 +226,7 @@ a.heading-anchor,
   border-bottom: none;
 }
 
-/* =========== LAYOUT — SITE NAV ============ */
+/* ==== LAYOUT — SITE NAV ==== */
 
 .site-nav {
   padding: var(--space-4) 0;
@@ -335,7 +321,7 @@ p:has(.site-logo) {
   background-size: contain;
 }
 
-/* ================ SITE ACTIONS (cart, member icon) ================= */
+/* ==== LAYOUT — SITE ACTIONS ==== */
 
 html.snipcart-cart--opened .site-actions,
 html.snipcart-sidecart--opened .site-actions {
@@ -382,7 +368,7 @@ html.snipcart-sidecart--opened .site-actions {
   font-size: var(--text-xs);
 }
 
-/* ================ SITE SEARCH ================= */
+/* ==== LAYOUT — SITE SEARCH ==== */
 
 /* Toggle: sits with the cart/member icons. It carries `.site-action` too,
    so it inherits their color + svg sizing; this just resets the <button>. */
@@ -650,7 +636,7 @@ html.snipcart-sidecart--opened .site-actions {
   }
 }
 
-/* ============ LAYOUT — SIDEBAR ============ */
+/* ==== LAYOUT — SIDEBAR ==== */
 
 body:not(.has-sidebar) article {
   margin-top: var(--space-4);
@@ -820,7 +806,7 @@ body.sidebar-right {
   }
 }
 
-/* ============ LAYOUT - FOOTER ============= */
+/* ==== LAYOUT — FOOTER ==== */
 
 .site-footer {
   margin-top: var(--space-16);
@@ -833,7 +819,7 @@ body.sidebar-right {
   text-decoration: underline;
 }
 
-/* ============ FLASH MESSAGES ============== */
+/* ==== FLASH MESSAGES ==== */
 
 div.flash {
   padding: var(--space-3) var(--space-4);
@@ -847,10 +833,14 @@ div.flash mark {
   background-color: var(--color-highlight-text);
 }
 
-/* ======== POST/PAGE CONTENT GLOBAL ======== */
+/* ==== POST/PAGE GLOBAL ==== */
 
-/* First element in any content block never has top margin */
-.content > :first-child {
+/* First element in any content block never has top margin. A page's or a
+   doc's writing sits inside .content in its own wrapper, so its first element
+   gets the same. */
+.content > :first-child,
+.page-content > :first-child,
+.documentation-content > :first-child {
   margin-top: 0 !important;
 }
 
@@ -1138,10 +1128,18 @@ a.footnote-backlink-number:hover {
   }
 }
 
-/* ============ POST/PAGE SINGLE ============ */
+/* ==== POST/PAGE SINGLE ==== */
+
+/* A layout's [image], [cover] and [artwork]. They sit inside .content, so
+   its image rule applies too. */
+.post-image,
+.page-image {
+  max-width: 100%;
+  height: auto;
+}
 
 .post-header {
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .post-header-top {
@@ -1204,6 +1202,52 @@ h1.post-title {
   font-style: italic;
 }
 
+/* [excerpt] in a layout: the summary from `excerpt:`, as a lead-in.
+   `p.` so it outranks `.content p`'s spacing. */
+p.post-excerpt,
+p.page-excerpt,
+p.product-excerpt {
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  color: var(--color-muted);
+  margin: var(--space-2) 0 var(--space-4) 0;
+}
+
+/* [tags] in a layout: an inline list. Each tag opens the site search
+   filtered to it, so it reads as a link but stays quiet. `ul.` so it
+   outranks `.content ul`'s list indent. */
+ul.post-tags,
+ul.page-tags,
+ul.product-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0;
+  font-size: var(--text-sm);
+}
+
+.post-tag,
+.page-tag,
+.product-tag {
+  margin: 0;
+}
+
+.post-tag-link,
+.page-tag-link,
+.product-tag-link {
+  color: var(--color-muted);
+  text-decoration: none;
+}
+
+.post-tag-link:hover,
+.page-tag-link:hover,
+.product-tag-link:hover {
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
 .post-content hr {
   border: 0;
   border-top: 1px solid var(--color-border);
@@ -1242,7 +1286,7 @@ h1.post-title {
   }
 }
 
-/* ============== COLLECTIONS =============== */
+/* ==== COLLECTIONS ==== */
 
 .collection-page-heading {
   display: flex;
@@ -1287,13 +1331,6 @@ p.collection-more a:hover {
   margin-bottom: var(--space-6);
 }
 
-.collection-heading {
-  font-size: var(--text-2xl);
-  margin-bottom: var(--space-4);
-  color: var(--color-heading);
-  font-weight: 700;
-}
-
 .collection h2 {
   font-size: var(--text-3xl);
   /*margin: var(--space-2) 0 var(--space-4) 0;*/
@@ -1334,7 +1371,7 @@ p.collection-more a:hover {
   color: var(--color-muted);
 }
 
-/* List */
+/* ---- List ---- */
 
 .collection.list .collection-item {
   margin-bottom: var(--space-4);
@@ -1361,6 +1398,8 @@ p.collection-more a:hover {
   vertical-align: -1px;
 }
 
+/* ---- Compact ---- */
+
 /* Compact - single line, link, date • author */
 
 .collection.compact .item-title {
@@ -1382,6 +1421,8 @@ p.collection-more a:hover {
 .collection.compact .paid-lock-icon {
   vertical-align: -4px;
 }
+
+/* ---- Full ---- */
 
 /* Full — Image + body when item has media */
 
@@ -1488,7 +1529,7 @@ p.collection-more a:hover {
   }
 }
 
-/* Links */
+/* ---- Links ---- */
 
 .collection.links .collection-item {
   margin-bottom: var(--space-1);
@@ -1506,6 +1547,8 @@ p.collection-more a:hover {
   margin: 0 0 0 0;
   line-height: 1;
 }
+
+/* ---- Menu ---- */
 
 /* Nav — a bare link list for layout areas (navigation, footer, sidebar).
    `style: horizontal|vertical` toggles the modifier class; default vertical. */
@@ -1542,88 +1585,20 @@ p.collection-more a:hover {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
+  column-gap: var(--space-3);
+}
+
+/* In the site nav every link already has its own space after it
+   (.site-nav a), so a gap there would double it. */
+.site-nav .collection-menu-horizontal {
+  column-gap: 0;
 }
 
 .collection-menu-item {
   margin: 0;
 }
 
-/* ============ COLLECTION PLAYLIST (music / podcast) ============
-   The `playlist` collection renders the track/episode list. Rows carry the data
-   a `player` card reads to build its queue. TUI-flavored: mono, compact, symbol
-   markers. Override or replace freely. (`player` is an alias for `playlist`.) */
-.collection.playlist,
-.collection.player {
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
-  font-size: var(--text-sm, 0.875rem);
-}
-
-.player-tracks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.player-track-meta {
-  display: flex;
-  gap: var(--space-2);
-  padding: 0.15rem 0;
-  cursor: pointer;
-}
-.player-track-number {
-  min-width: 2ch;
-  text-align: right;
-  opacity: 0.5;
-}
-.player-track-title {
-  flex: 1;
-}
-.player-track-duration {
-  opacity: 0.6;
-  font-variant-numeric: tabular-nums;
-}
-.player-track.is-playing .player-track-title {
-  font-weight: 700;
-}
-.player-track.is-playing .player-track-title::before {
-  margin-right: 0.4rem;
-  content: "\25B8 ";
-}
-.player-track-link {
-  color: inherit;
-  text-decoration: none;
-  opacity: 0.5;
-}
-.player-track-link::before {
-  content: "\2197";
-}
-.player-track-link:hover {
-  opacity: 1;
-}
-
-/* Paid tracks in a playlist, and the player's paywall notice.
-   A protected track's audio 403s, which on its own just looks like the player
-   is broken — the lock says why before you press play, and the notice says it
-   again if you do. */
-.player-track.is-paid .player-track-title {
-  opacity: 0.7;
-}
-
-.player-track .paid-lock-icon {
-  margin-left: 0.35em;
-  vertical-align: -0.2em;
-  width: var(--space-4);
-  height: var(--space-4);
-  opacity: 0.6;
-}
-
-.content p.player-paywall {
-  margin: var(--space-2) 0 0 0;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.85rem;
-  border: 1px solid currentColor;
-}
-
-/* Collection Glossary */
+/* ---- Glossary ---- */
 
 .collection.glossary dl {
   margin: 0 0 0 0;
@@ -1658,7 +1633,7 @@ p.collection-more a:hover {
   font-size: var(--text-sm);
 }
 
-/* Collection Grids */
+/* ---- Grid ---- */
 
 .collection-grid {
   display: grid;
@@ -1702,7 +1677,94 @@ p.collection-more a:hover {
   }
 }
 
-/* ================ GALLERIES =============== */
+/* ==== COLLECTION PLAYLIST ==== */
+
+/* The `playlist` collection renders the track/episode list. Rows carry the data
+   a `player` card reads to build its queue. TUI-flavored: mono, compact, symbol
+   markers. Override or replace freely. (`player` is an alias for `playlist`.) */
+.collection.playlist,
+.collection.player {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.content .player-tracks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.player-track-meta {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0.15rem 0;
+  cursor: pointer;
+}
+/* A fixed width, so titles line up whether a row shows S1E10, a
+   track number, or nothing (an episode with no number yet). */
+.player-track-number {
+  flex: 0 0 6ch;
+  text-align: right;
+  opacity: 0.5;
+}
+.player-track-title {
+  flex: 1;
+}
+.player-track-duration {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.player-track.is-playing .player-track-title,
+.player-track.is-current .player-track-title {
+  font-weight: 700;
+}
+.player-track-link {
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.5;
+}
+.player-track-link::before {
+  content: "\2197";
+}
+.player-track-link:hover {
+  opacity: 1;
+}
+
+/* With no player on the page to play it, a playlist row is a link to its
+   post, and the link covers the whole row. player.js marks a list a player
+   has taken .is-enhanced; then a click plays the row here instead. */
+.player-tracks:not(.is-enhanced) .player-track {
+  position: relative;
+}
+.player-tracks:not(.is-enhanced) .player-track-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+/* Paid tracks in a playlist, and the player's paywall notice.
+   A protected track's audio 403s, which on its own just looks like the player
+   is broken — the lock says why before you press play, and the notice says it
+   again if you do. */
+.player-track.is-paid .player-track-title {
+  opacity: 0.7;
+}
+
+.player-track .paid-lock-icon {
+  margin-left: 0.35em;
+  vertical-align: -0.2em;
+  width: var(--space-4);
+  height: var(--space-4);
+  opacity: 0.6;
+}
+
+.content p.player-paywall {
+  margin: var(--space-2) 0 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid currentColor;
+}
+
+/* ==== GALLERIES ==== */
 
 .gallery {
   margin-bottom: var(--space-6);
@@ -1780,7 +1842,9 @@ figcaption {
   }
 }
 
-/* --- Gallery item wrapper + click-to-zoom --------------------------------
+/* ---- Zoom ---- */
+
+/* Gallery item wrapper + click-to-zoom.
    Each image is wrapped in .gallery-item (the grid/track cell) and a
    .gallery-zoom-link (the click target). Zoom is pure CSS: the link points
    at an overlay's #id and .gallery-zoom:target reveals it — no JS needed.
@@ -1853,6 +1917,8 @@ figcaption {
   cursor: pointer;
 }
 
+/* ---- Ratios ---- */
+
 /* Explicit gallery ratios (grids only — carousels size by height).
    Images crop to fill; `object-fit: cover` comes from `.content .gallery img`.
    `auto`/`original` keep the image's natural shape instead. */
@@ -1880,7 +1946,9 @@ figcaption {
   object-fit: contain;
 }
 
-/* --- Carousel (slideshow: true) ------------------------------------------
+/* ---- Carousel ---- */
+
+/* Carousel (slideshow: true).
    CSS scroll-snap does the scrolling/snapping with no JS. gallery.js adds
    prev/next buttons and dots as progressive enhancement. */
 
@@ -1993,13 +2061,13 @@ figcaption {
   background: var(--color-text);
 }
 
-/* ================= CARDS ================== */
+/* ==== CARDS ==== */
 
 .card {
   position: relative;
 }
 
-/* Pullquote */
+/* ---- Card: pullquote ---- */
 
 .card-pullquote {
   text-align: center;
@@ -2064,7 +2132,7 @@ figcaption {
   }
 }
 
-/* Post Link Cards (small / medium / large) */
+/* ---- Card: post link ---- */
 
 .card.post-link-small,
 .card.post-link-medium,
@@ -2169,7 +2237,7 @@ figcaption {
   color: var(--color-text);
 }*/
 
-/* Post Link - Small */
+/* ---- Card: post link, small ---- */
 
 .card.post-link-small {
   gap: var(--space-4);
@@ -2200,7 +2268,7 @@ figcaption {
   color: var(--color-muted);
 }
 
-/* Product Link - Small */
+/* ---- Card: product link, small ---- */
 
 .product-link-small .card-header {
   display: flex;
@@ -2228,7 +2296,7 @@ figcaption {
   line-height: 1;
 }
 
-/* Post Link - Medium */
+/* ---- Card: post link, medium ---- */
 
 .card.post-link-medium {
   gap: var(--space-5);
@@ -2261,13 +2329,7 @@ figcaption {
   color: var(--color-muted);
 }
 
-.card.post-link-medium .card-body {
-  font-size: var(--text-sm);
-  line-height: 1.5;
-  color: var(--color-text);
-}
-
-/* Product Link - Medium */
+/* ---- Card: product link, medium ---- */
 
 .product-link-medium .card-header {
   display: flex;
@@ -2288,6 +2350,8 @@ figcaption {
 .post-link-medium.product-link-medium .card-link {
   font-size: var(--text-base);
 }
+
+/* ---- Card: post link, large ---- */
 
 /* Post Link - Large
    Grid layout with template areas. Mobile-first single column where
@@ -2417,7 +2481,7 @@ figcaption {
   }
 }
 
-/* Product Link - Large */
+/* ---- Card: product link, large ---- */
 
 .product-link-large .card-header {
   display: flex;
@@ -2440,7 +2504,7 @@ figcaption {
   margin-top: 0;
 }
 
-/* Asides */
+/* ---- Card: aside ---- */
 
 .card-aside {
   float: none;
@@ -2477,15 +2541,6 @@ figcaption {
   height: auto;
   margin: 0 0 0 0;
   display: block;
-}
-
-a.aside-link-inline {
-  text-decoration: underline;
-  color: var(--color-muted);
-}
-
-.card-aside .aside-link-inline:hover {
-  color: var(--color-text);
 }
 
 .card-aside .aside-link {
@@ -2604,26 +2659,47 @@ article .content,
   }
 }
 
-/* Player card (card type: player) — the transport, driven by the audio-player
-   controller. It reads a `playlist` collection on the same page (if any) to
-   build its queue. TUI-flavored: mono, compact, symbol-based transport. Play
-   state is [data-playing] on the button; progress width and handle position are
-   set inline by the controller, so here we only style appearance. */
+/* ==== MEDIA PLAYERS ==== */
+
+/* ---- Player: card ---- */
+
+/* Player card (card type: player, and every post's own player) — the
+   transport, driven by player.js. It plays through a `playlist` collection
+   on the same page (if any). TUI-flavored: mono, compact, symbol-based
+   transport. Play state is [data-playing] on the button; progress width and
+   handle position are set inline by player.js, so here we only style
+   appearance. */
 .card-player {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
   font-size: var(--text-sm, 0.875rem);
   border: 1px solid var(--color-border);
-  margin-top: var(--space-4);
-  margin-bottom: var(--space-4);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
   padding: var(--space-3) var(--space-4) var(--space-1) var(--space-4);
   --player-progress: 0;
+}
+
+/* ⏮ ⏭ under a podcast episode's or music track's player card: the episode
+   or track before and after it. Previous on the left, next on the right. */
+.player-series {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4, 1rem);
+  padding: var(--space-2, 0.5rem) 0;
+}
+.player-series-next {
+  margin-left: auto;
+  text-align: right;
+}
+.player-series-label {
+  color: var(--color-muted, inherit);
 }
 
 /* Artwork (show_artwork) sits left of the now/transport column; drop it and the
    column reflows full-width. Its left edge lines up with the column's. */
 .player-body {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-4);
   align-items: flex-start;
 }
 .player-main {
@@ -2647,10 +2723,9 @@ article .content,
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.player-now::before {
-  content: "\266A";
+
+.player-now-episode {
   opacity: 0.6;
-  margin-right: 0.5ch;
 }
 .player-now-link {
   margin-left: 0.5ch;
@@ -2696,6 +2771,8 @@ article .content,
   opacity: 1;
 }
 .player-time {
+  font-size: 0.75rem;
+  color: var(--player-meta-color);
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
@@ -2744,334 +2821,291 @@ article .content,
   padding: 0;
 }
 
-/* ============ MEDIA PLAYERS =============== */
+/* ---- Player: previous and next ---- */
 
-/* Audio Player */
-
-.audio-player {
-  padding: var(--space-5);
-  background: var(--player-bg);
-  border: 1px solid var(--player-border);
-  margin: var(--space-6) 0;
+/* ⏮ ⏭ in the transport. player.js (1.4) shows them only where this theme
+   says it styles them (--player-nav: 1); the theme then shows them on touch
+   screens. On a desktop the ⏮ ⏭ links under the player stay as they are. */
+.card-player {
+  --player-nav: 1;
 }
-
-.player-header {
-  display: flex;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
-}
-
-.player-header img {
-  border: 1px solid var(--color-border);
-  margin: 0;
-}
-
-.player-artwork {
-  width: 64px;
-  height: 64px;
-  aspect-ratio: 1;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.player-info {
-  flex: 1;
-  min-width: 0;
-  line-height: 1.2;
-}
-
-.player-title {
-  font-weight: 600;
-  font-size: var(--text-base);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.episode-meta {
-  font-size: var(--text-sm);
-  color: var(--player-meta-color);
-  margin-top: 0.15rem;
-}
-
-.episode-meta span + span::before {
-  content: " · ";
-}
-
-.now-playing {
-  font-size: 0.75rem;
-  color: var(--player-accent);
-  margin-top: 0.2rem;
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Progress */
-
-.player-progress {
-  position: relative;
-  height: 6px;
-  background: var(--player-track);
+.player-prev,
+.player-next {
+  display: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
-  margin: var(--space-1) 0;
+}
+.player-prev::before {
+  content: "\23EE";
+}
+.player-next::before {
+  content: "\23ED";
+}
+.player-prev:disabled,
+.player-next:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
-.progress-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  height: 100%;
-  width: 0%;
-  background: var(--player-accent);
-  pointer-events: none;
-  transition: width 0.1s linear;
+/* ---- Player: before player.js ---- */
+
+/* Before player.js takes over. The browser's own audio bar used to show for
+   a moment, then Roe's controls replaced it and the card changed height.
+   With scripting on, Roe's controls show from the start (they do nothing
+   until the script arrives, a moment later) and the browser's bar waits out
+   of sight; the ⏮ ⏭ links the script will hide are hidden already. If the
+   script hasn't arrived after 3 seconds, the browser's bar comes back over
+   them, so the page still plays. With scripting off, nothing here applies
+   and the browser's bar is the player. */
+@media (scripting: enabled) {
+  .card-player[data-player="audio"]:not(.is-enhanced) .player-main {
+    position: relative;
+  }
+  .card-player[data-player="audio"]:not(.is-enhanced) .player-transport[hidden] {
+    display: flex !important;
+    animation: player-script-late 0s 3s forwards;
+  }
+  .card-player[data-player="audio"]:not(.is-enhanced) audio.player-native {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    visibility: hidden;
+    animation: player-script-late-show 0s 3s forwards;
+  }
+  body:has([data-playlist]) .card-player[data-player="audio"]:not(.is-enhanced) .player-series {
+    display: none;
+  }
+}
+@keyframes player-script-late {
+  to {
+    visibility: hidden;
+  }
+}
+@keyframes player-script-late-show {
+  to {
+    visibility: visible;
+  }
 }
 
-.progress-handle {
-  position: absolute;
-  top: 50%;
-  left: 0%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--player-accent);
-  background: var(--color-bg);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
+/* ---- Player: touch screens ---- */
+
+/* Touch screens — a finger, not a mouse pointer, whatever the screen width.
+   No artwork, and every control big enough to hit: the times flank a
+   full-width bar, and ⏮ ▶ ⏭ 1× sit in a row of cells along the bottom of the
+   card. Playlist, chapter and fold rows get taller too. */
+@media (pointer: coarse) {
+  .card-player {
+    padding-bottom: 0;
+  }
+  .card-player .player-figure {
+    display: none;
+  }
+  .card-player .player-now {
+    font-size: var(--text-base, 1rem);
+    white-space: normal;
+  }
+  .card-player .player-transport {
+    flex-wrap: wrap;
+    gap: 0;
+    margin: var(--space-1) calc(-1 * var(--space-4)) 0;
+  }
+  /* The break between the bar's line and the buttons' line. */
+  .card-player .player-transport::after {
+    content: "";
+    order: 4;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .card-player .player-time-current {
+    order: 1;
+    margin: 0 var(--space-3) 0 var(--space-4);
+  }
+  .card-player .player-progress {
+    order: 2;
+    flex: 1 1 0;
+    height: 2rem;
+  }
+  .card-player .player-progress-handle::before {
+    font-size: 1.1em;
+  }
+  .card-player .player-time-duration {
+    order: 3;
+    margin: 0 var(--space-4) 0 var(--space-3);
+  }
+  .card-player .player-prev {
+    order: 5;
+  }
+  .card-player .player-toggle {
+    order: 6;
+  }
+  .card-player .player-next {
+    order: 7;
+  }
+  .card-player .player-speed {
+    order: 8;
+    opacity: 1;
+  }
+  .card-player .player-prev,
+  .card-player .player-toggle,
+  .card-player .player-next,
+  .card-player .player-speed {
+    flex: 1 1 0;
+    min-width: 4rem;
+    min-height: 3.25rem;
+    position: static;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top: 1px solid var(--color-border);
+    font-size: 1.25rem;
+  }
+  .card-player .player-speed {
+    font-size: var(--text-base, 1rem);
+  }
+  .card-player .player-next,
+  .card-player .player-speed,
+  .card-player[data-player-nav] .player-toggle {
+    border-left: 1px solid var(--color-border);
+  }
+  .card-player:not([data-player-nav]) .player-prev,
+  .card-player:not([data-player-nav]) .player-next {
+    display: none;
+  }
+  .card-player[data-player-nav] .player-series {
+    display: none;
+  }
+  /* Before player.js: the cells it will show, so the row doesn't reflow. */
+  @media (scripting: enabled) {
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-prev[hidden],
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-next[hidden] {
+      display: flex !important;
+    }
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-toggle {
+      border-left: 1px solid var(--color-border);
+    }
+    .card-player[data-player="audio"]:not(.is-enhanced) .player-series {
+      display: none;
+    }
+  }
+  .card-player .player-chapters {
+    padding-bottom: var(--space-1);
+  }
+  .player-track-meta,
+  li.chapter,
+  .player-chapters > summary,
+  .player-playlist > summary {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
 }
 
-.player-progress:hover .progress-handle {
+/* ---- Player: chapters ---- */
+
+/* Chapters and playlist: a podcast episode's `chapters:` inside the player
+   card (click a row to jump there), and a `playlist` collection's tracks or
+   episodes. Both fold away under their summary line. */
+.player-chapters,
+.player-playlist {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--color-border);
+}
+.player-chapters > summary,
+.player-playlist > summary {
+  list-style: none;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.player-chapters > summary::-webkit-details-marker,
+.player-playlist > summary::-webkit-details-marker {
+  display: none;
+}
+.player-chapters > summary::before,
+.player-playlist > summary::before {
+  content: "\25B8";
+  margin-right: 0.5ch;
+}
+.player-chapters[open] > summary::before,
+.player-playlist[open] > summary::before {
+  content: "\25BE";
+}
+.player-chapters > summary:hover,
+.player-playlist > summary:hover {
   opacity: 1;
 }
-
-.player-time {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--player-meta-color);
+.player-playlist-count::before {
+  content: "[";
+}
+.player-playlist-count::after {
+  content: "]";
+}
+.player-playlist > .player-tracks {
+  margin: var(--space-1) 0 0 0;
 }
 
-/* Controls */
-
-.player-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.player-controls-center {
-  position: relative;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.controls-center {
-  display: flex;
-}
-
-.player-btn {
-  background: none;
-  border: none;
-  padding: 0.35rem;
-  cursor: pointer;
-  color: var(--player-btn-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /*border-radius: 50%;*/
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-
-.player-btn:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.btn-skip svg {
-  width: 30px;
-  height: 30px;
-}
-
-.btn-play {
-  width: 40px;
-  height: 40px;
-  background: var(--player-accent);
-  color: var(--player-btn-play-color);
-  border-radius: 50%;
-}
-
-.btn-play:hover {
-  background: var(--player-accent-hover);
-  color: var(--player-btn-play-color);
-}
-
-.btn-play svg {
-  width: 26px;
-  height: 26px;
-}
-
-.btn-play .icon-pause {
-  display: none;
-}
-
-.btn-play[data-playing="true"] .icon-play {
-  display: none;
-}
-
-.btn-play[data-playing="true"] .icon-pause {
-  display: block;
-}
-
-.btn-speed {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: var(--space-1) var(--space-2);
-  min-width: var(--space-12);
-  border: 1px solid var(--player-border);
-  border-radius: 0.1rem;
-  background: var(--color-bg);
-  color: var(--player-btn-color);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  position: absolute;
-  top: var(--space-4);
-  right: var(--space-4);
-}
-
-/* Prev/Next episode in player */
-
-.btn-wrapper {
-  flex: 1;
-  display: flex;
-  min-width: 0;
-}
-
-.btn-wrapper:first-child {
-  justify-content: flex-start;
-}
-.btn-wrapper:last-child {
-  justify-content: flex-end;
-}
-
-.btn-episode {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-3);
-  text-decoration: none;
-  color: var(--player-btn-color);
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  cursor: pointer;
-  transition: background 0.15s;
-  flex: 0 0 auto;
-  max-width: 80%;
-}
-
-a.btn-episode {
-  color: var(--player-btn-color);
-}
-
-.btn-prev {
-  justify-content: flex-start;
-}
-.btn-next {
-  justify-content: flex-end;
-}
-
-.btn-episode:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.btn-episode.is-disabled {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.btn-episode svg {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-}
-
-.episode-nav-title {
-  font-size: var(--text-xxs);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--player-meta-color);
-  line-height: 1.2;
-}
-
-.btn-prev .episode-nav-title {
-  text-align: left;
-}
-.btn-next .episode-nav-title {
-  text-align: right;
-}
-
-/* Chapters */
-
-.player-chapters {
-  border-top: 1px solid var(--player-border);
-  padding-top: var(--space-3);
-  margin-top: var(--space-3);
-}
-
-.player-chapters-heading {
-  font-size: var(--space-3);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--player-meta-color);
-  margin-bottom: var(--space-2);
-}
-
-.chapter-list {
+ol.chapter-list {
   list-style: none;
+  margin: var(--space-1) 0 0 0;
   padding: 0;
+}
+li.chapter {
+  display: flex;
+  gap: var(--space-2);
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.chapter {
-  display: flex;
-  gap: var(--space-3);
-  padding: 0.35rem var(--space-2);
+  padding: 0.15rem 0;
   cursor: pointer;
-  font-size: 0.85rem;
-  transition: background 0.1s;
 }
-
-.chapter:hover,
-.chapter.is-active {
-  background: var(--player-chapter-active-bg);
-}
-
-.chapter.is-active {
-  font-weight: 600;
-}
-
 .chapter-time {
-  color: var(--player-meta-color);
+  min-width: 7ch;
+  text-align: right;
+  opacity: 0.6;
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  min-width: 3.5rem;
+}
+.chapter.is-active .chapter-title {
+  font-weight: 700;
+}
+.chapter.is-active .chapter-title::before {
+  margin-right: 0.4rem;
+  content: "\25B8 ";
 }
 
-/* Video Player */
+/* ---- Player: playlist ---- */
+
+/* A `playlist` collection, or the layout's [playlist] (the same thing), as
+   a box like the player card's. Straight after a player — a player card in
+   the writing, or the layout's [player] — it joins it: the player's bottom
+   edge and the space between give way. */
+.collection.playlist {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-sm, 0.875rem);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  padding: 0 var(--space-4) var(--space-2) var(--space-4);
+}
+.collection.playlist > .player-playlist {
+  margin-top: 0;
+  border-top: 0;
+}
+.card-player:has(+ .collection.playlist),
+.post-player:has(+ .collection.playlist) .card-player {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+.card-player + .collection.playlist,
+.post-player + .collection.playlist {
+  margin-top: var(--space-0);
+  border-top: 0;
+}
+.card-player + .collection.playlist > .player-playlist,
+.post-player + .collection.playlist > .player-playlist {
+  border-top: 1px dashed var(--color-border);
+}
+
+/* ---- Player: video ---- */
 
 .video-player-container {
   position: relative;
@@ -3086,6 +3120,8 @@ a.btn-episode {
   aspect-ratio: 16 / 9;
   background: #000;
 }
+
+/* ---- Player: video in the text ---- */
 
 /* A video embedded in a post's text: ![label](/media/video/clip.mp4).
    Same player as a video post, spaced like an image. */
@@ -3197,16 +3233,6 @@ a.video-btn {
   height: 28px;
 }
 
-.video-btn.btn-episode-nav.btn-prev.is-disabled {
-  display: none;
-}
-
-.video-btn.btn-episode-nav.is-disabled {
-  opacity: 0.3;
-  cursor: default;
-  pointer-events: none;
-}
-
 .video-time {
   color: #fff;
   font-size: 0.8125rem;
@@ -3258,349 +3284,7 @@ a.video-btn {
   display: block;
 }
 
-/* ================ PODCAST ================= */
-
-article.post-podcast {
-  margin-left: 0;
-}
-
-.podcast-hero {
-  gap: var(--space-4);
-  position: relative;
-  margin-top: var(--space-6);
-  margin-bottom: var(--space-3);
-  align-items: center;
-  justify-content: center;
-}
-
-.podcast-hero > picture img {
-  width: 100%;
-  display: block;
-  aspect-ratio: 1;
-  object-fit: cover;
-}
-
-.hero-player .audio-player {
-  background: var(--player-overlay-bg);
-  border: 1px solid var(--color-border);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(8px);
-  margin: 0;
-}
-
-.podcast-hero.is-no-cover {
-  display: block;
-}
-
-.podcast-hero.is-no-cover .hero-player {
-  position: static;
-  padding: 0;
-  width: 100%;
-}
-
-.podcast-hero.is-no-cover .hero-player .audio-player {
-  background: var(--player-bg);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: 1px solid var(--player-border);
-}
-
-p.podcast-audio-fallback {
-  font-size: var(--text-xs);
-  margin: 0 0 0 0;
-  line-height: 1;
-  position: absolute;
-  right: 0;
-}
-
-/* Episode list */
-
-.episode-list {
-  margin-top: var(--space-8);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-0);
-}
-
-.episode-list ol {
-  list-style: none;
-  padding-left: 0;
-}
-
-.episode-list li {
-  margin-bottom: 0;
-}
-
-.episode-list h2 {
-  font-size: var(--text-base);
-  font-weight: 600;
-  margin-bottom: var(--space-4);
-}
-
-.episode {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.episode-list-meta {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  margin-bottom: var(--space-4);
-}
-
-.episode-item {
-  border-bottom: 1px solid var(--color-border);
-}
-
-.episode-item.is-current {
-  background: var(--color-bg-dim);
-}
-
-.episode-item a {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  text-decoration: none;
-  color: inherit;
-  transition: background 0.1s;
-}
-
-.episode-item a:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.episode-item a > span {
-  font-size: 0.95rem;
-}
-
-.episode-item.is-current a > span {
-  font-weight: 600;
-}
-
-.episode-meta-row {
-  display: flex;
-  gap: var(--space-3);
-  font-size: 0.75rem;
-  color: var(--player-meta-color);
-}
-
-.episode-number {
-  font-weight: 600;
-}
-
-/* Subscribe / feed */
-
-/* Subscribe block spacing — used on episode pages and on podcast-connected
-   pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
-.podcast-subscribe {
-  margin: var(--space-4) 0;
-  font-size: 0.85rem;
-}
-
-/* Larger feed-link variant */
-
-.podcast-subscribe .feed-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem var(--space-3);
-  border: 1px solid var(--player-border);
-  color: var(--player-btn-color);
-  font-size: 0.8rem;
-  text-transform: none;
-  letter-spacing: normal;
-  opacity: 1;
-}
-
-.podcast-subscribe .feed-link:hover {
-  background: var(--player-btn-hover-bg);
-}
-
-.feed-link {
-  font-size: var(--text-xxs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.15rem 0.4rem;
-  border: 1px solid currentColor;
-  text-decoration: none;
-  opacity: 0.6;
-  transition: opacity 0.15s;
-}
-
-.feed-link:hover {
-  opacity: 1;
-}
-
-.feed-link-private {
-  opacity: 0.8;
-}
-
-/* Subscribe links row (app/service links + RSS). Used both inline and
-   inside the collapsible menu below. */
-.subscribe-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-/* Menu mode (subscribe_display: menu): a native <details> disclosure —
-   the "Subscribe" button is the <summary> styled as a button, and
-   clicking it reveals the links. No JS. */
-.podcast-subscribe--menu > summary {
-  display: inline-block;
-  list-style: none;
-  cursor: pointer;
-}
-
-.podcast-subscribe--menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.podcast-subscribe--menu[open] > summary {
-  margin-bottom: var(--space-3);
-}
-
-/* ============ DOCUMENTATION =============== */
-
-.docs-back-link {
-  margin-bottom: var(--space-0);
-  font-size: var(--text-sm);
-  display: inline-block;
-}
-
-.content.documentation p mark,
-.documentation mark {
-  background-color: var(--color-highlight-text);
-  color: var(--color-text);
-  padding: 0 calc(var(--space-1) * 0.8);
-  border-radius: 1px;
-  line-height: 1;
-}
-
-.documentation img.screenshot {
-  border: 1px solid var(--color-muted);
-}
-
-@media (prefers-color-scheme: dark) {
-  .content.documentation p mark,
-  .documentation mark {
-    color: var(--color-bg);
-  }
-}
-
-.content.documentation p code {
-  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
-}
-
-.content.documentation a code {
-  color: var(--color-link);
-}
-
-.content.documentation a:hover code {
-  color: var(--color-text);
-}
-
-.content.documentation li pre {
-  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-4);
-  margin: 0;
-}
-
-.content.documentation li code {
-  font-size: var(--text-xs);
-  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
-}
-
-.content.documentation li pre code {
-  padding: 0;
-}
-
-.page-documentation .collection-grid,
-.documentation .collection-grid {
-  display: grid;
-  column-gap: var(--space-8);
-  row-gap: var(--space-4);
-  margin: var(--space-4) 0;
-}
-
-.page-documentation .collection-grid h2 {
-  font-size: var(--text-2xl);
-  margin-top: 0;
-}
-
-.content.documentation table {
-  font-size: var(--text-sm);
-  line-height: 1.75;
-}
-
-/* =============== UTILITIES ================ */
-
-.back-link {
-  display: inline-block;
-  margin-top: var(--space-12);
-  padding-top: var(--space-8);
-  color: var(--color-link);
-  text-decoration: underline;
-}
-
-.back-link:hover {
-  color: var(--color-text);
-}
-
-hr.clear-floats {
-  clear: both;
-  border-top: none;
-}
-
-/* ================= FORMS ================== */
-
-/* Global form vocabulary. Promoted from member pages (the only place forms
-   appear today); any future form reuses these. Member-specific bits stay in
-   the Members section. */
-
-.form-field {
-  margin-bottom: var(--space-4);
-}
-
-.form-field label {
-  display: block;
-  font-size: var(--text-sm);
-  margin-bottom: var(--space-1);
-  color: var(--color-muted);
-}
-
-.form-field input[type="email"],
-.form-field input[type="text"],
-.form-field input[type="password"] {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg);
-  font-family: inherit;
-  font-size: var(--text-base);
-  color: var(--color-text);
-  box-sizing: border-box;
-}
-
-.form-field input:focus {
-  outline: 2px solid var(--color-link);
-  outline-offset: -1px;
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--space-4);
-  margin-top: var(--space-6);
-}
-
-.form-actions a {
-  text-decoration: none;
-}
-
-/* ================ BUTTONS ================= */
+/* ==== BUTTONS ==== */
 
 /* Global button vocabulary: .btn-* classes any feature reuses (share menu,
    products, member forms). Member pages override the .btn-* palette at higher
@@ -3693,7 +3377,52 @@ a.btn-grid {
   font-size: var(--text-sm);
 }
 
-/* ================= SHARE ================== */
+/* ==== FORMS ==== */
+
+/* Global form vocabulary. Promoted from member pages (the only place forms
+   appear today); any future form reuses these. Member-specific bits stay in
+   the Members section. */
+
+.form-field {
+  margin-bottom: var(--space-4);
+}
+
+.form-field label {
+  display: block;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-1);
+  color: var(--color-muted);
+}
+
+.form-field input[type="email"],
+.form-field input[type="text"],
+.form-field input[type="password"] {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.form-field input:focus {
+  outline: 2px solid var(--color-link);
+  outline-offset: -1px;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.form-actions a {
+  text-decoration: none;
+}
+
+/* ==== SHARE ==== */
 
 /* Share button (Roe-anji `for: share`): a single trigger (.btn-primary) that
    reveals Copy link + Email (.btn-outline) on desktop, or opens the native
@@ -3752,9 +3481,88 @@ a.btn-grid {
   font-size: var(--text-xs);
 }
 
-/* ================ MEMBERS ================= */
+/* ==== PODCAST ==== */
 
-/* Member pages (account/edit) */
+article.post-podcast {
+  margin-left: 0;
+}
+
+/* ---- Podcast: subscribe ---- */
+
+/* Subscribe block spacing — used on episode pages and on podcast-connected
+   pages (pages/show.html.erb), so it's not scoped to .podcast-episode. */
+.podcast-subscribe {
+  margin: var(--space-2) 0;
+  font-size: 0.85rem;
+}
+
+/* Larger feed-link variant */
+
+.podcast-subscribe .feed-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem var(--space-3);
+  border: 1px solid var(--player-border);
+  color: var(--player-btn-color);
+  font-size: 0.8rem;
+  text-transform: none;
+  letter-spacing: normal;
+  opacity: 1;
+}
+
+.podcast-subscribe .feed-link:hover {
+  background: var(--player-btn-hover-bg);
+}
+
+.feed-link {
+  font-size: var(--text-xxs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid currentColor;
+  text-decoration: none;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.feed-link:hover {
+  opacity: 1;
+}
+
+.feed-link-private {
+  opacity: 0.8;
+}
+
+/* Subscribe links row (app/service links + RSS). Used both inline and
+   inside the collapsible menu below. */
+.subscribe-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* Menu mode (subscribe_display: menu): a native <details> disclosure —
+   the "Subscribe" button is the <summary> styled as a button, and
+   clicking it reveals the links. No JS. */
+.podcast-subscribe--menu > summary {
+  display: inline-block;
+  list-style: none;
+  cursor: pointer;
+}
+
+.podcast-subscribe--menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.podcast-subscribe--menu[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+/* ==== MEMBERS ==== */
+
+/* ---- Members: account ---- */
 
 .member-page .account-details {
   margin: 0 0 var(--space-6) 0;
@@ -3787,6 +3595,8 @@ a.btn-grid {
   display: contents;
 }
 
+/* ---- Members: pages ---- */
+
 /* Member pages (signup/signin/upgrade/donate/unsubscribe wrapper) */
 
 .member-page {
@@ -3805,6 +3615,8 @@ a.btn-grid {
 .member-page form {
   margin: 0 0;
 }
+
+/* ---- Members: buttons ---- */
 
 /* Buttons (member palette) — override the global .btn-* colors on member pages
    (link-coloured rather than the heading-coloured global default). The base
@@ -3861,6 +3673,8 @@ a.btn-grid {
   color: var(--color-bg);
 }
 
+/* ---- Members: checkout ---- */
+
 .checkout-form-wrapper {
   margin-top: var(--space-6);
   margin-bottom: var(--space-2);
@@ -3870,6 +3684,8 @@ a.btn-grid {
 .checkout-form-wrapper.is-member .non-member-checkout {
   display: none;
 }
+
+/* ---- Members: podcast feeds ---- */
 
 /* Private podcast feeds on the member account page. The URL sits in a
    readonly input so it can be selected and copied on a phone, where a
@@ -3928,7 +3744,7 @@ a.btn-grid {
   display: inline;
 }
 
-/* Alerts */
+/* ---- Members: alerts ---- */
 
 .member-page .alert {
   padding: var(--space-6);
@@ -3958,16 +3774,6 @@ a.btn-grid {
   font-size: var(--text-sm);
   color: var(--color-muted);
   margin-top: var(--space-2);
-}
-
-.member-page .alert--success {
-  border-color: var(--color-link);
-  background-color: rgba(0, 0, 238, 0.04);
-}
-
-.member-page .alert--success h1,
-.member-page .alert--success h2 {
-  color: var(--color-link);
 }
 
 .member-page .alert--warning {
@@ -4018,23 +3824,7 @@ a.btn-grid {
   margin-bottom: var(--space-1);
 }
 
-.member-page .password-display {
-  padding: var(--space-4);
-  margin: var(--space-3) 0;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-bg-dim);
-  font-family: var(--font-mono);
-  font-size: var(--text-lg);
-  word-break: break-all;
-}
-
-.member-page .password-note {
-  font-size: var(--text-xs);
-  color: var(--color-muted);
-  margin-top: var(--space-3);
-}
-
-/* Donation presets */
+/* ---- Members: donations ---- */
 
 .member-page .donate-presets {
   display: flex;
@@ -4065,7 +3855,7 @@ a.btn-grid {
   border-color: var(--color-link);
 }
 
-/* Paid-content gate */
+/* ---- Members: paywall ---- */
 
 .paid-content-gate {
   font-size: var(--text-2xl);
@@ -4087,6 +3877,8 @@ a.btn-grid {
 .paid-content-signin {
   font-size: var(--text-xs);
 }
+
+/* ---- Members: deleting an account ---- */
 
 /* Deleting an account — separated from the account actions, and behind a
    disclosure, because it can't be undone. */
@@ -4119,7 +3911,7 @@ a.btn-grid {
   color: inherit;
 }
 
-/* ========== STORE — PRODUCT PAGE ========== */
+/* ==== STORE — PRODUCT PAGE ==== */
 
 .product .content {
   max-width: var(--container-width);
@@ -4271,7 +4063,7 @@ a.btn-grid {
   }
 }
 
-/* ==== STORE — PRODUCT COLLECTION GRID ===== */
+/* ==== STORE — PRODUCT GRID ==== */
 
 article.page-store,
 article.page-store .content {
@@ -4460,7 +4252,98 @@ article.page-store h2 {
   color: var(--color-heading);
 }
 
-/* ============== BREADCRUMBS =============== */
+/* ==== DOCUMENTATION ==== */
+
+.docs-back-link {
+  margin-bottom: var(--space-0);
+  font-size: var(--text-sm);
+  display: inline-block;
+}
+
+.content.documentation p mark,
+.documentation mark {
+  background-color: var(--color-highlight-text);
+  color: var(--color-text);
+  padding: 0 calc(var(--space-1) * 0.8);
+  border-radius: 1px;
+  line-height: 1;
+}
+
+.documentation img.screenshot {
+  border: 1px solid var(--color-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+  .content.documentation p mark,
+  .documentation mark {
+    color: var(--color-bg);
+  }
+}
+
+.content.documentation p code {
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation a code {
+  color: var(--color-link);
+}
+
+.content.documentation a:hover code {
+  color: var(--color-text);
+}
+
+.content.documentation li pre {
+  padding: var(--space-4) var(--space-4) var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.content.documentation li code {
+  font-size: var(--text-xs);
+  padding: calc(var(--space-1) * 0.5) calc(var(--space-2) * 0.5);
+}
+
+.content.documentation li pre code {
+  padding: 0;
+}
+
+.page-documentation .collection-grid,
+.documentation .collection-grid {
+  display: grid;
+  column-gap: var(--space-8);
+  row-gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+.page-documentation .collection-grid h2 {
+  font-size: var(--text-2xl);
+  margin-top: 0;
+}
+
+.content.documentation table {
+  font-size: var(--text-sm);
+  line-height: 1.75;
+}
+
+/* ==== UTILITIES ==== */
+
+.back-link {
+  display: inline-block;
+  margin-top: var(--space-12);
+  padding-top: var(--space-8);
+  color: var(--color-link);
+  text-decoration: underline;
+}
+
+.back-link:hover {
+  color: var(--color-text);
+}
+
+hr.clear-floats {
+  clear: both;
+  border-top: none;
+}
+
+/* ==== BREADCRUMBS ==== */
 
 .breadcrumbs {
   margin-top: calc(var(--space-4) * -1);
@@ -4487,7 +4370,7 @@ article.page-store h2 {
   font-weight: 600;
 }
 
-/* ============== CUSTOM CODE =============== */
+/* ==== CUSTOM CODE ==== */
 [data-typewriter]::after {
   color: var(--color-link);
   font-weight: bold;
