@@ -17,7 +17,7 @@ template: links
 
 Welcome to Roe.
 
-If you've already [installed Roe](/documentation/roe/guide-installation), you're ready to build your first page. If you haven't yet, complete [Install Roe](/documentation/roe/guide-installation) first.
+If you've already installed Roe, you're ready to build your first page. If you haven't yet, complete [installing Roe](/documentation/roe/guide-installation) first.
 
 ## Learn Roe with simple tutorials
 

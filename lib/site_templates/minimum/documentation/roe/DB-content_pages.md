@@ -29,7 +29,7 @@ Pages are for static content — things that don't change often and aren't part 
 - Legal pages (Privacy, Terms)
 - Member pages (Sign up, Sign in, etc.)
 
-Pages don't have dates and don't appear in RSS feeds or post Collections.
+Pages don't have dates and don't appear in RSS feeds.
 
 ## Creating Pages
 
@@ -85,7 +85,7 @@ This way, you can change the `title` or `url_name` to whatever you like and Roe 
 
 ### Release and Podcast Pages
 
-Add `release: <release-key>` to a page to make it a release's page, or `podcast: <podcast-key>` to make it a podcast's page. Both are in the editor's Add Field menu, and on the new-page form, when [Music](/documentation/roe/settings-music) or [Podcasts](/documentation/roe/podcasts) is turned on.
+Add `release: <release-key>` to a page to make it a music page for that release, or `podcast: <podcast-key>` to make it a podcast's page. Both are in the editor's `+ Add Field menu`, and on the new-page form, when [Music](/documentation/roe/settings-music) or [Podcasts](/documentation/roe/podcasts) is turned on.
 
 The page then uses the `music-page` or `podcast-page` [content layout](/documentation/roe/layouts#content-layouts). By default that shows:
 
