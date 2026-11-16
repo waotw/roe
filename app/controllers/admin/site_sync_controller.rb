@@ -69,6 +69,13 @@ class Admin::SiteSyncController < Admin::BaseController
     # push/pull buttons. nil when nothing has happened recently.
     @transfer_status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
 
+    # refresh_if_stale (above) asked live again in the background: the page
+    # waits for the answer and redraws (site_sync_refresh_controller.js), so
+    # nobody has to press REFRESH SYNC STATUS. Not while a transfer runs —
+    # site_sync_controller.js reloads the page when that finishes.
+    @peer_answer_coming = @peer_call_configured && SiteSync::Exchange.peer_state_stale?(@peer_state) &&
+                          @transfer_status&.dig(:state).to_s != "running"
+
     # Static Site Sync section state — only computed when SSG is
     # enabled to keep the page render cheap for everyone else. Diff is
     # only computed when the user has actually configured the sync;
@@ -583,6 +590,11 @@ class Admin::SiteSyncController < Admin::BaseController
   # `progress` is populated by SiteSyncTransferJob during rsync steps:
   # { completed: 5, total: 12 }. Absent for non-rsync steps, in which
   # case the UI just hides the progress line.
+  # When live last answered, for a page waiting on a background exchange.
+  def peer_status
+    render json: { received_at: SiteSync::Exchange.last_contact_at&.to_i }
+  end
+
   def transfer_status
     status = Rails.cache.read(SiteSyncTransferJob::STATUS_CACHE_KEY)
     if status.nil?

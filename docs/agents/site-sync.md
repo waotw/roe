@@ -241,11 +241,29 @@ Rules for all Site Sync copy:
 
 ---
 
+## Live's answer on the Site Sync page
+
+The page draws from live's last answer, which is cached. When that answer is
+more than a minute old (`Exchange::REFRESH_STALE_AFTER`), opening the page
+asks live again in the background (`refresh_if_stale`). The page then waits
+for the new answer (`site_sync_refresh_controller.js`, polling `peer_status`
+every 2 seconds for up to 20) and reloads once it arrives. If a field on the
+page was edited first, it shows a note instead of reloading over the edit. It
+doesn't wait while a transfer runs, because `site_sync_controller.js` reloads
+the page when that finishes. REFRESH SYNC STATUS still asks live straight away.
+
+## Old live backup folders
+
+`backups/live/content/<time>/` folders follow the Sync History window
+(`sync_history_days`): `Versions.trim!` removes any folder named for a time
+before the cutoff, except the newest, which `latest` points at (rsync's
+`--link-dest`, `rake site:rollback`). Since 2026-11-13 each sync removes its
+own folder once the store has the files, so what's left is older syncs and
+`rake site:backup`'s full copies. That task keeps its own newest 15 as well.
+
+---
+
 ## Still open
 
 - Live's own sync record isn't rewound (see REWIND).
-- The Site Sync page shows live's last cached answer; after a change on live
-  it needs REFRESH SYNC STATUS before it notices.
-- `backups/live/content/` folders made before 2026-11-13 were never pruned;
-  `rake site:backup` (Fly) writes full live backups to the same folder.
 - A schedule for local snapshots.

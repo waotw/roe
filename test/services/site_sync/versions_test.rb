@@ -186,6 +186,31 @@ class SiteSync::VersionsTest < ActiveSupport::TestCase
     refute SiteSync::Versions.object?(Digest::SHA256.hexdigest("v1")), "only the old event used it"
   end
 
+  test "trimming removes live backup folders past the cutoff, keeping the newest and latest" do
+    root = Dir.mktmpdir("live-content")
+    SiteSync::BackupPaths.stubs(:live_content).returns(root)
+    old = %w[2026-07-11-191115 2026-07-12-103657]
+    recent = (Time.current - 2.days).strftime("%Y-%m-%d-%H%M%S")
+    (old + [ recent ]).each { |name| FileUtils.mkdir_p(File.join(root, name)) }
+    FileUtils.mkdir_p(File.join(root, ".downloads"))
+    File.symlink(old.first, File.join(root, "latest"))
+
+    SiteSync::Versions.trim!(days: 30)
+
+    assert_equal [ ".downloads", "latest", recent ].sort, Dir.children(root).sort
+    assert_equal recent, File.readlink(File.join(root, "latest")), "latest moves to the newest folder left"
+
+    FileUtils.rm_rf(File.join(root, recent))
+    old.each { |name| FileUtils.mkdir_p(File.join(root, name)) }
+    SiteSync::Versions.trim!(days: nil)
+    assert old.all? { |name| File.directory?(File.join(root, name)) }, "forever keeps everything"
+
+    SiteSync::Versions.trim!(days: 30)
+    assert_equal [ old.last ], Dir.children(root).grep(/\A20/), "the newest folder stays however old it is"
+  ensure
+    FileUtils.rm_rf(root)
+  end
+
   test "sync_history_days: 30 unless set; 0 or forever keeps everything" do
     { nil => 30, "" => 30, 7 => 7, "14" => 14, 0 => nil, "forever" => nil, "junk" => 30 }.each do |raw, days|
       SiteConfig.stubs(:get).with("sync_history_days").returns(raw)

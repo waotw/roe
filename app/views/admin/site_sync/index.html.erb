@@ -7,6 +7,20 @@
     </p>
   </div>
 
+  <%# Live is being asked again in the background (Exchange.refresh_if_stale):
+      redraw when it answers. If something on the page has been edited by
+      then, say so instead of reloading over it. %>
+  <% if @peer_answer_coming %>
+    <div data-controller="site-sync-refresh"
+         data-site-sync-refresh-url-value="<%= admin_site_sync_peer_status_path %>"
+         data-site-sync-refresh-since-value="<%= @peer_state&.dig(:received_at).to_i %>"
+         data-site-sync-refresh-target="note" hidden
+         class="mb-4 px-3 py-2 text-sm border border-amber-300 bg-amber-50 text-amber-900">
+      <%# COPY: live answered while the page was being edited %>
+      Live has sent a newer sync status. Reload the page to see it.
+    </div>
+  <% end %>
+
   <%# ─── Post-restore recovery banner (production only) ───────────── %>
   <%= render "restore_recovery" %>
 

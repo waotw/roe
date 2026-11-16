@@ -105,6 +105,7 @@ Rails.application.routes.draw do
     post "site_sync/clone_to_live",    to: "site_sync#clone_to_live",   as: "clone_site_to_live"
     post "site_sync/resolve_conflicts", to: "site_sync#resolve_conflicts", as: "resolve_site_sync_conflicts"
     get  "site_sync/transfer_status",         to: "site_sync#transfer_status",        as: "site_transfer_status"
+    get  "site_sync/peer_status",             to: "site_sync#peer_status",            as: "site_sync_peer_status"
     post "site_sync/transfer_status/dismiss", to: "site_sync#dismiss_transfer_status", as: "dismiss_site_transfer_status"
     post "site_sync/transfer_status/retry",   to: "site_sync#retry_transfer",         as: "retry_site_transfer"
 

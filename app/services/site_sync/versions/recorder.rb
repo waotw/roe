@@ -107,12 +107,7 @@ module SiteSync
         return unless dir && File.dirname(dir) == root && File.basename(dir).match?(/\A20\d{2}-/) && File.directory?(dir)
 
         FileUtils.rm_rf(dir)
-        latest = File.join(root, "latest")
-        return unless File.symlink?(latest) && !File.exist?(latest)
-
-        FileUtils.rm_f(latest)
-        newest = Dir.glob(File.join(root, "20*")).select { |d| File.directory?(d) && !File.symlink?(d) }.max
-        FileUtils.ln_s(File.basename(newest), latest) if newest
+        Versions.repoint_live_latest(root)
       rescue StandardError => e
         Rails.logger.warn "[SiteSync::Versions] couldn't remove #{dir}: #{e.class} #{e.message}"
       end

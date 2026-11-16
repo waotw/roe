@@ -281,6 +281,7 @@ module SiteSync
     # row points to. A version inside the window stays rebuildable: it's either
     # the `before` of a change inside the window, or still on disk.
     def trim!(days: keep_days, now: Time.current)
+      prune_live_backups!(days: days, now: now)
       return unless File.exist?(db_path)
 
       with_db do |db|
@@ -298,6 +299,46 @@ module SiteSync
           File.delete(file) if File.mtime(file) < now - 1.day
         end
       end
+    end
+
+    LIVE_BACKUP_NAME = /\A(\d{4})-(\d{2})-(\d{2})-(\d{2})(\d{2})(\d{2})\z/
+
+    # backups/live/content/<time>/ holds live's copies from before a push.
+    # Since the store took over, each sync removes its own folder
+    # (Recorder#discard_live_backup), but older ones and `rake site:backup`'s
+    # full copies stay. They follow the same window as Sync History: a
+    # folder named for a time before the cutoff goes, except the newest,
+    # which `latest` (rsync's --link-dest, `rake site:rollback`) points at.
+    def prune_live_backups!(days: keep_days, now: Time.current)
+      return unless days
+
+      root = SiteSync::BackupPaths.live_content
+      return unless Dir.exist?(root)
+
+      cutoff = now - days.days
+      folders = Dir.children(root).filter_map do |name|
+        path = File.join(root, name)
+        next if File.symlink?(path) || !File.directory?(path)
+
+        m = LIVE_BACKUP_NAME.match(name) or next
+        [ path, Time.zone.local(*m.captures.map(&:to_i)) ]
+      end
+      newest = folders.max_by(&:last)&.first
+      folders.each { |path, at| FileUtils.rm_rf(path) if at < cutoff && path != newest }
+      repoint_live_latest(root)
+    rescue StandardError => e
+      Rails.logger.warn "[SiteSync::Versions] couldn't prune live backups: #{e.class} #{e.message}"
+    end
+
+    # `latest` names the newest folder; after one is removed it may point at
+    # nothing.
+    def repoint_live_latest(root)
+      latest = File.join(root, "latest")
+      return unless File.symlink?(latest) && !File.exist?(latest)
+
+      FileUtils.rm_f(latest)
+      newest = Dir.glob(File.join(root, "20*")).select { |d| File.directory?(d) && !File.symlink?(d) }.max
+      FileUtils.ln_s(File.basename(newest), latest) if newest
     end
 
     def with_db

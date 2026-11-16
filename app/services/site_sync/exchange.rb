@@ -778,10 +778,14 @@ module SiteSync
       # — and would fail badly when the peer is unreachable.
       def refresh_if_stale
         state = peer_state
-        if state.nil? || state[:received_at].to_i < REFRESH_STALE_AFTER.ago.to_i
-          SiteSyncExchangeJob.perform_later if can_call_peer?
-        end
+        SiteSyncExchangeJob.perform_later if peer_state_stale?(state) && can_call_peer?
         state
+      end
+
+      # Older than REFRESH_STALE_AFTER, or never heard: refresh_if_stale asks
+      # again. The Site Sync page also uses it to know an answer is coming.
+      def peer_state_stale?(state = peer_state)
+        state.nil? || state[:received_at].to_i < REFRESH_STALE_AFTER.ago.to_i
       end
 
       # True if peer reports unsynced changes (their current
