@@ -247,6 +247,7 @@ module ContentMetadataSchema
     {
       # Core product fields
       "title" => { type: :text, label: "title", required: true },
+      "subtitle" => { type: :text, label: "subtitle" },
       "category" => {
         type: :text,
         label: "category",

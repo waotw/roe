@@ -1,0 +1,7 @@
+<%# The product's `description:`. A variant without one shows its group's,
+    from the primary (the same fallback as the cart line). Styled like
+    [excerpt], with its own `description` class, as a podcast's is. %>
+<% description = (record.description.presence || record.group_primary_description).to_s.strip %>
+<% if description.present? %>
+  <p class="<%= kind %>-excerpt <%= kind %>-description"><%= description %></p>
+<% end %>

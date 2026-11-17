@@ -188,6 +188,16 @@ class SearchIndexGeneratorTest < ActiveSupport::TestCase
     refute_includes e[:text], "Secret paid body"
   end
 
+  test "a paywall in a file with Windows line endings splits the same way" do
+    SiteConfig.stubs(:feature).returns(nil)
+    SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")
+    make_post(title: "Walled CRLF", audience: "paid", body: PAYWALLED_MULTILINE.gsub("\n", "\r\n"))
+
+    e = entry_titled("Walled CRLF")
+    assert_includes e[:text], "Free intro everyone may read"
+    refute_includes e[:text], "Secret paid body"
+  end
+
   test "a paid post with no paywall is fully gated, so only its excerpt is public" do
     SiteConfig.stubs(:feature).returns(nil)
     SiteConfig.stubs(:feature).with("members", "everyone.show_paid_content").returns("true")

@@ -398,6 +398,7 @@ the source. "new" means not in v0.4.1.
 | `product` | 0.4.1 | `app/helpers/application_helper.rb:215` | ✓ | ✓ | 8 | /store/lab-poster |
 | `product-button` | 0.4.1 | `app/views/shared/_snipcart_button.html.erb:14` |  |  | 0 |  |
 | `product-button-error` | 0.4.1 | `app/services/product_button_renderer.rb:256` |  |  | 0 |  |
+| `product-description` | new | `app/views/content_layouts/parts/_product_description.html.erb:6` |  |  | 0 |  |
 | `product-excerpt` | new | `app/models/content_layout/explain.rb:220` | ✓ | ✓ | 0 |  |
 | `product-grid` | 0.4.1 | `app/models/concerns/has_markdown_extensions.rb:4` | ✓ | ✓ | 4 | /admin/themes/reference/store |
 | `product-image` | 0.4.1 | `app/helpers/products_helper.rb:7` | ✓ | ✓ | 8 | /store/lab-poster |
@@ -406,6 +407,7 @@ the source. "new" means not in v0.4.1.
 | `product-link-small` | 0.4.1 | `app/views/cards/_post_link_small.html.erb:1` | ✓ | ✓ | 2 | /admin/themes/reference/store |
 | `product-notice` | 0.4.1 | `app/views/shared/_snipcart_button.html.erb:21` |  |  | 0 |  |
 | `product-price` | 0.4.1 | `app/models/content_layout/explain.rb:223` | ✓ | ✓ | 6 | /admin/themes/reference/buttons |
+| `product-subtitle` | new | `app/views/content_layouts/parts/_subtitle.html.erb:3` |  |  | 0 |  |
 | `product-tag` | new | `app/models/content_layout/explain.rb:225` | ✓ | ✓ | 0 |  |
 | `product-tag-link` | new | `app/models/content_layout/explain.rb:225` | ✓ | ✓ | 0 |  |
 | `product-tags` | new | `app/models/content_layout/explain.rb:225` | ✓ | ✓ | 0 |  |

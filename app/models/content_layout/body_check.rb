@@ -52,13 +52,14 @@ class ContentLayout
 
     # The insides of every ```name fence. A block shown as an example inside
     # a longer fence (```` or ~~~) in the docs isn't a block, so those
-    # fences are taken out first.
+    # fences are taken out first. `\r?` lets a closing fence end a line
+    # written with Windows line endings.
     def blocks(name)
-      without_examples.scan(/^```#{name}[ \t]*\r?\n(.*?)^```[ \t]*$/m).map(&:first)
+      without_examples.scan(/^```#{name}[ \t]*\r?\n(.*?)^```[ \t]*\r?$/m).map(&:first)
     end
 
     def without_examples
-      @without_examples ||= @text.gsub(/^(`{4,}|~{3,})[^\n]*\n.*?^\1[ \t]*$/m, "")
+      @without_examples ||= @text.gsub(/^(`{4,}|~{3,})[^\n]*\n.*?^\1[ \t]*\r?$/m, "")
     end
   end
 end

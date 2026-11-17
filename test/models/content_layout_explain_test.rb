@@ -103,7 +103,7 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
 
   test "each type offers its parts first, then its other fields, in one list" do
     assert_equal %w[title subtitle date author image feed_links excerpt tags body], choices("article")
-    assert_equal %w[image title price buy_button tags body category description variant], choices("product")
+    assert_equal %w[image title subtitle price buy_button description tags body category variant], choices("product")
     assert_equal %w[title body], choices("documentation")
     assert_includes choices("podcast"), "playlist"
     assert_includes choices("music"), "playlist"
