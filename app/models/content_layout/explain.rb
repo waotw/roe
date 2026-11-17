@@ -225,8 +225,8 @@ class ContentLayout
       when "tags"          then %(<ul class="#{k}-tags"><li class="#{k}-tag"><a class="#{k}-tag-link">tag</a></li></ul>)
       when "body"
         case k
-        when "post"    then %(<div class="post-content">…the post's writing…</div>)
-        when "product" then "…the product's writing…"
+        when "post"    then %(<div class="post-content">…the post markdown content…</div>)
+        when "product" then "…the product markdown content…"
         else %(<div class="#{k}-content">…the #{noun}'s writing…</div>)
         end
       else %(<p class="#{k}-field #{k}-field-#{part.dasherize}">#{part}</p>)
