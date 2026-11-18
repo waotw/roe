@@ -54,7 +54,7 @@ class ContentLayout
     def part(name)
       case name
       when "title"      then email? ? %(<h1>#{h(@post.title.presence || "Untitled")}</h1>) : ""
-      when "subtitle"   then @post.subtitle.present? ? %(<p class="post-subtitle">#{h(@post.subtitle)}</p>) : ""
+      when "subtitle"   then @post.subtitle.present? ? %(<p class="post-subtitle">#{FieldText.html(@post.subtitle)}</p>) : ""
       when "date"       then email? ? date_html : ""
       when "author"     then email? ? author_html : ""
       when "artist"     then email? ? byline(artist_name) : ""
@@ -64,7 +64,7 @@ class ContentLayout
       when "body"       then email? ? %(<div class="post-content">\n#{@body_html}\n</div>) : @body_html
       when "feed_links" then email? ? links_paragraph("feed-links", feed_links) : ""
       when "subscribe"  then email? ? links_paragraph("podcast-subscribe", subscribe_links) : ""
-      when "excerpt"    then @post.excerpt.present? ? %(<p class="post-excerpt">#{h(@post.excerpt)}</p>) : ""
+      when "excerpt"    then @post.excerpt.present? ? %(<p class="post-excerpt">#{FieldText.html(@post.excerpt)}</p>) : ""
       when "tags"       then @post.tags.any? ? %(<p class="post-tags">#{h(@post.tags.join(", "))}</p>) : ""
       when *ContentLayout::BUILT_PARTS then "" # site-only: episodes, buy_button, …
       else field_html(name)
@@ -166,10 +166,9 @@ class ContentLayout
 
     def field_html(name)
       value = @post.metadata[name]
-      value = value.join(", ") if value.is_a?(Array)
       return "" if value.blank? || value.is_a?(Hash)
 
-      %(<p class="post-field post-field-#{name.dasherize}">#{h(value.to_s)}</p>)
+      %(<p class="post-field post-field-#{name.dasherize}">#{FieldText.html(value)}</p>)
     end
 
     def absolute(path)

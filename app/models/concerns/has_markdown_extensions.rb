@@ -1590,8 +1590,7 @@ module HasMarkdownExtensions
 
       # Subtitle
       if show_subtitle && item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "#{item.subtitle}"
-        output << "{: .item-subtitle}"
+        output << %(<p class="item-subtitle">#{FieldText.html(item.subtitle)}</p>)
         output << ""
       end
 
@@ -1652,14 +1651,12 @@ module HasMarkdownExtensions
       output << ""
 
       if show_subtitle && item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "#{item.subtitle}"
-        output << "{: .item-subtitle}"
+        output << %(<p class="item-subtitle">#{FieldText.html(item.subtitle)}</p>)
         output << ""
       end
 
       if show_excerpt && item.respond_to?(:excerpt) && item.excerpt.present?
-        output << item.excerpt.to_s
-        output << "{: .item-excerpt}"
+        output << %(<p class="item-excerpt">#{FieldText.html(item.excerpt)}</p>)
         output << ""
       end
 
@@ -1786,9 +1783,9 @@ module HasMarkdownExtensions
 
       # Subtitle: explicit config override > item's subtitle field
       subtitle_str = if config[:subtitle].present?
-        CGI.escapeHTML(config[:subtitle].to_s)
+        FieldText.html(config[:subtitle])
       elsif show_subtitle
-        item.respond_to?(:subtitle) ? CGI.escapeHTML(item.subtitle.to_s.strip) : nil
+        item.respond_to?(:subtitle) ? FieldText.html(item.subtitle) : nil
       end
 
       meta_html = ""
@@ -1833,8 +1830,8 @@ module HasMarkdownExtensions
 
       html = "<div class=\"glossary-entry\">\n"
       html << "  <dt id=\"#{term_id}\" class=\"item-title\">#{title_content}</dt>\n"
-      html << "  <dd class=\"item-subtitle\">#{CGI.escapeHTML(subtitle)}</dd>\n" if subtitle.present?
-      html << "  <dd class=\"item-excerpt\">#{CGI.escapeHTML(excerpt)}</dd>\n" if excerpt.present?
+      html << "  <dd class=\"item-subtitle\">#{FieldText.html(subtitle)}</dd>\n" if subtitle.present?
+      html << "  <dd class=\"item-excerpt\">#{FieldText.html(excerpt)}</dd>\n" if excerpt.present?
       html << "</div>"
       html
     end
@@ -1856,8 +1853,7 @@ module HasMarkdownExtensions
 
       # Subtitle
       if item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "#{item.subtitle}"
-        output << "{: .item-subtitle}"
+        output << %(<p class="item-subtitle">#{FieldText.html(item.subtitle)}</p>)
         output << ""
       end
 
@@ -2415,8 +2411,8 @@ module HasMarkdownExtensions
       # Optional description
       if show_description && display_product.respond_to?(:description) && display_product.description.present?
         # Truncate to ~100 characters
-        desc = display_product.description.length > 100 ? display_product.description[0..97] + "..." : display_product.description
-        output << %Q(    <div class="grid-item-description">#{desc}</div>)
+        desc = FieldText.shortened(display_product.description, 100)
+        output << %Q(    <div class="grid-item-description">#{FieldText.html(desc)}</div>)
       end
 
       # Price and button
@@ -3353,7 +3349,7 @@ module HasMarkdownExtensions
     text = explicit.to_s
     text = first_paragraph_of_post(referenced_post) if text.blank? && referenced_post.present?
     return "" if text.blank?
-    text.length > max_length ? text[0..max_length - 3] + "..." : text
+    FieldText.shortened(text, max_length)
   end
 
   # Walk a post's markdown content line by line, looking for the first

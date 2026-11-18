@@ -48,7 +48,7 @@ class FeedGenerator
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
 
           item.description = if post.excerpt.present?
-            post.excerpt
+            FieldText.plain(post.excerpt)
           else
             feed_description(post)
           end
@@ -85,7 +85,7 @@ class FeedGenerator
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
 
           item.description = if post.excerpt.present?
-            post.excerpt
+            FieldText.plain(post.excerpt)
           else
             feed_description(post)
           end
@@ -316,8 +316,8 @@ class FeedGenerator
 
   def feed_description(post)
     # Priority: subtitle > excerpt > first paragraph
-    return post.subtitle if post.subtitle.present?
-    return post.excerpt if post.excerpt.present?
+    return FieldText.plain(post.subtitle) if post.subtitle.present?
+    return FieldText.plain(post.excerpt) if post.excerpt.present?
 
     # Extract first paragraph from content
     clean_content = post.content
@@ -387,8 +387,8 @@ class FeedGenerator
 
   def episode_description(post)
     # Priority: excerpt > subtitle > content snippet
-    return post.excerpt if post.excerpt.present?
-    return post.subtitle if post.subtitle.present?
+    return FieldText.plain(post.excerpt) if post.excerpt.present?
+    return FieldText.plain(post.subtitle) if post.subtitle.present?
 
     # Fallback: first paragraph or truncated content
     feed_description(post)

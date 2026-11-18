@@ -128,12 +128,12 @@ module ContentLayoutHelper
     content_tag(:div, safe_join(parts, "\n"), class: row.classes.join(" ").presence || "layout-row")
   end
 
-  # A part named after a metadata field the record has: its value, plainly.
+  # A part named after a metadata field the record has: its value, with inline
+  # Markdown (FieldText).
   def render_layout_field(name, record, kind)
     value = record.respond_to?(:metadata) ? record.metadata[name] : nil
-    value = value.join(", ") if value.is_a?(Array)
     return nil if value.blank? || value.is_a?(Hash)
 
-    content_tag(:p, value.to_s, class: "#{kind}-field #{kind}-field-#{name.dasherize}")
+    content_tag(:p, FieldText.html(value), class: "#{kind}-field #{kind}-field-#{name.dasherize}")
   end
 end

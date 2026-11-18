@@ -3,5 +3,5 @@
     [excerpt], with its own `description` class, as a podcast's is. %>
 <% description = (record.description.presence || record.group_primary_description).to_s.strip %>
 <% if description.present? %>
-  <p class="<%= kind %>-excerpt <%= kind %>-description"><%= description %></p>
+  <p class="<%= kind %>-excerpt <%= kind %>-description"><%= FieldText.html(description) %></p>
 <% end %>

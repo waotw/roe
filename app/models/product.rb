@@ -242,7 +242,7 @@ class Product < ApplicationRecord
   # So: lead with this product's own variant, and fall back to the group's
   # description when the variant doesn't set its own.
   def snipcart_description
-    detail = description.presence || group_primary_description
+    detail = FieldText.plain(description.presence || group_primary_description)
     [ variant.presence, detail.presence ].compact.join(" — ").presence
   end
 

@@ -218,7 +218,11 @@
           <% end %>
         </div>
       <% end %>
-      <div data-metadata-editor-target="fieldsContainer" class="space-y-2">
+      <%# multiline-field turns a field marked data-multiline into a textarea
+          when it gets a line break; the editor listens to the new element. %>
+      <div data-metadata-editor-target="fieldsContainer" class="space-y-2"
+           data-controller="multiline-field"
+           data-action="keydown->multiline-field#keydown paste->multiline-field#paste input->multiline-field#input multiline-field:swapped->metadata-editor#attachChangeListeners">
         <%# Render known fields in config order first %>
         <% known_fields_config.each do |field_name, config| %>
           <% next unless metadata_hash.key?(field_name) %>
@@ -380,14 +384,25 @@
                        (weight: [ 500 ] grams) rather than inside the label,
                        which sets the width of the label column for every row. -->
                     <div class="flex-1 flex items-center gap-2">
+                      <% if config[:multiline] && display_value.to_s.include?("\n") %>
+                      <textarea id="metadata-field-<%= field_name %>"
+                              name="metadata_fields[<%= field_name %>]"
+                              rows="<%= [ display_value.to_s.lines.size, 2 ].max %>"
+                              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                              data-metadata-field="<%= field_name %>"
+                              data-multiline
+                              <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>><%= ERB::Util.html_escape(display_value.to_s) %></textarea>
+                      <% else %>
                       <input type="text"
                               id="metadata-field-<%= field_name %>"
                               name="metadata_fields[<%= field_name %>]"
                               value="<%= ERB::Util.html_escape(display_value) %>"
                               class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'bg-gray-200 text-gray-600' if config[:readonly] %>"
                               data-metadata-field="<%= field_name %>"
+                              <% if config[:multiline] %>data-multiline<% end %>
                               <% if config[:readonly] %>readonly<% end %>
                               <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <% end %>
                       <% if config[:suffix] %>
                         <span class="font-mono text-xs text-gray-500 shrink-0"><%= config[:suffix] %></span>
                       <% end %>
@@ -469,12 +484,22 @@
                   placeholder="field_name"
                   class="font-mono text-xs px-2 py-2 border border-gray-300 metadata-label"
                   data-custom-key>
+              <% if value.is_a?(String) && value.include?("\n") %>
+              <textarea id="metadata-field-<%= field_name.parameterize %>"
+                  name="metadata_fields[<%= field_name %>]"
+                  rows="<%= [ value.lines.size, 2 ].max %>"
+                  class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
+                  data-metadata-field="<%= field_name %>"
+                  data-multiline><%= ERB::Util.html_escape(value) %></textarea>
+              <% else %>
               <input type="text"
                   id="metadata-field-<%= field_name.parameterize %>"
                   name="metadata_fields[<%= field_name %>]"
                   value="<%= ERB::Util.html_escape(value.to_s) %>"
                   class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-                  data-metadata-field="<%= field_name %>">
+                  data-metadata-field="<%= field_name %>"
+                  data-multiline>
+              <% end %>
               <%= render "shared/metadata_remove_button" %>
             </div>
           <% end %>

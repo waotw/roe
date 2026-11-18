@@ -384,10 +384,10 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
 
   test "a variant without a description shows its group's, from the primary" do
     site_layout("product", "[title] [description]\n[body]\n")
-    a_product(group: "book", primary: true, description: "The group's copy.")
+    a_product(group: "book", primary: true, description: "The group copy.")
     epub = a_product(group: "book", variant: "Epub")
     get product_path(epub.url_name)
-    assert_select "p.product-description", "The group's copy."
+    assert_select "p.product-description", "The group copy."
   end
 
   test "[subtitle] and [description] draw nothing on a product without them" do

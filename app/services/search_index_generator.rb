@@ -196,7 +196,7 @@ class SearchIndexGenerator
   end
 
   def excerpt_for(record)
-    record.respond_to?(:excerpt) ? record.excerpt.to_s : ""
+    record.respond_to?(:excerpt) ? FieldText.plain(record.excerpt) : ""
   end
 
   # What a non-member may search in a paid post: the excerpt plus whatever

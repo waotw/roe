@@ -16,7 +16,7 @@
         <h3 class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></h3>
 
         <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
-          <p class="item-subtitle"><%= item.subtitle %></p>
+          <p class="item-subtitle"><%= FieldText.html(item.subtitle) %></p>
         <% end %>
 
         <% if item.respond_to?(:date) && item.date %>
@@ -26,7 +26,7 @@
         <% end %>
 
         <% if item.respond_to?(:excerpt) && item.excerpt.present? %>
-          <p class="item-excerpt"><%= item.excerpt %></p>
+          <p class="item-excerpt"><%= FieldText.html(item.excerpt) %></p>
         <% end %>
       </div>
     </div>

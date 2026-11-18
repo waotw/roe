@@ -43,10 +43,10 @@ module SeoHelper
   # subtitle → collection description → site description.
   def seo_description
     if (subject = seo_subject)
-      excerpt = subject.metadata["excerpt"].to_s.strip.presence
+      excerpt = FieldText.plain(subject.metadata["excerpt"]).presence
       return excerpt if excerpt
 
-      subtitle = subject.metadata["subtitle"].to_s.strip.presence
+      subtitle = FieldText.plain(subject.metadata["subtitle"]).presence
       return subtitle if subtitle
     elsif (collection_desc = instance_variable_get(:@page_description).to_s.strip.presence)
       return collection_desc

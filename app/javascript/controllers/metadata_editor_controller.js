@@ -432,7 +432,8 @@ export default class extends Controller {
              value=""
              placeholder="value"
              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-             data-custom-value>
+             data-custom-value
+             data-multiline>
       ${this.removeButtonHtml()}
     `;
 
@@ -578,6 +579,25 @@ export default class extends Controller {
     return fieldConfig?.required === true;
   }
 
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // A field that can hold lines (multiline_field_controller): a textarea
+  // when the value has a line break, a text input when it doesn't.
+  multilineFieldHtml(value, attributes) {
+    const text = String(value ?? "");
+    if (text.includes("\n")) {
+      const rows = Math.max(2, text.split("\n").length);
+      return `<textarea ${attributes} rows="${rows}" data-multiline>${this.escapeHtml(text)}</textarea>`;
+    }
+    return `<input type="text" value="${this.escapeHtml(text)}" ${attributes} data-multiline>`;
+  }
+
   buildInputHtml(fieldName, config, value) {
     const escapedValue = String(value)
       .replace(/&/g, "&amp;")
@@ -682,6 +702,13 @@ export default class extends Controller {
                       ⚠ File not found under <code>site/media/</code>.
                     </p>
                   </div>`;
+        }
+
+        if (config.multiline) {
+          return this.multilineFieldHtml(
+            value,
+            `id="metadata-field-${fieldName}" name="metadata_fields[${fieldName}]" autocomplete="off" class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300" data-metadata-field="${fieldName}" ${config.hint ? `placeholder="${config.hint}"` : ""}`,
+          );
         }
 
         return `<input type="text"
@@ -834,7 +861,20 @@ export default class extends Controller {
       return `"${minutePrecision}Z"`;
     }
 
-    return `"${strValue.replace(/"/g, '\\"')}"`;
+    // A value with lines is a `|-` block, as HasMetadata writes it — inside
+    // double quotes YAML would fold each line break into a space. `|2-` when
+    // the first line starts with a space, which YAML would otherwise read as
+    // the indentation.
+    if (strValue.includes("\n")) {
+      const lines = strValue.replace(/\r\n?/g, "\n").split("\n");
+      const indicator = /^\s/.test(lines[0]) ? "|2-" : "|-";
+      return (
+        indicator +
+        lines.map((line) => (line === "" ? "" : `\n  ${line}`) || "\n").join("")
+      );
+    }
+
+    return `"${strValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
 
   formToYaml() {
@@ -917,20 +957,44 @@ export default class extends Controller {
     const lines = yamlText.split("\n");
     const fields = {};
 
-    lines.forEach((line) => {
-      if (!line.trim()) return;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      // A line that's indented belongs to the key above it.
+      if (/^\s/.test(line)) continue;
 
       const colonIndex = line.indexOf(":");
-      if (colonIndex === -1) return;
+      if (colonIndex === -1) continue;
 
       let key = line.substring(0, colonIndex).trim();
       let value = line.substring(colonIndex + 1).trim();
+
+      // A block of lines (`key: |` or `key: >`): its indented lines below.
+      const block = value.match(/^([|>])([1-9])?([+-])?([1-9])?\s*$/);
+      if (block) {
+        const body = [];
+        while (i + 1 < lines.length && (/^\s/.test(lines[i + 1]) || lines[i + 1] === "")) {
+          body.push(lines[++i]);
+        }
+        while (body.length && body[body.length - 1].trim() === "") body.pop();
+        const width =
+          Number(block[2] || block[4]) ||
+          Math.min(
+            ...body.filter((l) => l.trim()).map((l) => l.match(/^\s*/)[0].length),
+          );
+        const text = body.map((l) => l.slice(width));
+        fields[key] =
+          block[1] === "|"
+            ? text.join("\n")
+            : text.join("\n").replace(/([^\n])\n(?=[^\n])/g, "$1 ");
+        continue;
+      }
 
       // List fields (tags, related) — parse the YAML array back to comma-separated.
       if (key === "tags" || key === "related") {
         if (value === "[]" || value === "") {
           fields[key] = "";
-          return;
+          continue;
         }
 
         // Parse array format: ["tag1", "tag2"]
@@ -941,22 +1005,22 @@ export default class extends Controller {
             .map((tag) => tag.trim().replace(/^["']|["']$/g, ""))
             .filter((tag) => tag !== "");
           fields[key] = tags.join(", ");
-          return;
+          continue;
         }
       }
 
       // Standard parsing for other fields
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
+      if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
+        // Double quotes: \" \\ and \n are escapes.
+        value = value
+          .slice(1, -1)
+          .replace(/\\(["\\n])/g, (_, c) => (c === "n" ? "\n" : c));
+      } else if (value.startsWith("'") && value.endsWith("'") && value.length > 1) {
+        value = value.slice(1, -1).replace(/''/g, "'");
       }
 
-      value = value.replace(/\\"/g, '"').replace(/\\'/g, "'");
-
       fields[key] = value;
-    });
+    }
 
     // Clear and rebuild form
     const container = this.fieldsContainerTarget;
@@ -1069,15 +1133,14 @@ export default class extends Controller {
 
     row.innerHTML = `
       <input type="text"
-             value="${key}"
+             value="${this.escapeHtml(key)}"
              placeholder="field_name"
              class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
              data-custom-key>
-      <input type="text"
-             value="${value}"
-             placeholder="value"
-             class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-             data-custom-value>
+      ${this.multilineFieldHtml(
+        value,
+        'placeholder="value" class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300" data-custom-value',
+      )}
       ${this.removeButtonHtml()}
     `;
 

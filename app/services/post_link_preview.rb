@@ -76,10 +76,12 @@ class PostLinkPreview
   # Reuse the renderer's own resolver so the placeholder matches what would
   # actually render (metadata excerpt → first prose paragraph, truncated).
   def excerpt_for(record)
-    record.send(:resolve_card_excerpt,
-                explicit: record.metadata["excerpt"].to_s,
-                referenced_post: record,
-                max_length: 300)
+    excerpt = record.send(:resolve_card_excerpt,
+                          explicit: record.metadata["excerpt"].to_s,
+                          referenced_post: record,
+                          max_length: 300)
+    # A shortened excerpt comes back as escaped HTML; the field wants text.
+    excerpt.html_safe? ? CGI.unescapeHTML(excerpt.to_str) : excerpt
   rescue StandardError
     record.metadata["excerpt"].to_s
   end

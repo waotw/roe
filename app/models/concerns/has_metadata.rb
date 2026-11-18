@@ -100,18 +100,37 @@ module HasMetadata
         '""'
       when Array
         return "[]" if value.empty?
-        "[#{value.map { |item| format_yaml_scalar(item) }.join(', ')}]"
+        "[#{value.map { |item| item.is_a?(String) ? yaml_quoted(item) : format_yaml_scalar(item) }.join(', ')}]"
       when String
         if value.empty?
           '""'
         elsif value.match?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)
           "\"#{value}\""
+        elsif value.include?("\n")
+          yaml_block(value)
         else
-          "\"#{value.gsub('"', '\"')}\""
+          yaml_quoted(value)
         end
       else
         "\"#{value}\""
       end
+    end
+
+    # A value with lines, as a `|-` block. In double quotes YAML folds each
+    # line break into a space, so a subtitle written on two lines came back
+    # as one. `|2-` when the first line starts with a space, which YAML would
+    # otherwise take for the block's indentation.
+    def yaml_block(value)
+      lines = value.gsub(/\r\n?/, "\n").sub(/\n+\z/, "").split("\n", -1)
+      indicator = lines.first.to_s.match?(/\A\s/) ? "|2-" : "|-"
+      ([ indicator ] + lines.map { |line| line.empty? ? "" : "  #{line}" }).join("\n")
+    end
+
+    # Double-quoted, with the backslash escaped as well as the quote: `C:\new`
+    # written as-is reads back with a line break in it, or doesn't read.
+    def yaml_quoted(value)
+      escaped = value.gsub("\\") { "\\\\" }.gsub('"') { '\\"' }.gsub(/\r?\n/) { "\\n" }
+      "\"#{escaped}\""
     end
   end
 
