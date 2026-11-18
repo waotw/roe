@@ -38,6 +38,7 @@ The Admin shows product metadata as a simple form.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `title` | Yes | Product name |
+| `subtitle` | No | A byline, short snippet of text, etc. |
 | `sku` | Yes | Unique identifier — how Snipcart tracks the item at checkout (required to publish) |
 | `price` | Yes | Price as a number (e.g., `10.00`) |
 | `category` | Yes | Product category — used for filtering and SKU generation |
@@ -45,7 +46,7 @@ The Admin shows product metadata as a simple form.
 | `status` | Yes | `draft` or `published` |
 | `url_name` | No | Custom URL slug (auto-generated from the title if not set) |
 | `tags` | No | Tags for filtering and organization |
-| `description` | No | Short description shown in product grids |
+| `description` | No | Short description used in product collections and layouts |
 | `group` | No | Groups variants together — see [Product Variants](#product-variants-groups) |
 | `variant` | No | Label for this variant (e.g., "Paperback") |
 | `primary` | No | `true` to show this variant first in a grouped collection |
@@ -56,9 +57,9 @@ The Admin shows product metadata as a simple form.
 
 A Product can be a file Snipcart delivers after payment — an album, a PDF, a sample pack — instead of something you post.
 
-Tick `digital` in the Product's metadata and the `file_guid` field appears below it. Paste in the `GUID` that Snipcart gave you when you uploaded the file, and Roe handles the rest: the file is delivered from Snipcart, and the checkout won't ask the buyer for a shipping address.
+Check `digital` in the Product's metadata and the `file_guid` field appears below it. Paste in the `GUID` that Snipcart gave you when you uploaded the file, and Roe handles the rest: the file is delivered from Snipcart, and the checkout won't ask the buyer for a shipping address.
 
-The two fields travel together. Untick `digital` and the GUID field goes away, so a Product can't end up carrying a GUID it doesn't use.
+The two fields travel together. Uncheck `digital` and the GUID field gets removed.
 
 Roe warns you in the editor if the GUID is missing or malformed. If `digital` is checked and the `file_guid` has issues, the `ADD TO CART` button won't render. This is to prevent a user from paying for something that won't be delivered.
 
