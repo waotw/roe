@@ -103,6 +103,9 @@ module ActiveSupport
       # later tests in random order. Remove it so each test starts from the
       # built-in defaults, exactly as the site.yml rewrite above does.
       File.delete(SiteConfig::CONTENT_FILE) if File.exist?(SiteConfig::CONTENT_FILE)
+      # The tag list and the last-synced copy of it, for the same reason.
+      FileUtils.rm_f(File.join(SiteConfig::SITE_PATH, "tags.yml"))
+      FileUtils.rm_f(File.join(RoeSitePaths::SITE_PATH, ".tags-synced.json"))
 
       # Sync the seeded site.yml into a SiteConfig record. Uses the same
       # path production does (find_by(file_path:) → create_from_file)

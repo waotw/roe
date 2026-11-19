@@ -34,6 +34,7 @@ class SiteSyncTransferJob < ApplicationJob
     refreshing_baseline: "Refreshing sync baseline…",
     realigning_mtimes:   "Aligning file timestamps…",
     reconciling_content: "Updating the database to match new files…",
+    merging_tags:        "Combining the tag lists…",
     notifying_peer:      "Notifying peer to refresh its ledger…",
     backing_up_database: "Backing up live database (encrypted)…",
     # SiteSyncRewindJob, which shares this status.
@@ -107,6 +108,12 @@ class SiteSyncTransferJob < ApplicationJob
       SiteSync::Exchange.reconcile_peer_content! if @pushed
       ContentSync.sync_all if @pulled
     end
+
+    # Both sides have now read their new content, so each tag list holds the
+    # tags its content uses. Combine what's left over (unused tags created or
+    # deleted on one side). tags.yml itself is never copied.
+    update_step(:merging_tags)
+    SiteSync::TagMerge.run!
 
     # Phantom-mtime realignment. A peer-side rewrite during reconcile (e.g. a
     # config file re-serialized by ContentSync) can leave a file byte-identical

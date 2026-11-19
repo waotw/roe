@@ -760,6 +760,7 @@ class Admin::ConfigsController < Admin::BaseController
   # out of site.yml. Reuses the schema-driven config editor.
   def edit_content
     @config_type = "content"
+    TagList.move_out_of_content_yml!
     @config_content = File.exist?(SiteConfig::CONTENT_FILE) ? File.read(SiteConfig::CONTENT_FILE) : ""
     @config_hash = (YAML.safe_load(@config_content, permitted_classes: [ Date, Time, Symbol ]) if @config_content.present?) || {}
     @config_schema = CONTENT_CONFIG_SCHEMA
@@ -768,8 +769,9 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_content
-    # The form has no tags field; keep the list content.yml already has.
-    params[:content] = TagList.carry_into(params[:content])
+    # An old tags: list in content.yml goes to tags.yml first, so this save,
+    # built from a form with no tags field, can't drop it.
+    TagList.move_out_of_content_yml!
     update_config("content", SiteConfig::CONTENT_FILE)
   end
 

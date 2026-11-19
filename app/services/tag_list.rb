@@ -1,5 +1,9 @@
-# The site's tags: a `tags:` list in content.yml, and the work of keeping it
-# and the content that uses it in step.
+# The site's tags: the list in system/global/tags.yml, and the work of
+# keeping it and the content that uses it in step.
+#
+# Its own file, written only by Roe, so it never tangles with settings. Site
+# Sync doesn't copy it; SiteSync::TagMerge combines the two sides' lists after
+# the content has moved.
 #
 # The list follows the content. TracksTags calls record_change after every
 # post, page, product or doc save — from the admin, the file watcher, or a
@@ -25,6 +29,8 @@ class TagList
   class << self
     # ── The list ────────────────────────────────────────────────────────────
 
+    def file = File.join(SiteConfig::SITE_PATH, "tags.yml")
+
     def names
       Array(read_config["tags"]).map { |t| t.to_s.strip }.reject(&:blank?).uniq
     end
@@ -35,8 +41,8 @@ class TagList
       sorted(listed? ? names : used_names)
     end
 
-    # A site from before the list existed has no `tags:` key. The first change
-    # or the next full sync fills it from the content.
+    # A site from before the list existed has no tags.yml. The first change or
+    # the next full sync fills it from the content.
     def listed?
       read_config.key?("tags")
     end
@@ -59,6 +65,33 @@ class TagList
     # MANAGE TAGS is unused until something uses it. Runs after a full sync.
     def reconcile!
       locked { write(names | used_names) }
+    end
+
+    # Sets the whole list. Site Sync uses it after combining both sides.
+    def replace!(list)
+      locked { write(list) }
+    end
+
+    # Before 0.5.0 shipped, the list lived under `tags:` in content.yml. Moves
+    # it to tags.yml, keeping anything already there, and takes it out of
+    # content.yml. Runs on any read, so no save can miss it.
+    def move_out_of_content_yml!
+      path = SiteConfig::CONTENT_FILE
+      return unless File.exist?(path)
+
+      text = File.read(path)
+      return unless text.match?(BLOCK)
+
+      data = YAML.safe_load(text, permitted_classes: [ Date, Time, Symbol ])
+      return unless data.is_a?(Hash) && data.key?("tags")
+
+      locked do
+        current = File.exist?(file) ? names_in_file : []
+        write(current | clean(data["tags"]))
+        SiteFile.write(path, text.sub(BLOCK, ""))
+      end
+    rescue Psych::Exception
+      nil
     end
 
     def add!(name)
@@ -158,11 +191,10 @@ class TagList
       true
     end
 
-    # ── content.yml ─────────────────────────────────────────────────────────
+    # ── tags.yml ────────────────────────────────────────────────────────────
 
-    # The text of a content.yml with its `tags:` block set to `list`, in
-    # place if there is one, else at the end. The rest of the file is kept
-    # as written.
+    # The text with its `tags:` block set to `list`, in place if there is one,
+    # else at the end. Anything else in the text is kept as written.
     def with_list(text, list)
       block = "tags:#{list.empty? ? ' []' : ''}\n" + list.map { |t| "  - #{yaml_scalar(t)}\n" }.join
       text = text.to_s
@@ -174,17 +206,6 @@ class TagList
       end
     end
 
-    # Settings → Content builds content.yml from its form, which has no tags
-    # field. Keep the list the file already has unless the text sets one.
-    def carry_into(submitted)
-      parsed = YAML.safe_load(submitted.to_s, permitted_classes: [ Date, Time, Symbol ]) || {}
-      return submitted if !parsed.is_a?(Hash) || parsed.key?("tags") || !listed?
-
-      with_list(submitted, sorted(names))
-    rescue Psych::Exception
-      submitted
-    end
-
     def clean(tags)
       Array(tags).map { |t| t.to_s.strip }.reject(&:blank?).uniq
     end
@@ -192,21 +213,28 @@ class TagList
     private
 
     def write(list)
-      path = SiteConfig::CONTENT_FILE
-      text = File.exist?(path) ? File.read(path) : ""
-      SiteFile.write(path, with_list(text, sorted(list)))
+      FileUtils.mkdir_p(File.dirname(file))
+      SiteFile.write(file, with_list("", sorted(list)))
     end
 
     def sorted(list) = clean(list).sort_by { |t| [ t.downcase, t ] }
 
     def read_config
-      path = SiteConfig::CONTENT_FILE
-      return {} unless File.exist?(path)
+      move_out_of_content_yml!
+      return {} unless File.exist?(file)
 
-      data = YAML.safe_load(File.read(path), permitted_classes: [ Date, Time, Symbol ])
+      data = YAML.safe_load(File.read(file), permitted_classes: [ Date, Time, Symbol ])
       data.is_a?(Hash) ? data : {}
     rescue Psych::Exception
       {}
+    end
+
+    # Without the move, for use inside it.
+    def names_in_file
+      data = YAML.safe_load(File.read(file), permitted_classes: [ Date, Time, Symbol ])
+      clean(data.is_a?(Hash) ? data["tags"] : [])
+    rescue Psych::Exception
+      []
     end
 
     def validate!(name)

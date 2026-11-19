@@ -20,7 +20,7 @@ class TagListTest < ActiveSupport::TestCase
     ContentSync.sync_file(path)
   end
 
-  def content_yml = File.read(SiteConfig::CONTENT_FILE)
+  def tags_yml = File.read(TagList.file)
 
   # ── content.yml ───────────────────────────────────────────────────────────
 
@@ -36,14 +36,20 @@ class TagListTest < ActiveSupport::TestCase
     assert_equal "a: 1\ntags: []\n", TagList.with_list("a: 1\ntags:\n- x\n", [])
   end
 
-  test "carry_into keeps the list when the submitted settings leave it out" do
-    File.write(SiteConfig::CONTENT_FILE, "soft_line_breaks: true\ntags:\n  - lab\n")
+  test "a list left in content.yml moves to tags.yml and out of content.yml" do
+    File.write(SiteConfig::CONTENT_FILE, "soft_line_breaks: true\ntags:\n  - lab\n  - arts\nsearch:\n  all_pages: false\n")
+    File.write(TagList.file, "tags:\n  - kept\n")
 
-    kept = TagList.carry_into("soft_line_breaks: false\n")
-    assert_equal %w[lab], YAML.safe_load(kept)["tags"]
-    assert_equal false, YAML.safe_load(kept)["soft_line_breaks"]
+    assert_equal %w[arts kept lab], TagList.names.sort
+    assert_equal "soft_line_breaks: true\nsearch:\n  all_pages: false\n", File.read(SiteConfig::CONTENT_FILE)
+  end
 
-    assert_equal "tags: []\n", TagList.carry_into("tags: []\n"), "a list that's sent is the list"
+  test "the list is written to tags.yml, not content.yml" do
+    File.write(SiteConfig::CONTENT_FILE, "soft_line_breaks: true\n")
+    make_post("tl-file", %w[tl-file-tag])
+
+    assert_includes tags_yml, "tl-file-tag"
+    assert_equal "soft_line_breaks: true\n", File.read(SiteConfig::CONTENT_FILE)
   end
 
   # ── Following the content ────────────────────────────────────────────────
@@ -76,7 +82,7 @@ class TagListTest < ActiveSupport::TestCase
 
   test "reconcile adds used tags a list is missing and removes nothing" do
     make_post("tl-rec", %w[tl-rec-tag])
-    File.write(SiteConfig::CONTENT_FILE, "tags:\n  - tl-kept\n")
+    File.write(TagList.file, "tags:\n  - tl-kept\n")
 
     TagList.reconcile!
     assert_includes TagList.names, "tl-rec-tag"
@@ -86,7 +92,7 @@ class TagListTest < ActiveSupport::TestCase
   test "the list is alphabetical, one tag per line" do
     make_post("tl-order", %w[zeta Alpha beta])
 
-    block = content_yml[/^tags:\n(?:  - .*\n)+/]
+    block = tags_yml[/^tags:\n(?:  - .*\n)+/]
     names = block.lines.drop(1).map { |l| l.sub("  - ", "").strip }
     assert_equal names.sort_by(&:downcase), names
   end

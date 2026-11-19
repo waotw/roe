@@ -32,7 +32,11 @@ module SiteSync
     #                       one side reads as drift against the other.
     #                       BackupManager already excludes them for the
     #                       same reason.
-    EXCLUDED_PATHS = %w[system/secrets media/images/variants].freeze
+    #   - system/global/tags.yml  the tag list. Each side keeps it from its
+    #                       own content, so copying it would overwrite one
+    #                       side's tags with the other's. SiteSync::TagMerge
+    #                       combines the two after the content has moved.
+    EXCLUDED_PATHS = %w[system/secrets media/images/variants system/global/tags.yml].freeze
 
     # Roe's bundled documentation — 85 files a site may not want to carry.
     # Kept off the wire unless the site publishes them.
@@ -43,7 +47,9 @@ module SiteSync
     #   - .sync-state.json the ledger itself; otherwise the ledger's mtime
     #                     bumps every time we write it and we'd flap drift
     #   - .last_deploy.yml tracks local deploy state, environment-specific
-    EXCLUDED_FILES = %w[.DS_Store .sync-state.json .last_deploy.yml].freeze
+    #   - .tags-synced.json the tag list both sides agreed at the last sync
+    #                     (SiteSync::TagMerge), kept by the writing computer
+    EXCLUDED_FILES = %w[.DS_Store .sync-state.json .last_deploy.yml .tags-synced.json].freeze
 
     class << self
       def current

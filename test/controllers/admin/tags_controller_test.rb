@@ -109,11 +109,12 @@ class Admin::TagsControllerTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?]", bulk_tags_admin_posts_path
   end
 
-  test "saving Settings → Content keeps the tag list" do
-    make_post("tc-settings", %w[tc-kept])
+  test "saving Settings → Content keeps a list still in content.yml" do
+    File.write(SiteConfig::CONTENT_FILE, "soft_line_breaks: false\ntags:\n  - tc-unused\n")
 
     patch admin_content_config_path, params: { content: "soft_line_breaks: true\n" }
-    assert_includes TagList.names, "tc-kept"
+    assert_includes TagList.names, "tc-unused"
+    assert_equal "soft_line_breaks: true\n", File.read(SiteConfig::CONTENT_FILE)
   end
 
   test "the posts list has each post's tags as filter links for search to reveal" do
