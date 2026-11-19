@@ -117,11 +117,17 @@ export default class extends Controller {
 
   // ── Adding ────────────────────────────────────────────────────────────────
 
+  // Only while typing. Shown on focus, the list covered the ticked tags the
+  // menu opens with, which made them look missing.
   suggest() {
     const query = this.inputTarget.value.trim().toLowerCase()
+    if (query === "") {
+      this.suggestionsTarget.classList.add("hidden")
+      return
+    }
     const taken = new Set(this.shared().concat(this.added))
     const matches = this.optionsValue
-      .filter((tag) => !taken.has(tag) && (query === "" || tag.toLowerCase().includes(query)))
+      .filter((tag) => !taken.has(tag) && tag.toLowerCase().includes(query))
       .slice(0, 8)
     if (matches.length === 0) {
       this.suggestionsTarget.classList.add("hidden")
