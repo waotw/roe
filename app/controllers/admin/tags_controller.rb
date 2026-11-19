@@ -1,10 +1,9 @@
-# MANAGE TAGS on Settings → Content. Shows the tags: list in content.yml with
-# how many posts, pages, products and docs use each, and adds, renames and
-# deletes tags. Renaming and deleting change every file that has the tag.
+# Settings → tags.yml. Shows the tag list with how many posts, pages,
+# products and docs use each, and adds, renames and deletes tags. Renaming
+# and deleting change every file that has the tag.
 #
-# Everything renders inside the tag_manager turbo frame, so the window stays
-# open between changes. Changes redirect back to index, which the frame
-# follows.
+# Changes render inside the tag_manager turbo frame, so the page doesn't
+# reload. They redirect back to index, which the frame follows.
 class Admin::TagsController < Admin::BaseController
   layout -> { turbo_frame_request? ? false : "admin" }
 

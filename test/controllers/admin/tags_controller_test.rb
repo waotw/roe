@@ -16,6 +16,15 @@ class Admin::TagsControllerTest < ActionDispatch::IntegrationTest
     Post.find_by("json_extract(metadata, '$.url_name') = ?", slug)
   end
 
+  test "Settings lists tags.yml, which opens the tag page" do
+    get admin_configs_path
+    assert_select "a[href=?]", admin_tags_path, text: "tags.yml"
+
+    get admin_tags_path
+    assert_select "h1", text: "Tags"
+    assert_select "a[href=?]", admin_configs_path, text: /Back to Settings/
+  end
+
   test "lists each tag with counts that link to the filtered list" do
     make_post("tc-one", %w[tc-lab])
     make_post("tc-two", %w[tc-lab])

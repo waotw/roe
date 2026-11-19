@@ -3,14 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 // The tag manager's table (admin/tags/index): search, and the inline rename
 // form each row swaps in for its counts.
 export default class extends Controller {
-  static targets = ["row", "view", "renameForm", "search", "close"]
-
-  connect() {
-    // Opened as a page of its own there's no window to close.
-    if (this.hasCloseTarget && !this.element.closest("[data-controller~='tag-dialog']")) {
-      this.closeTarget.hidden = true
-    }
-  }
+  static targets = ["row", "view", "renameForm", "search"]
 
   search() {
     const query = this.searchTarget.value.trim().toLowerCase()

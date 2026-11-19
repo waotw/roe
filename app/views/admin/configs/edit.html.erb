@@ -33,15 +33,12 @@
                config_schema: @config_schema,
                available_themes: @available_themes %>
   <% elsif @config_type == 'content' %>
-    <div data-controller="tag-dialog">
-      <%= render 'shared/config_editor',
-                 form_url: admin_content_config_path,
-                 config_content: @config_content,
-                 config_hash: @config_hash,
-                 config_schema: @config_schema,
-                 available_themes: [] %>
-      <%= render 'admin/tags/dialog' %>
-    </div>
+    <%= render 'shared/config_editor',
+               form_url: admin_content_config_path,
+               config_content: @config_content,
+               config_hash: @config_hash,
+               config_schema: @config_schema,
+               available_themes: [] %>
   <% elsif @config_type == 'security' %>
     <%= render 'shared/config_editor',
                form_url: admin_update_security_config_path,

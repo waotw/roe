@@ -505,6 +505,13 @@ class Admin::ConfigsController < Admin::BaseController
         edit_path: admin_edit_content_config_path
       },
       {
+        name: "tags.yml",
+        path: "global/tags.yml",
+        type: "tags",
+        description: "The tags used across posts, pages, products and docs",
+        edit_path: admin_tags_path
+      },
+      {
         name: "custom_code.yml",
         path: "global/custom_code.yml",
         type: "custom_code",

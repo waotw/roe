@@ -1,7 +1,6 @@
 <%#
-  The tag manager. Opened in a window from Settings → Content (see
-  admin/tags/_dialog), and works as a page of its own too. Every change
-  re-renders this frame.
+  The tag manager: Settings → tags.yml. Every change re-renders the
+  tag_manager frame, so the page doesn't reload.
 %>
 <%
   columns = [ [ :posts, "Posts", ->(tag) { admin_posts_path(tag: tag) } ],
@@ -14,15 +13,21 @@
   primary = "uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer"
   input = "font-mono text-xs px-2 py-1.5 border border-gray-400 bg-white rounded-xs"
 %>
-<%= turbo_frame_tag "tag_manager" do %>
+<% content_for :title, "Tags" %>
+
+<div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300">
+  <h1 class="text-3xl font-bold font-sans">Tags</h1>
+  <%= link_to "← Back to Settings", admin_configs_path,
+        class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs text-nowrap" %>
+</div>
+
+<p class="text-sm text-gray-700 mb-5">
+  The tags used across the site, kept in <code>tags.yml</code>. A tag is added here the first time it's used and removed when nothing uses it.
+</p>
+
+<%= turbo_frame_tag "tag_manager", class: "block max-w-3xl" do %>
   <div class="font-mono text-sm" data-controller="tag-manager">
-    <div class="flex items-center gap-3 mb-4">
-      <h2 class="font-sans text-xl font-bold text-gray-900">Manage tags</h2>
-      <span class="text-xs text-gray-500"><%= pluralize(@usage.size, "tag") %></span>
-      <div class="grow"></div>
-      <button type="button" data-action="tag-dialog#close" data-tag-manager-target="close"
-              class="text-2xl leading-none text-gray-500 hover:text-gray-900 cursor-pointer" aria-label="Close">&times;</button>
-    </div>
+    <p class="mb-3 text-xs text-gray-500"><%= pluralize(@usage.size, "tag") %></p>
 
     <% if @notice.present? %>
       <p class="mb-3 px-3 py-2 text-xs bg-green-50 border border-green-300 text-green-800"><%= @notice %></p>
