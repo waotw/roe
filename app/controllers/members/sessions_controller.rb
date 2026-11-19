@@ -71,7 +71,8 @@ module Members
 
       if member&.active? && member.password_digest.present? && member.authenticate(password)
         session[:member_id] = member.id
-        redirect_to root_path, notice: "Signed in successfully"
+        # Back to the members-only page that sent them to sign in, if any.
+        redirect_to_stored_location_or root_path, notice: "Signed in successfully"
       elsif member&.status_pending? && member.password_digest.present? && member.authenticate(password)
         # Only after the password matches, so the form still never reveals
         # which emails have accounts.
@@ -120,7 +121,8 @@ module Members
 
       if member&.active?
         session[:member_id] = member.id
-        redirect_to root_path, notice: "Signed in successfully"
+        # Back to the members-only page that sent them to sign in, if any.
+        redirect_to_stored_location_or root_path, notice: "Signed in successfully"
       else
         redirect_to signin_path, alert: "Invalid or expired link"
       end
