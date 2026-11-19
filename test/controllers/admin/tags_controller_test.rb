@@ -124,6 +124,15 @@ class Admin::TagsControllerTest < ActionDispatch::IntegrationTest
     assert_select "[data-tag-hits-target=hits] a[href=?][data-tag=?]", admin_posts_path(tag: "tc-hit"), "tc-hit"
   end
 
+  test "bulk tags goes back to the list, even after a visit to a members-only page" do
+    a = make_post("tc-back", %w[tc-back])
+    get "/account" # signed out as a member, so this stores /account to return to
+
+    post bulk_tags_admin_posts_path, params: { ids: [ a.id ], remove: [ "tc-back" ] },
+         headers: { "HTTP_REFERER" => "http://www.example.com/admin/posts?tag=tc-back" }
+    assert_redirected_to "http://www.example.com/admin/posts?tag=tc-back"
+  end
+
   test "the products list has a selection with the TAGS menu" do
     get admin_products_path
     assert_response :success

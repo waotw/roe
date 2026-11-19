@@ -48,7 +48,12 @@ module MemberAuthentication
     session[:member_return_to] = request.fullpath if request.get? && !request.xhr?
   end
 
-  def redirect_back_or_to(default, **options)
+  # Where a member goes after signing in. Named apart from Rails'
+  # redirect_back_or_to on purpose: under that name it replaced the method
+  # Rails' redirect_back calls, so once a visitor had hit a members-only page,
+  # every redirect_back in the app — the admin's bulk actions included — sent
+  # them to that page instead of back where they were.
+  def redirect_to_stored_location_or(default, **options)
     redirect_to session.delete(:member_return_to) || default, **options
   end
 end
