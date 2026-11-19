@@ -818,11 +818,9 @@ class StaticGenerator
 
     collection = collection.tagged_with(positive_tags) if positive_tags.any?
 
+    # Whole tag, case ignored: -lab drops lab and LAB, not lab-image.
     negative_tags.each do |neg_tag|
-      collection = collection.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{neg_tag}%"
-      )
+      collection = collection.not_tagged_with(neg_tag)
     end
 
     collection

@@ -94,9 +94,12 @@
     </label>
   </div>
 
+  <%= render "admin/shared/tag_filter", path: request.path %>
+
   <%= render "admin/shared/bulk_toolbar",
              destroy_path: bulk_destroy_admin_posts_path,
-             publish_path: bulk_publish_admin_posts_path, label: "post" %>
+             publish_path: bulk_publish_admin_posts_path,
+             tags_path: bulk_tags_admin_posts_path, label: "post" %>
 
   <div class="mt-4 flex flex-col">
     <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -143,6 +146,7 @@
                            data-bulk-select-target="checkbox"
                            data-action="change->bulk-select#update"
                            data-id="<%= post.id %>"
+                           data-tags="<%= TagList.clean(post.tags).to_json %>"
                            data-status="<%= post.status %>"
                            data-warnings="<%= post.publish_warnings? %>"
                            data-newsletter="<%= %w[newsletter both].include?(post.metadata['published_to'].to_s) %>"

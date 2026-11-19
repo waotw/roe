@@ -18,7 +18,7 @@ class Admin::PostsController < Admin::BaseController
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
-    @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+    @posts = tagged(Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST")))
 
     # Get all post types that exist in the database
     @existing_types = Post.pluck(Arel.sql("json_extract(metadata, '$.post_type')"))
@@ -30,7 +30,7 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def drafts
-    @posts = Post.draft.order(created_at: :desc)
+    @posts = tagged(Post.draft.order(created_at: :desc))
 
     # Get distinct post types that exist (ADD THIS!)
     @existing_types = Post.distinct
@@ -42,7 +42,7 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def unlisted
-    @posts = Post.unlisted.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+    @posts = tagged(Post.unlisted.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST")))
     @title = "Unlisted Posts"
     @description = "Posts available at URL but not in feed."
     render :index

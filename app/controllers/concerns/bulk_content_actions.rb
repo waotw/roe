@@ -1,4 +1,4 @@
-# Bulk delete / publish for the posts, pages, and products index tables.
+# Bulk delete / publish / tags for the posts, pages, and products index tables.
 # Selection happens client-side (bulk_select_controller.js); these endpoints
 # receive the chosen ids and act.
 #
@@ -50,6 +50,20 @@ module BulkContentActions
     redirect_back fallback_location: bulk_index_path, notice: notice
   end
 
+  # Add and remove tags across the selection. The list's TAGS menu sends the
+  # tags to add and the shared tags that were unticked.
+  def bulk_tags
+    add = TagList.clean(params[:add])
+    remove = TagList.clean(params[:remove])
+    if add.any? { |t| t.include?(",") }
+      return redirect_back fallback_location: bulk_index_path, alert: "A tag can't contain a comma."
+    end
+
+    changed = bulk_model.where(id: bulk_ids).to_a.count { |record| TagList.retag(record, add: add, remove: remove) }
+    redirect_back fallback_location: bulk_index_path,
+                  notice: "Updated tags on #{helpers.pluralize(changed, bulk_label)}."
+  end
+
   private
 
   # Overridable hooks (defaults are no-ops).
@@ -58,6 +72,16 @@ module BulkContentActions
 
   def bulk_ids
     Array(params[:ids]).flatten.map(&:to_s).select { |s| s.match?(/\A\d+\z/) }
+  end
+
+  # ?tag=lab — the counts in the tag manager link here. Keeps the order the
+  # list already has.
+  def tagged(records)
+    @tag_filter = params[:tag].to_s.strip.presence
+    return records unless @tag_filter
+
+    ids = records.select { |r| TagList.clean(r.tags).include?(@tag_filter) }.map(&:id)
+    records.is_a?(Array) ? records.select { |r| ids.include?(r.id) } : records.where(id: ids)
   end
 
   def publishable_draft?(record)

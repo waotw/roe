@@ -136,6 +136,21 @@ class CollectionQueryTest < ActiveSupport::TestCase
     assert_includes negative, "cq-untagged", "but keeps the untagged one"
   end
 
+  test "tags match whole and ignore case, both ways" do
+    write_post("cq-lower", "tags" => [ "cqlab" ])
+    write_post("cq-upper", "tags" => [ "CQLAB", "other" ])
+    write_post("cq-string", "tags" => "other, CqLab")
+    write_post("cq-longer", "tags" => [ "cqlabs", "cqlab-noimage" ])
+    query = ->(tags) { CollectionQuery.new(source: "posts", tags: tags).records.to_a.map(&:url_name) }
+
+    positive = query.call("cqlab")
+    assert_equal %w[cq-lower cq-string cq-upper], (positive & %w[cq-lower cq-upper cq-string cq-longer]).sort
+
+    negative = query.call("-cqlab")
+    assert_includes negative, "cq-longer", "-cqlab keeps cqlabs and cqlab-noimage"
+    %w[cq-lower cq-upper cq-string].each { |name| assert_not_includes negative, name }
+  end
+
   # --- ordering ----------------------------------------------------------
 
   test "order_items sorts by a keyword and by an explicit url_name list" do

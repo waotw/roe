@@ -10,7 +10,17 @@ class ContentSync
     sync_documentation
     sync_media
     sync_products
+    reconcile_tags
     prune_variant_cache
+  end
+
+  # Every save already updates content.yml's tags: list (TracksTags). This
+  # catches what a save can't: a site from before the list existed, or a
+  # content.yml replaced by hand. Only adds; see TagList.reconcile!.
+  def reconcile_tags
+    TagList.reconcile!
+  rescue => e
+    Rails.logger.warn "[ContentSync] tag list not updated: #{e.class} #{e.message}"
   end
 
   # Reconcile the image-variant cache against reality after content +

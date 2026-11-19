@@ -3,6 +3,7 @@ class Documentation < ApplicationRecord
 
   include HasAudience
   include HasMetadata
+  include TracksTags
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex

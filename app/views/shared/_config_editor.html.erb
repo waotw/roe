@@ -290,6 +290,16 @@
                   </div>
                 </div>
 
+                <!-- Tags Section: the tags: list, edited in its own window -->
+                <div class="config-section mb-10">
+                  <h3 class="text-base font-semibold text-gray-900 mb-1">Tags</h3>
+                  <div class="space-y-3 pl-4 border-l-2 border-gray-200">
+                    <p class="text-sm text-gray-600">The tags used across the site. A tag is added here the first time it's used and removed when nothing uses it.</p>
+                    <button type="button" data-action="tag-dialog#open"
+                            class="inline-flex items-center uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer">MANAGE TAGS</button>
+                  </div>
+                </div>
+
               <% elsif @config_type == 'fonts' %>
                 <!-- Themes Section -->
                 <div class="config-section mb-8">

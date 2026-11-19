@@ -10,8 +10,10 @@
     </div>
   </div>
 
+  <%= render "admin/shared/tag_filter", path: admin_pages_path %>
+
   <!-- Content Pages Section -->
-  <div class="mt-8">
+  <div class="mt-4">
     <% if members_enabled? && @member_pages.any? %>
       <h2 class="text-lg font-semibold text-gray-900 mb-3">Content Pages</h2>
     <% end %>

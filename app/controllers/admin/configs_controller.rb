@@ -768,6 +768,8 @@ class Admin::ConfigsController < Admin::BaseController
   end
 
   def update_content
+    # The form has no tags field; keep the list content.yml already has.
+    params[:content] = TagList.carry_into(params[:content])
     update_config("content", SiteConfig::CONTENT_FILE)
   end
 

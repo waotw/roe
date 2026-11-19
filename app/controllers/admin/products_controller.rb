@@ -16,7 +16,7 @@ class Admin::ProductsController < Admin::BaseController
     # or a ProductGroup (2+ products sharing a `group:` value), most-recently-
     # edited first, groups kept together with their primary on top. Grouping is
     # derived from front-matter, not stored — see ProductGroup.
-    @rows = ProductGroup.rows_for(Product.all)
+    @rows = ProductGroup.rows_for(tagged(Product.all))
   end
 
   def new

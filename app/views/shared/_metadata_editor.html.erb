@@ -125,6 +125,7 @@
     end
   end
 %>
+<% tag_field_options = (TagList.field_options rescue []) %>
 <div id="metadata-container"
      data-controller="metadata-editor duration-detect<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' && SiteFeature.snipcart_enabled? %>"
      data-release-link-settings-path-value="<%= admin_edit_music_config_path %>"
@@ -136,6 +137,7 @@
      data-metadata-editor-resource-type-value="<%= resource_type %>"
      data-metadata-editor-podcast-configs-value="<%= PodcastConfig.all_podcasts.to_json %>"
      data-metadata-editor-media-paths-value="<%= ERB::Util.html_escape(autocomplete_paths_by_kind.to_json) %>"
+     data-metadata-editor-tag-options-value="<%= tag_field_options.to_json %>"
      <% if resource_type == 'product' %>
      data-metadata-editor-product-categories-value="<%= (ProductCategory.all rescue []).to_json %>"
      data-metadata-editor-product-groups-value="<%= (ProductGroup.all rescue []).to_json %>"
@@ -266,7 +268,9 @@
                      elsif resource_type == 'product' && field_name == 'category'
                        (ProductCategory.all rescue [])
                      end %>
-                <% if autocomplete_options %>
+                <% if field_name == 'tags' %>
+                  <%= render 'shared/tag_field', value: display_value, options: tag_field_options %>
+                <% elsif autocomplete_options %>
                   <div class="flex-1 relative"
                         data-controller="autocomplete"
                         data-autocomplete-options-value="<%= autocomplete_options.to_json %>">

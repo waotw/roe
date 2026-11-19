@@ -1,7 +1,8 @@
 <div data-controller="bulk-select">
   <%= render "admin/shared/bulk_toolbar",
              destroy_path: bulk_destroy_admin_pages_path,
-             publish_path: bulk_publish_admin_pages_path, label: "page" %>
+             publish_path: bulk_publish_admin_pages_path,
+             tags_path: bulk_tags_admin_pages_path, label: "page" %>
 <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
   <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
     <div class="overflow-hidden ring-1 ring-black ring-opacity-5">
@@ -40,6 +41,7 @@
                      data-bulk-select-target="checkbox"
                      data-action="change->bulk-select#update"
                      data-id="<%= page.id %>"
+                     data-tags="<%= TagList.clean(page.tags).to_json %>"
                      data-status="<%= page.status %>"
                      data-warnings="<%= page.publish_warnings? %>"
                      data-newsletter="false"

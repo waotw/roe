@@ -13,7 +13,7 @@ class Admin::PagesController < Admin::BaseController
     # Default order: follow layout/navigation.md when it exists (pages listed in
     # the nav come first, in nav order); otherwise alphabetical by title. Pages
     # not in the nav fall to the end, alphabetically.
-    @member_pages, @content_pages = ordered_pages.partition { |page| member_page?(page) }
+    @member_pages, @content_pages = tagged(ordered_pages).partition { |page| member_page?(page) }
 
     # Empty on a healthy site. Non-empty means Members is on and a page it needs
     # can't be found by declaration, by the form it renders, or by filename —

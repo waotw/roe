@@ -14,6 +14,7 @@ export default class extends Controller {
     productCategories: Array,
     productGroups: Array,
     mediaPaths: Object,
+    tagOptions: Array,
   };
 
   static targets = [
@@ -598,6 +599,27 @@ export default class extends Controller {
     return `<input type="text" value="${this.escapeHtml(text)}" ${attributes} data-multiline>`;
   }
 
+  // Same markup as shared/_tag_field.html.erb; tag_field_controller.js
+  // draws the boxes from the hidden input's value.
+  tagFieldHtml(escapedValue) {
+    const options = JSON.stringify(
+      this.hasTagOptionsValue ? this.tagOptionsValue : [],
+    ).replace(/"/g, "&quot;");
+    return `<div class="flex-1 relative" data-controller="tag-field" data-tag-field-options-value="${options}">
+              <input type="hidden" id="metadata-field-tags" name="metadata_fields[tags]"
+                     value="${escapedValue}" data-metadata-field="tags" data-tag-field-target="value">
+              <div class="flex flex-wrap items-center gap-1 w-full min-h-[1.625rem] px-1 py-0.5 border border-gray-300 bg-white cursor-text"
+                   data-action="click->tag-field#focus">
+                <span class="contents" data-tag-field-target="chips"></span>
+                <input type="text" data-tag-field-target="entry" placeholder="Add a tag…" autocomplete="off"
+                       class="flex-1 min-w-[6rem] border-0 px-1 py-0.5 font-mono text-xs bg-transparent focus:ring-0 focus:outline-none"
+                       data-action="input->tag-field#typed focus->tag-field#suggest keydown->tag-field#keydown blur->tag-field#commit">
+              </div>
+              <div data-tag-field-target="dropdown"
+                   class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto"></div>
+            </div>`;
+  }
+
   buildInputHtml(fieldName, config, value) {
     const escapedValue = String(value)
       .replace(/&/g, "&amp;")
@@ -611,6 +633,8 @@ export default class extends Controller {
           ? " bg-gray-100 text-gray-600"
           : "";
         const readonlyAttr = config.readonly ? " readonly" : "";
+
+        if (fieldName === "tags") return this.tagFieldHtml(escapedValue);
 
         // Special handling for category/group fields with autocomplete. Both
         // reuse the shared autocomplete controller; only the option list differs

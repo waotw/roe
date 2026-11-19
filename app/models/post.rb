@@ -4,6 +4,7 @@ class Post < ApplicationRecord
   include ResolvesMediaAudience
   include HasAudience
   include HasMetadata
+  include TracksTags
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex

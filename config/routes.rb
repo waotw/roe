@@ -159,6 +159,7 @@ Rails.application.routes.draw do
         get :check_unique
         post :bulk_destroy
         post :bulk_publish
+        post :bulk_tags
       end
       member do
         post :publish_modal
@@ -177,6 +178,7 @@ Rails.application.routes.draw do
       collection do
         post :bulk_destroy
         post :bulk_publish
+        post :bulk_tags
         post :restore_member_pages
       end
       member do
@@ -223,6 +225,7 @@ Rails.application.routes.draw do
         get :duplicate_skus
         post :bulk_destroy
         post :bulk_publish
+        post :bulk_tags
       end
       member do
         post :publish_modal
@@ -403,6 +406,12 @@ Rails.application.routes.draw do
 
     get "configs/content/edit", to: "configs#edit_content", as: "edit_content_config"
     patch "configs/content", to: "configs#update_content", as: "content_config"
+
+    # Tags: the list in content.yml, opened from Settings → Content.
+    get    "tags",        to: "tags#index",   as: "tags"
+    post   "tags",        to: "tags#create"
+    patch  "tags/rename", to: "tags#rename",  as: "rename_tag"
+    delete "tags",        to: "tags#destroy", as: "destroy_tag"
 
     get   "configs/custom_code/edit", to: "configs#edit_custom_code", as: "edit_custom_code_config"
     patch "configs/custom_code",      to: "configs#update_custom_code", as: "custom_code_config"

@@ -1,4 +1,4 @@
-<div class="px-4 sm:px-0 font-mono">
+<div class="px-4 sm:px-0 font-mono" data-controller="bulk-select">
 
   <div class="sm:flex sm:items-center">
     <div class="sm:flex-auto font-sans">
@@ -11,6 +11,13 @@
     </div>
   </div>
 
+  <%= render "admin/shared/tag_filter", path: admin_products_path %>
+
+  <%= render "admin/shared/bulk_toolbar",
+             destroy_path: bulk_destroy_admin_products_path,
+             publish_path: bulk_publish_admin_products_path,
+             tags_path: bulk_tags_admin_products_path, label: "product" %>
+
   <div class="mt-4 flex flex-col">
     <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
@@ -19,7 +26,16 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th scope="col" class="py-2 px-6 md:px-4 text-left text-sm font-semibold text-gray-900 uppercase">Product</th>
+                  <th scope="col" data-bulk-select-target="selectColumn" class="hidden py-2 pl-6 md:pl-4 pr-2 w-8">
+                    <input type="checkbox" data-action="change->bulk-select#selectAll" aria-label="Select all">
+                  </th>
+                  <th scope="col" class="py-2 px-6 md:px-4 text-left text-sm font-semibold text-gray-900 uppercase">
+                    <span class="inline-flex items-center gap-2">
+                      Product
+                      <button type="button" data-action="bulk-select#toggleMode" data-bulk-select-target="toggle"
+                              class="uppercase text-[10px] px-2 py-0.5 border border-gray-800 bg-white hover:bg-gray-200 font-mono rounded-xs cursor-pointer">Select</button>
+                    </span>
+                  </th>
                   <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Price</th>
                   <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">SKU</th>
                   <th scope="col" class="px-4 py-2 text-left text-sm font-semibold text-gray-900 uppercase">Status</th>
@@ -45,7 +61,7 @@
                          data-updated="<%= ProductGroup.rank(row) %>"
                          data-search="<%= members.map { |m| "#{m.title} #{m.sku}" }.join(' ').downcase %>">
                     <tr>
-                      <td colspan="5" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide bg-slate-300 font-mono text-slate-800">
+                      <td colspan="6" class="pt-2 pb-1 pl-6 md:pl-4 pr-3 text-xs font-semibold uppercase tracking-wide bg-slate-300 font-mono text-slate-800">
                         Group: <%= row.name %>
                         <% if row.warnings.any? %>
                           <span class="inline-block text-base text-amber-600 font-semibold font-sans leading-0"
