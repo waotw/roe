@@ -195,7 +195,7 @@ class CollectionQuery
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "pages"
-      collection = Page.public_pages
+      collection = show_unlisted ? Page.public_items : Page.public_pages
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "documentation"

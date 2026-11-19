@@ -109,7 +109,6 @@ export default class extends Controller {
     resourceType: String,
     resourceId: String,
     previewPath: String,
-    collectionTemplate: String,
     asideTemplate: String,
     postLinkTemplate: String,
     pullquoteTemplate: String,

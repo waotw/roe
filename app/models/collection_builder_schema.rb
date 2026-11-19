@@ -63,10 +63,11 @@ module CollectionBuilderSchema
       ] },
 
     # Collections show published items only unless this is on. Mainly for
-    # playlists that gather tracks not listed on their own.
+    # playlists that gather tracks not listed on their own, and lists of
+    # unlisted pages.
     { key: "show_unlisted", type: :boolean, label: "Include unlisted",
-      hint: "Also include unlisted posts. Off by default.",
-      depends_on: { field: "source", value: "posts" } },
+      hint: "Also include unlisted posts or pages. Off by default.",
+      depends_on: { field: "source", in: [ "posts", "pages" ] } },
 
     { key: "tags", type: :text, label: "Tags",
       hint: "Comma-separated tags to include. Prefix a tag with - to exclude it." },

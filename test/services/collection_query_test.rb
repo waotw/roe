@@ -184,6 +184,23 @@ class CollectionQueryTest < ActiveSupport::TestCase
     assert_includes with, "cq-unl", "shown with show_unlisted: true"
   end
 
+  test "show_unlisted widens a pages collection the same way" do
+    %w[published unlisted draft].each do |status|
+      meta = { "title" => "cq page #{status}", "url_name" => "cq-page-#{status}", "status" => status }
+      slug = ContentWriter.new.write(kind: :page, filename: "cq-page-#{status}", metadata: meta, body: "x")
+      @created << File.join(RoeSitePaths::SITE_PAGES_PATH, "#{slug}.md")
+    end
+
+    without = CollectionQuery.new(source: "pages").records.to_a.map(&:url_name)
+    assert_includes without, "cq-page-published"
+    assert_not_includes without, "cq-page-unlisted", "unlisted hidden by default"
+
+    with = CollectionQuery.new(source: "pages", show_unlisted: "true").records.to_a.map(&:url_name)
+    assert_includes with, "cq-page-published"
+    assert_includes with, "cq-page-unlisted", "shown with show_unlisted: true"
+    assert_not_includes with, "cq-page-draft", "drafts never show"
+  end
+
   # --- records: collection membership -----------------------------------
 
   test "a collection: name filter selects only members (and returns an Array)" do
