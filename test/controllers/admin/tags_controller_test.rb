@@ -116,6 +116,14 @@ class Admin::TagsControllerTest < ActionDispatch::IntegrationTest
     assert_includes TagList.names, "tc-kept"
   end
 
+  test "the posts list has each post's tags as filter links for search to reveal" do
+    make_post("tc-hits", %w[tc-hit])
+
+    get admin_posts_path
+    assert_select "[data-controller~=?]", "tag-hits"
+    assert_select "[data-tag-hits-target=hits] a[href=?][data-tag=?]", admin_posts_path(tag: "tc-hit"), "tc-hit"
+  end
+
   test "the products list has a selection with the TAGS menu" do
     get admin_products_path
     assert_response :success
