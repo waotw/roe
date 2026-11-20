@@ -133,6 +133,9 @@ module HasMarkdownExtensions
     # Keep content off ids that belong to injected third-party mount points.
     html = reserve_mount_ids(html)
 
+    # French spacing: no line break before ? ! : ; » or after «.
+    html = PunctuationSpaces.apply(html)
+
     html.html_safe
   ensure
     # Clear render context to prevent data leaking between requests

@@ -15,6 +15,8 @@
 #   can't run from one line onto the next.
 # - Typography follows the body: straight quotes curl, `...` becomes `…`.
 # - GFM, as image captions use, so `snake_case` and bare URLs stay as written.
+# - A space before ? ! : ; » or after « can't break the line
+#   (PunctuationSpaces), as in the body.
 #
 # `plain` is the same text with the Markdown taken out, for places that hold
 # text rather than HTML: meta tags, feed descriptions, Snipcart's cart line,
@@ -34,7 +36,7 @@ class FieldText
       text = normalize(value)
       return "".html_safe if text.empty?
 
-      cached(text) { render(text) }.html_safe
+      PunctuationSpaces.apply(cached(text) { render(text) }).html_safe
     end
 
     # The text a reader sees, without markup. Line breaks become `separator`.
@@ -43,7 +45,9 @@ class FieldText
       return "" if text.empty?
 
       # The only line breaks in the HTML are the ones after each <br>.
-      fragment = Nokogiri::HTML::DocumentFragment.parse(html(text).to_str.delete("\n"))
+      # From the rendered lines directly, not #html: plain text keeps ordinary
+      # spaces (PunctuationSpaces is for line breaking on a page).
+      fragment = Nokogiri::HTML::DocumentFragment.parse(cached(text) { render(text) }.delete("\n"))
       fragment.css("br").each { |br| br.replace(Nokogiri::XML::Text.new(separator, fragment.document)) }
       fragment.text.strip
     end
