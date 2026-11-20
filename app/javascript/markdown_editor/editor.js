@@ -278,9 +278,16 @@ export class MarkdownEditor {
       ? toolbar.offsetHeight - (collapsible?.offsetHeight || 0) + (collapsible?.scrollHeight || 0)
       : 0;
     const drawer = document.querySelector('[data-controller~="editor-drawer"]');
+    // The find panel sits on top of the drawer, so the two stack. CodeMirror
+    // allows for the panel by itself, but takes the larger margin rather than
+    // the sum, and it measures where the panel is now — near the top of the
+    // page the drawer is tucked away, and it slides up (lifting the panel)
+    // as soon as the jump scrolls the page, covering the match. Counting the
+    // drawer whether it's up or not, plus the panel, keeps the match clear.
+    const panel = this.view?.dom.querySelector(".cm-panels-bottom");
     return {
       top: Math.min(toolbarHeight, window.innerHeight / 2) + 8,
-      bottom: (drawer?.offsetHeight || 0) + 16,
+      bottom: (drawer?.offsetHeight || 0) + (panel?.offsetHeight || 0) + 16,
     };
   }
 
