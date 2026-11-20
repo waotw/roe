@@ -238,7 +238,7 @@ class ContentWatcher
       puts "\n   ✓ #{type.capitalize} integration config reloaded\n"
 
     elsif absolute_file.include?("site/posts")
-      result = Post.create_or_update_from_file(absolute_file)
+      result = following_links(Post, absolute_file) { Post.create_or_update_from_file(absolute_file) }
 
       case result
       when :warning
@@ -250,21 +250,21 @@ class ContentWatcher
       end
 
     elsif absolute_file.include?("site/pages")
-      result = Page.create_or_update_from_file(absolute_file)
+      result = following_links(Page, absolute_file) { Page.create_or_update_from_file(absolute_file) }
 
       if result
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
 
     elsif absolute_file.include?("site/documentation")
-      result = Documentation.create_or_update_from_file(absolute_file)
+      result = following_links(Documentation, absolute_file) { Documentation.create_or_update_from_file(absolute_file) }
 
       if result
         puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
       end
 
     elsif absolute_file.include?("site/products")
-      result = Product.create_or_update_from_file(absolute_file)
+      result = following_links(Product, absolute_file) { Product.create_or_update_from_file(absolute_file) }
 
       if result
         puts "\n   ✓ Product saved: #{result.title || File.basename(file)}\n"
@@ -320,6 +320,10 @@ class ContentWatcher
           new_basename.include?(old_basename) ||
             old_basename.include?(new_basename.sub(/^\d+-/, ""))
         end
+        # A new name that shares nothing with the old one (`welcome.md` →
+        # `hello.md`): the same text as the record the old file was is the
+        # same file.
+        new_file ||= (added - renames.values).find { |file| same_text?(old_file, file) }
 
         renames[old_file] = new_file if new_file
 
@@ -343,6 +347,19 @@ class ContentWatcher
     end
 
     renames
+  end
+
+  # Is `new_file` the content `old_file` held, by the record still stored for
+  # the old file: same body, front matter aside.
+  def self.same_text?(old_file, new_file)
+    return false unless new_file.end_with?(".md") && File.file?(new_file)
+
+    record = [ Post, Page, Documentation, Product ].lazy.map { |model| content_record(model, old_file) }.find(&:itself)
+    return false unless record && record.content.to_s.strip.present?
+
+    File.read(new_file).sub(/\A---\s*\n.*?\n---\s*\n/m, "").strip == record.content.to_s.strip
+  rescue StandardError
+    false
   end
 
   # A media file's address in the media table: "/media/video/a.mp4". The
@@ -420,23 +437,40 @@ class ContentWatcher
     if absolute_old.include?("site/posts")
       post = Post.find_by(file_path: absolute_old)
       if post
-        post.update(file_path: absolute_new)
-        Post.create_or_update_from_file(absolute_new)
+        following_links(Post, absolute_new, old_file: absolute_old) do
+          post.update(file_path: absolute_new)
+          Post.create_or_update_from_file(absolute_new)
+        end
         puts "   ✓ Post renamed in database"
       end
     elsif absolute_old.include?("site/pages")
       page = Page.find_by(file_path: absolute_old)
       if page
-        page.update(file_path: absolute_new)
-        Page.create_or_update_from_file(absolute_new)
+        following_links(Page, absolute_new, old_file: absolute_old) do
+          page.update(file_path: absolute_new)
+          Page.create_or_update_from_file(absolute_new)
+        end
         puts "   ✓ Page renamed in database"
       end
     elsif absolute_old.include?("site/documentation")
       doc = Documentation.find_by(file_path: absolute_old)
       if doc
-        doc.update(file_path: absolute_new)
-        Documentation.create_or_update_from_file(absolute_new)
+        following_links(Documentation, absolute_new, old_file: absolute_old) do
+          doc.update(file_path: absolute_new)
+          Documentation.create_or_update_from_file(absolute_new)
+        end
         puts "   ✓ Documentation renamed in database"
+      end
+    elsif absolute_old.include?("site/products")
+      # Products keep their path relative to site/. Without this branch a
+      # product renamed outside Roe was never picked up at its new name.
+      product = Product.find_by(file_path: relative_site_path(absolute_old))
+      if product
+        following_links(Product, absolute_new, old_file: absolute_old) do
+          product.update(file_path: relative_site_path(absolute_new))
+          Product.create_or_update_from_file(absolute_new)
+        end
+        puts "   ✓ Product renamed in database"
       end
     elsif absolute_old.include?("site/media")
       # Media files are stored with web paths like "/media/images/file.jpg"
@@ -452,6 +486,31 @@ class ContentWatcher
         puts "   New: #{new_web_path}"
       end
     end
+  end
+
+  # A file changed or renamed outside Roe: once its record is updated, the
+  # site's own links to it follow its new file name and address
+  # (InternalLinkRewriter), as they do after a save or rename in the admin.
+  # The file itself is left alone. A failure here never stops the load.
+  def self.following_links(model, absolute_file, old_file: nil)
+    before = content_record(model, old_file || absolute_file)
+    source = before && InternalLinkRewriter.source_for(before)
+    result = yield
+    after = source && content_record(model, absolute_file)
+    if after
+      begin
+        count = InternalLinkRewriter.follow(source, after, except: absolute_file)
+        puts "   🔗 Links updated in #{count} #{'file'.pluralize(count)}" if count.positive?
+      rescue StandardError => e
+        Rails.logger.error("[ContentWatcher] links to #{absolute_file}: #{e.class}: #{e.message}")
+      end
+    end
+    result
+  end
+
+  def self.content_record(model, absolute_file)
+    path = model == Product ? relative_site_path(absolute_file) : RoeSitePaths.normalize(absolute_file)
+    model.find_by(file_path: path)
   end
 
   def self.remove_file(file)

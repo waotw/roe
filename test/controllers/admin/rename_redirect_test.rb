@@ -156,4 +156,16 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     @files << File.join(RoeSitePaths::SITE_PATH, "pages", "rename-redirect-links-renamed.md")
     assert_includes File.read(linker.file_path), "[b](/pages/rename-redirect-links-renamed.md)"
   end
+
+  test "the editor is told when a page's url_name is another page's address" do
+    sign_in_as(@admin)
+    first = page_with("clash-one")
+    page_with("clash-two")
+
+    get check_unique_admin_pages_path, params: { field: "url_name", value: "clash-two", exclude: first.id }
+    assert_equal({ "taken" => true, "conflict" => "About Us" }, response.parsed_body)
+
+    get check_unique_admin_pages_path, params: { field: "url_name", value: "clash-one", exclude: first.id }
+    assert_equal false, response.parsed_body["taken"], "a page doesn't clash with itself"
+  end
 end

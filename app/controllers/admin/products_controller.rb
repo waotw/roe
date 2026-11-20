@@ -240,6 +240,13 @@ class Admin::ProductsController < Admin::BaseController
     end
   end
 
+  # Is this url_name already another product's address? Advisory only
+  # (UrlNameClash); the unique-field controller asks while it's typed.
+  def check_unique
+    conflict = UrlNameClash.find(Product, params[:value], except_id: params[:exclude])
+    render json: { taken: conflict.present?, conflict: conflict&.title }
+  end
+
   def rename
     @product = Product.find(params[:id])
     new_filename = sanitize_filename(params[:new_filename])

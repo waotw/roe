@@ -225,6 +225,13 @@ class Admin::PagesController < Admin::BaseController
     end
   end
 
+  # Is this url_name already another page's address? Advisory only
+  # (UrlNameClash); the unique-field controller asks while it's typed.
+  def check_unique
+    conflict = UrlNameClash.find(Page, params[:value], except_id: params[:exclude])
+    render json: { taken: conflict.present?, conflict: conflict&.title }
+  end
+
   def rename
     @page = Page.find(params[:id])
     new_filename = sanitize_filename(params[:new_filename])

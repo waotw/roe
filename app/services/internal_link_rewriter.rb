@@ -18,6 +18,22 @@
 class InternalLinkRewriter
   CONTENT_MODELS = %w[Post Page Product Documentation].freeze
 
+  # Where links to a record point now: its file name and its address. Take
+  # it before a save or rename, then hand it to .follow after.
+  def self.source_for(record)
+    { ref: InternalLinks.ref_for(record), address: record.public_url }
+  end
+
+  # Points links at the record's new file name and address, if either moved.
+  # `except`: a file to leave alone (the record's own, whose text an editor
+  # may hold). Returns the number of files changed.
+  def self.follow(source, record, except: nil)
+    return 0 unless source && record
+
+    file_renamed(source[:ref], InternalLinks.ref_for(record), except: except) +
+      address_changed(source[:address], record.public_url, except: except)
+  end
+
   def self.file_renamed(old_ref, new_ref, except: nil)
     old_ref = old_ref.to_s.delete_prefix("/")
     new_ref = new_ref.to_s.delete_prefix("/")

@@ -123,11 +123,17 @@
       )
       unique_conflicts[unique_name] = found.title if found
     end
+  elsif %w[page product].include?(resource_type) && defined?(item) && item.present? && item.persisted?
+    # Pages and products: another one at the same address (UrlNameClash).
+    unique_exclude = item.id.to_s
+    found = UrlNameClash.find(item.class, item.url_name, except_id: item.id)
+    unique_conflicts['url_name'] = found.title if found
   end
+  unique_check_url = { 'page' => check_unique_admin_pages_path, 'product' => check_unique_admin_products_path }[resource_type] || check_unique_admin_posts_path
 %>
 <% tag_field_options = (TagList.field_options rescue []) %>
 <div id="metadata-container"
-     data-controller="metadata-editor duration-detect<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' && SiteFeature.snipcart_enabled? %>"
+     data-controller="metadata-editor duration-detect field-links<%= ' release-link' if resource_type == 'post' && SiteFeature.music_enabled? %><%= ' digital-product' if resource_type == 'product' && SiteFeature.snipcart_enabled? %>"
      data-release-link-settings-path-value="<%= admin_edit_music_config_path %>"
      data-metadata-editor-known-fields-value="<%= known_fields_config.to_json %>"
      data-metadata-editor-default-author-value="<%= ERB::Util.html_escape(default_author) %>"
@@ -361,12 +367,13 @@
                         ⚠ File not found under <code>site/media/</code>.
                       </p>
                     </div>
-                  <% elsif resource_type == 'post' && Post::UNIQUE_FIELDS.key?(field_name) %>
+                  <% elsif (resource_type == 'post' && Post::UNIQUE_FIELDS.key?(field_name)) || (%w[page product].include?(resource_type) && field_name == 'url_name') %>
                     <!-- Text input with an advisory "already in use" warning -->
                     <div class="flex-1 flex flex-col gap-1"
                          data-controller="unique-field"
                          data-unique-field-field-value="<%= field_name %>"
-                         data-unique-field-scope-fields-value="<%= ERB::Util.html_escape(Post::UNIQUE_FIELDS[field_name].to_json) %>"
+                         data-unique-field-scope-fields-value="<%= ERB::Util.html_escape((resource_type == 'post' ? Post::UNIQUE_FIELDS[field_name] : []).to_json) %>"
+                         data-unique-field-url-value="<%= unique_check_url %>"
                          data-unique-field-exclude-value="<%= ERB::Util.html_escape(unique_exclude) %>">
                       <input type="text"
                               id="metadata-field-<%= field_name %>"

@@ -93,4 +93,48 @@ class InternalLinksTest < ActiveSupport::TestCase
 
     assert_includes File.read(linker.file_path), "[old](/posts/il-here) and [old too](/posts/il-here#a) and [other](/posts/il-gone-not)"
   end
+
+  # ── Files changed outside Roe ────────────────────────────────────────────
+
+  test "a file renamed outside Roe takes the site's links with it" do
+    target = make(:post, "il-ext-old")
+    linker = make(:post, "il-ext-linker", body: "[[posts/il-ext-old]] and [x](/posts/il-ext-old.md)\n")
+    new_path = File.join(RoeSitePaths::SITE_POSTS_PATH, "il-ext-new.md")
+    @created << new_path
+    File.rename(target.file_path, new_path)
+
+    ContentWatcher.send(:handle_changes, [], [ new_path ], [ target.file_path ])
+
+    assert_includes File.read(linker.file_path), "[[posts/il-ext-new]] and [x](/posts/il-ext-new.md)"
+  end
+
+  test "a url_name changed outside Roe updates links written as addresses" do
+    target = make(:post, "il-ext-addr", url_name: "il-ext-before")
+    linker = make(:post, "il-ext-addr-linker", body: "[old](/posts/il-ext-before)\n")
+    File.write(target.file_path, File.read(target.file_path).sub("url_name: \"il-ext-before\"", "url_name: \"il-ext-after\""))
+
+    ContentWatcher.send(:handle_changes, [ target.file_path ], [], [])
+
+    assert_includes File.read(linker.file_path), "[old](/posts/il-ext-after)"
+  end
+
+  # ── Metadata fields ──────────────────────────────────────────────────────
+
+  test "links work in Markdown metadata fields, and their plain text is the link's text" do
+    make(:post, "il-field", title: "Field Target")
+
+    assert_includes FieldText.html("See [[posts/il-field]]."), %(<a href="/posts/il-field">Field Target</a>)
+    assert_includes FieldText.html("See [it](/posts/il-field.md)."), %(<a href="/posts/il-field">it</a>)
+    assert_equal "See it and Field Target", FieldText.plain("See [[posts/il-field|it]] and [[il-field]]")
+  end
+
+  # ── Two pages at one address ─────────────────────────────────────────────
+
+  test "a page using another page's address is found; products in one group aren't" do
+    first = make(:page, "il-clash-a", url_name: "il-clash")
+    second = make(:page, "il-clash-b", url_name: "il-clash")
+
+    assert_equal second.id, UrlNameClash.find(Page, "il-clash", except_id: first.id)&.id
+    assert_nil UrlNameClash.find(Page, "il-clash-free", except_id: first.id)
+  end
 end

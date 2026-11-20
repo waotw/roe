@@ -17,6 +17,8 @@
 # - GFM, as image captions use, so `snake_case` and bare URLs stay as written.
 # - A space before ? ! : ; » or after « can't break the line
 #   (PunctuationSpaces), as in the body.
+# - Links to the site's own content work as in the body: `[[posts/x]]`,
+#   `[[posts/x|text]]` and `[text](/posts/x.md)` (InternalLinks).
 #
 # `plain` is the same text with the Markdown taken out, for places that hold
 # text rather than HTML: meta tags, feed descriptions, Snipcart's cart line,
@@ -71,8 +73,20 @@ class FieldText
     end
 
     def render(text)
-      text.split("\n").map(&:strip).reject(&:empty?).map { |line| line_html(line) }.join("<br>\n")
+      text.split("\n").map(&:strip).reject(&:empty?).map { |line| linked_line_html(line) }.join("<br>\n")
     end
+
+    # Wikilinks become placeholders before kramdown and links after it, and
+    # links to files get the item's address — as the body does it.
+    def linked_line_html(line)
+      return line_html(line) unless links?(line)
+
+      store = {}
+      html = line_html(InternalLinks.protect(line, store))
+      InternalLinks.rewrite_file_hrefs(InternalLinks.restore(html, store))
+    end
+
+    def links?(text) = text.include?("[[") || text.include?(".md")
 
     # A line that kramdown would read as a block (a list item, a heading, a
     # quote, a rule, a link definition) gets its first character as an
@@ -89,7 +103,11 @@ class FieldText
       nil
     end
 
+    # A value with links to the site's own content isn't kept: where it goes
+    # depends on that content (an address, a draft), not only on the text.
     def cached(text)
+      return yield if links?(text)
+
       @lock.synchronize do
         return @cache[text] if @cache.key?(text)
       end

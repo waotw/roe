@@ -183,6 +183,7 @@ Rails.application.routes.draw do
         post :bulk_publish
         post :bulk_tags
         post :restore_member_pages
+        get :check_unique
       end
       member do
         post :publish_modal
@@ -222,6 +223,7 @@ Rails.application.routes.draw do
     resources :products do
       collection do
         get :check_sku
+        get :check_unique
         get :suggest_sku
         get :search
         get :next_sku_number
