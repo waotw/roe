@@ -2,16 +2,21 @@ require "test_helper"
 
 class PunctuationSpacesTest < ActiveSupport::TestCase
   NBSP = "\u00A0"
+  NARROW = "\u202F"
 
   def apply(html) = PunctuationSpaces.apply(html)
 
-  test "the space before ? ! : ; and » can't break" do
-    assert_equal "<p>D’immigrés#{NBSP}? Oui#{NBSP}! Da#{NBSP}: non#{NBSP}; « bon#{NBSP}»</p>".sub("« ", "«#{NBSP}"),
+  test "narrow no-break space before ? ! ; » and after «, a full one before :" do
+    assert_equal "<p>D’immigrés#{NARROW}? Oui#{NARROW}! Da#{NBSP}: non#{NARROW}; «#{NARROW}bon#{NARROW}»</p>",
                  apply("<p>D’immigrés ? Oui ! Da : non ; « bon »</p>")
   end
 
-  test "the space after « can't break, and kramdown's entities count" do
-    assert_equal "&laquo;#{NBSP}oui#{NBSP}&raquo;", apply("&laquo; oui &raquo;")
+  test "kramdown's entities count" do
+    assert_equal "&laquo;#{NARROW}oui#{NARROW}&raquo;", apply("&laquo; oui &raquo;")
+  end
+
+  test "a no-break space already typed is set to the right width" do
+    assert_equal "oui#{NARROW}? non#{NBSP}:", apply("oui#{NBSP}? non#{NARROW}:")
   end
 
   test "a space after a tag counts, as in a name in bold" do
@@ -29,7 +34,7 @@ class PunctuationSpacesTest < ActiveSupport::TestCase
   end
 
   test "text after a code element is still changed" do
-    assert_equal "<code>a ? b</code> et alors#{NBSP}?", apply("<code>a ? b</code> et alors ?")
+    assert_equal "<code>a ? b</code> et alors#{NARROW}?", apply("<code>a ? b</code> et alors ?")
   end
 
   test "keeps an HTML-safe string HTML-safe" do
@@ -38,12 +43,12 @@ class PunctuationSpacesTest < ActiveSupport::TestCase
 
   test "a post body renders with it" do
     html = Post.new(content: "L’homme : D’immigrés ?\n\n```\nx ? y : z\n```\n").to_html
-    assert_includes html, "L’homme#{NBSP}: D’immigrés#{NBSP}?"
+    assert_includes html, "L’homme#{NBSP}: D’immigrés#{NARROW}?"
     assert_includes html, "x ? y : z", "code untouched"
   end
 
   test "metadata fields render with it, but their plain text keeps ordinary spaces" do
-    assert_includes FieldText.html("Vraiment ?"), "Vraiment#{NBSP}?"
+    assert_includes FieldText.html("Vraiment ?"), "Vraiment#{NARROW}?"
     assert_equal "Vraiment ?", FieldText.plain("Vraiment ?")
   end
 end

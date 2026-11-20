@@ -2,26 +2,30 @@
 #
 # French puts a space before ? ! : ; » and after «. Written as an ordinary
 # space, a browser may break the line there and leave the ? alone at the
-# start of the next one. This swaps those spaces for a no-break space
-# (U+00A0) in rendered HTML. It's the width of a normal space, so nothing
-# looks different; the line just can't break there. Files aren't changed.
+# start of the next one. This swaps those spaces for no-break spaces in
+# rendered HTML, the widths French typesetting uses: the narrow no-break
+# space (U+202F) before ? ! ; » and after «, a full-width no-break space
+# (U+00A0) before :. Files aren't changed.
 #
-# English rarely puts a space before these marks, so English text is
-# untouched in practice.
+# English rarely puts a space before these marks; where it does (Roe's docs
+# write "like this ↓ :"), keeping the mark on the line is better there too.
 #
 # Only text is changed: tags and their attributes (links, image addresses)
 # are left alone, and so is everything inside <pre>, <code>, <kbd>, <samp>,
 # <script>, <style> and <textarea>, so code examples stay exact.
 module PunctuationSpaces
   NBSP = "\u00A0".freeze
+  NARROW = "\u202F".freeze
 
   SKIP = %w[pre code kbd samp script style textarea].freeze
   TAG = /(<!--.*?-->|<[^>]*>)/m
 
-  # Spaces (and existing no-break spaces) before the closing marks, and after
+  # Spaces (ordinary or already no-break) before the closing marks, and after
   # the opening guillemet. Entities cover kramdown's typographic output.
-  BEFORE = /[ \u00A0]+(?=[?!:;»]|&raquo;|&#187;)/
-  AFTER = /(«|&laquo;|&#171;)[ \u00A0]+/
+  SPACES = "[ \u00A0\u202F]+"
+  BEFORE_COLON = /#{SPACES}(?=:)/
+  BEFORE = /#{SPACES}(?=[?!;»]|&raquo;|&#187;)/
+  AFTER = /(«|&laquo;|&#171;)#{SPACES}/
 
   module_function
 
@@ -35,7 +39,8 @@ module PunctuationSpaces
         depth = track(part, depth)
         part
       elsif depth.zero?
-        part.gsub(BEFORE, NBSP).gsub(AFTER) { "#{Regexp.last_match(1)}#{NBSP}" }
+        part.gsub(BEFORE_COLON, NBSP).gsub(BEFORE, NARROW)
+            .gsub(AFTER) { "#{Regexp.last_match(1)}#{NARROW}" }
       else
         part
       end
