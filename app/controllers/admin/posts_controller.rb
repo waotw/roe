@@ -337,6 +337,7 @@ class Admin::PostsController < Admin::BaseController
     was_published = @post.published?
     status_before = @post.status
     old_address = rename_redirect_source(@post)
+    link_source = internal_link_source(@post)
 
     # Use the formatted YAML (includes GUID if added/restored)
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
@@ -361,6 +362,7 @@ class Admin::PostsController < Admin::BaseController
     # "Save new URL & redirect" in the editor's slug-change modal: write the
     # 301 as part of this save (RenameRedirect).
     add_rename_redirect(Post, old_address, metadata, @post.file_path)
+    update_internal_links(link_source, @post, own_file: @post.file_path)
 
     finish_editor_save(record: @post, resource_type: "post", edit_path: edit_admin_post_path(@post),
                        file_path: @post.file_path, submitted: submitted, status_before: status_before)
@@ -425,11 +427,13 @@ class Admin::PostsController < Admin::BaseController
     end
 
     begin
+      link_source = internal_link_source(@post)
       File.rename(old_path, new_path)
       @post.update(file_path: new_path.to_s)
       ContentSync.sync_file(new_path)
 
       flash[:notice] = "Renamed to #{new_filename}.md"
+      update_internal_links(link_source, @post)
     rescue => e
       flash[:error] = "Failed to rename: #{e.message}"
     end

@@ -40,7 +40,10 @@ class MarkdownDoctor
     unindented_footnote_line: "Footnote line not indented, so it leaves the note",
     content_after_footnotes: "Text below the footnotes shows above them",
     marker_across_lines: "Formatting that doesn't close on its own line",
-    broken_anchor_link: "Link to a heading that isn't on the page"
+    broken_anchor_link: "Link to a heading that isn't on the page",
+    broken_internal_link: "Link to a file that isn't there",
+    unclear_internal_link: "Link that matches more than one file",
+    draft_link: "Link to a draft"
   }.freeze
 
   # Which issues Fix All is allowed to touch.
@@ -101,13 +104,17 @@ class MarkdownDoctor
   # An in-page link: `[text](#anchor)` or `href="#anchor"`. The anchor is in
   # group 1 or 2.
   ANCHOR_LINK_RE = /\[[^\]]*\]\(#([^)\s]+)\)|href=["']#([^"']+)["']/
+  # Links to the site's own files: `[[posts/x]]`, `[[posts/x|text]]`, and
+  # `[text](/posts/x.md)`. The target is in group 1 or 2. Same shapes as
+  # InternalLinks, kept here so the CLI runs without Rails.
+  INTERNAL_LINK_RE = %r{\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]|\]\((?!(?:[a-z][a-z0-9+.-]*:)|//)([^)\s?#]+?\.md(?:#[^)\s]*)?)\)}i
 
   # gfm: whether the site renders with Kramdown's GFM parser, which Roe uses
   # when soft line breaks are on (HasMarkdownExtensions#to_html). The two
   # parsers nest lists differently, and a rule that's right for one is a
   # false alarm for the other.
-  def self.diagnose(content, page_ids: nil, gfm: false)
-    new(content, page_ids: page_ids, gfm: gfm).diagnose
+  def self.diagnose(content, page_ids: nil, gfm: false, link_status: nil)
+    new(content, page_ids: page_ids, gfm: gfm, link_status: link_status).diagnose
   end
 
   def self.diagnose_file(path, gfm: false)
@@ -121,10 +128,15 @@ class MarkdownDoctor
   # rather than from re-deriving heading ids here: collection items, glossary
   # terms and galleries make ids of their own, and a guess would call good
   # links broken.
-  def initialize(content, page_ids: nil, gfm: false)
+  #
+  # link_status: a callable taking a link target and returning what
+  # InternalLinks.status does ([:ok | :draft | :missing | :ambiguous, detail]),
+  # for checking links to the site's files. Optional, like page_ids.
+  def initialize(content, page_ids: nil, gfm: false, link_status: nil)
     @lines = content.to_s.lines
     @issues = []
     @page_ids = page_ids
+    @link_status = link_status
     @gfm = gfm
   end
 
@@ -139,6 +151,7 @@ class MarkdownDoctor
     check_indentation
     check_markers_across_lines
     check_anchor_links if @page_ids
+    check_internal_links if @link_status
     @issues.each do |issue|
       issue[:fixable] = self.class.fixable?(issue[:type]) && !issue.delete(:unsafe)
     end
@@ -305,6 +318,33 @@ class MarkdownDoctor
           message: "Nothing on this page has the id \"#{anchor}\", so this link goes nowhere#{anchor_suggestion(anchor, known)}"
         }
       end
+    end
+  end
+
+  # `[[posts/x]]` and `[text](/posts/x.md)` that name no file, more than one,
+  # or a draft. The first two show as plain text on the site; a draft link
+  # does too, until the draft is published.
+  def check_internal_links
+    scan_lines do |line, line_num, inside_code_block|
+      next if inside_code_block
+
+      line.gsub(INLINE_CODE_RE, "").scan(INTERNAL_LINK_RE).each do |wiki, file|
+        target = (wiki || file).strip
+        state, detail = @link_status.call(target)
+        issue = internal_link_issue(state, detail, wiki ? "[[#{wiki}]]" : target)
+        @issues << issue.merge(line: line_num) if issue
+      end
+    end
+  end
+
+  def internal_link_issue(state, detail, shown)
+    case state
+    when :missing
+      { type: :broken_internal_link, message: "#{shown} doesn't match a post, page, product or doc, so it shows as plain text" }
+    when :ambiguous
+      { type: :unclear_internal_link, message: "#{shown} could be #{detail.join(' or ')}. Add the folder to say which" }
+    when :draft
+      { type: :draft_link, message: "#{shown} is a draft, so it shows as plain text until it's published" }
     end
   end
 

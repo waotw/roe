@@ -135,4 +135,25 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     assert_equal "/", Page.public_url_for("home")
     assert_equal "/store/a", Product.public_url_for("a")
   end
+
+  # The site's own links follow the item, redirect or not: links written as
+  # addresses get the new address, links to the file get the new file name.
+  test "a new address or file name updates the site's own links to it" do
+    sign_in_as(@admin)
+    page = page_with("links-target")
+    linker = page_with("links-linker")
+    File.write(linker.file_path, "---\ntitle: Linker\nstatus: published\nurl_name: links-linker\n---\n" \
+                                 "[a](/links-target) [b](/pages/rename-redirect-links-target.md)\n")
+    ContentSync.sync_file(linker.file_path)
+
+    patch admin_page_path(page), params: {
+      metadata: "title: About Us\nstatus: published\nurl_name: links-moved\n", content: "Body."
+    }
+    assert_includes File.read(linker.file_path), "[a](/links-moved) [b](/pages/rename-redirect-links-target.md)"
+    assert_equal "Links updated in 1 file.", flash[:notice]
+
+    patch rename_admin_page_path(page), params: { new_filename: "rename-redirect-links-renamed" }
+    @files << File.join(RoeSitePaths::SITE_PATH, "pages", "rename-redirect-links-renamed.md")
+    assert_includes File.read(linker.file_path), "[b](/pages/rename-redirect-links-renamed.md)"
+  end
 end

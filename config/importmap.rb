@@ -25,6 +25,7 @@ pin "crelt", preload: false # @1.0.7
 pin "style-mod", preload: false # @4.1.4
 pin "w3c-keyname", preload: false # @2.2.8
 pin "@codemirror/search", to: "@codemirror--search.js", preload: false # @6.7.2
+pin "@codemirror/autocomplete", to: "@codemirror--autocomplete.js", preload: false # @6.20.4
 pin "@lezer/markdown", to: "@lezer--markdown.js", preload: false # @1.8.0
 pin "@lezer/common", to: "@lezer--common.js", preload: false # @1.5.3
 pin "@lezer/highlight", to: "@lezer--highlight.js", preload: false # @1.2.5

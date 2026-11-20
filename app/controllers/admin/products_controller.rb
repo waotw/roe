@@ -141,6 +141,7 @@ class Admin::ProductsController < Admin::BaseController
     was_published = @product.status == "published"
     status_before = @product.status
     old_address = rename_redirect_source(@product)
+    link_source = internal_link_source(@product)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
@@ -151,6 +152,7 @@ class Admin::ProductsController < Admin::BaseController
     # A plain save says nothing — the editor's dot shows "changes saved".
     flash[:notice] = "Product published" if !was_published && @product.status == "published"
     add_rename_redirect(Product, old_address, metadata, @product.file_path)
+    update_internal_links(link_source, @product, own_file: File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     finish_editor_save(record: @product, resource_type: "product", edit_path: edit_admin_product_path(@product),
                        file_path: File.join(RoeSitePaths::SITE_PATH, @product.file_path), submitted: submitted, status_before: status_before)
   end
@@ -266,10 +268,12 @@ class Admin::ProductsController < Admin::BaseController
     end
 
     begin
+      link_source = internal_link_source(@product)
       File.rename(old_full, new_full)
       @product.update(file_path: new_rel)
       ContentSync.sync_file(new_full)
       flash[:notice] = "Renamed to #{new_filename}.md"
+      update_internal_links(link_source, @product)
     rescue => e
       flash[:error] = "Failed to rename: #{e.message}"
     end

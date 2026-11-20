@@ -51,4 +51,26 @@ module RenameRedirect
     added = "Redirect added: #{result.from} → #{result.to}."
     flash[:notice] = flash[:notice].present? ? "#{flash[:notice]}. #{added}" : added
   end
+
+  # Where the site's own links point, before a save or rename moves the item:
+  # its file name and its address. Pass the result to update_internal_links.
+  def internal_link_source(record)
+    { ref: InternalLinks.ref_for(record), address: record.public_url }
+  end
+
+  # Points other content's links at the item's new file name and address
+  # (InternalLinkRewriter), whether or not a redirect was asked for: the
+  # redirect is for visitors from outside, these are the site's own links.
+  # The item's own file is left alone on a save — the editor holds its text.
+  def update_internal_links(source, record, own_file: nil)
+    record.reload
+    count = InternalLinkRewriter.file_renamed(source[:ref], InternalLinks.ref_for(record))
+    count += InternalLinkRewriter.address_changed(source[:address], record.public_url, except: own_file)
+    return if count.zero?
+
+    updated = "Links updated in #{count} #{'file'.pluralize(count)}."
+    flash[:notice] = flash[:notice].present? ? "#{flash[:notice]}. #{updated}" : updated
+  rescue StandardError => e
+    Rails.logger.error("[internal links] #{e.class}: #{e.message}")
+  end
 end

@@ -379,8 +379,16 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
   # a rule missing from it is a rule nobody looks at. Cheaper to fail here than
   # to notice months later that a check has never been seen working.
   test "the sample post exercises every rule" do
+    # Links to files are judged against stand-in content: what each target
+    # in the sample is, without needing those files to exist.
+    link_status = lambda do |target|
+      { "posts/no-such-post" => [ :missing, nil ], "posts/sample-draft" => [ :draft, nil ],
+        "/sample-shared.md" => [ :ambiguous, %w[posts/sample-shared pages/sample-shared] ] }
+        .fetch(target, [ :ok, nil ])
+    end
     issues = MarkdownDoctor.diagnose(
       File.read(Rails.root.join("test/fixtures/files/markdown_doctor_sample.md")),
+      link_status: link_status,
     )
 
     # Text after the notes can't be shown here: it needs the notes to be the

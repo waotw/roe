@@ -12,7 +12,7 @@ class Admin::MarkdownController < Admin::BaseController
   # POST /admin/markdown/check
   # → { issues: [{ type:, line:, message:, fixable:, label: }], fixable_count: }
   def check
-    issues = MarkdownDoctor.diagnose(content_param, page_ids: page_ids, gfm: gfm?)
+    issues = MarkdownDoctor.diagnose(content_param, page_ids: page_ids, gfm: gfm?, link_status: link_status)
 
     render json: {
       issues: issues.map { |i| present(i) },
@@ -33,7 +33,7 @@ class Admin::MarkdownController < Admin::BaseController
     render json: {
       content: fixed,
       applied: applied.map { |i| present(i) },
-      remaining: MarkdownDoctor.diagnose(fixed, page_ids: page_ids(fixed), gfm: gfm?).map { |i| present(i) }
+      remaining: MarkdownDoctor.diagnose(fixed, page_ids: page_ids(fixed), gfm: gfm?, link_status: link_status).map { |i| present(i) }
     }
   end
 
@@ -108,6 +108,11 @@ class Admin::MarkdownController < Admin::BaseController
   rescue StandardError => e
     Rails.logger.warn("[markdown#page_ids] #{e.class}: #{e.message}")
     nil
+  end
+
+  # Links to the site's own files ([[posts/x]], [text](/posts/x.md)).
+  def link_status
+    ->(target) { InternalLinks.status(target) }
   end
 
   # ISSUE_TYPES holds the human label; the raw symbol is for grouping and CSS.

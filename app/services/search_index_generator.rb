@@ -267,7 +267,8 @@ class SearchIndexGenerator
   end
 
   def plain_text(markdown)
-    markdown.gsub(/```.*?```/m, " ")        # fenced blocks (code/cards/etc.)
+    InternalLinks.plain(markdown)                  # [[posts/x|text]] → text
+            .gsub(/```.*?```/m, " ")        # fenced blocks (code/cards/etc.)
             .gsub(/!\[[^\]]*\]\([^)]*\)/, " ") # images
             .gsub(/[#>*_`~\-|]/, " ")        # common markdown punctuation
             .gsub(/\s+/, " ")

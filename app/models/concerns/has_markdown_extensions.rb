@@ -46,6 +46,12 @@ module HasMarkdownExtensions
     code_blocks = {}
     processed_content = protect_fenced_code(source, code_blocks)
 
+    # Wikilinks ([[posts/x]], [[posts/x|text]]) become placeholders, so kramdown
+    # never sees the brackets, and the pipe can't split a table cell. Restored
+    # as links after kramdown. See InternalLinks.
+    wikilinks = {}
+    processed_content = InternalLinks.protect(processed_content, wikilinks)
+
     # Protect || split markers from Kramdown's table parsing. Every
     # marker restores to the same value, so a single shared placeholder
     # is enough — no per-occurrence indexing needed.
@@ -101,6 +107,11 @@ module HasMarkdownExtensions
 
     # Restore pullquote splits
     html.gsub!("PULLQUOTE_SPLIT_END", "||")
+
+    # Internal links: wikilinks back as links, and links to files
+    # ([text](/posts/x.md)) pointed at the item's address.
+    html = InternalLinks.restore(html, wikilinks)
+    html = InternalLinks.rewrite_file_hrefs(html)
 
     # Swap search-trigger icon placeholders for the inline SVG AFTER Kramdown
     # (Kramdown mangles inline SVG, so triggers carry a token instead).

@@ -77,6 +77,8 @@ Rails.application.routes.draw do
     # The live editor's block cards: which Roe-anji blocks would render a
     # warning instead of themselves.
     post "markdown/blocks", to: "markdown#blocks", as: "markdown_blocks"
+    # What the editor's link list offers (InternalLinks).
+    get "internal_links", to: "internal_links#index", as: "internal_links"
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"

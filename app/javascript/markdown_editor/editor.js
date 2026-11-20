@@ -58,6 +58,7 @@ import { livePreview } from "markdown_editor/live_preview";
 import { linkStyles } from "markdown_editor/links";
 import { roeBlocks } from "markdown_editor/roe_blocks";
 import { footnotePaste, footnoteAt, footnoteContinuation } from "markdown_editor/footnotes";
+import { internalLinks, wikilinks } from "markdown_editor/internal_links";
 
 // Marks a change made by assigning .value or calling setRangeText. A real
 // textarea fires no input event for those, so neither do we.
@@ -78,8 +79,8 @@ function modeExtensions(mode, blocksUrl) {
   const attrs = EditorView.editorAttributes.of({
     class: `roe-md-editor roe-md-${mode}`,
   });
-  if (mode === "source") return [attrs, linkStyles];
-  return [attrs, linkStyles, livePreview, roeBlocks({ checkUrl: blocksUrl })];
+  if (mode === "source") return [attrs, linkStyles, wikilinks(mode)];
+  return [attrs, linkStyles, livePreview, wikilinks(mode), roeBlocks({ checkUrl: blocksUrl })];
 }
 
 // ── document.execCommand ──────────────────────────────────────────────────
@@ -179,6 +180,9 @@ export class MarkdownEditor {
       dropCursor(),
       highlightSpecialChars(),
       search({ top: false }),
+      // The list of posts, pages, products and docs to link to (after `](/`,
+      // after `[[`, or on clicking a link to one).
+      internalLinks(),
       highlightSelectionMatches(),
       keymap.of([...searchKeymap, ...historyKeymap, ...defaultKeymap]),
       markdown(),
