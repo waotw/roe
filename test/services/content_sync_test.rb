@@ -95,7 +95,9 @@ class ContentSyncTest < ActiveSupport::TestCase
     assert_nil Post.find_by(id: orphan_id)
   end
 
-  test "rename detection matches similar basenames" do
+  # A rename moves every link to the old file onto the new one, so a guess
+  # is worse than a miss: a similar name with different text is a new post.
+  test "rename detection doesn't match a similar name with different text" do
     content = <<~YAML
       ---
       title: Article Title
@@ -115,12 +117,10 @@ class ContentSyncTest < ActiveSupport::TestCase
 
     ContentSync.new.send(:handle_orphaned_posts, [ new_path ])
 
-    post.reload
-    assert_equal new_path, post.file_path
-    assert_equal original_id, post.id
+    assert_nil Post.find_by(id: original_id)
   end
 
-  test "rename detection handles number prefix" do
+  test "rename detection follows an unchanged file to a new name" do
     content = <<~YAML
       ---
       title: Post
@@ -135,8 +135,7 @@ class ContentSyncTest < ActiveSupport::TestCase
     post = Post.create_or_update_from_file(old_path)
     original_id = post.id
 
-    new_content = content.gsub("# Post", "# Renamed Post")
-    new_path = write_test_file("posts/2024-01-15-post.md", new_content)
+    new_path = write_test_file("posts/2024-01-15-post.md", content)
 
     ContentSync.new.send(:handle_orphaned_posts, [ new_path ])
 

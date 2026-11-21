@@ -95,6 +95,15 @@ class ContentWatcher
     puts "  Added: #{added.inspect}"
     puts "  Modified: #{modified.inspect}"
     puts "  Removed: #{removed.inspect}"
+    # A file both removed and added in one batch is still there: an editor
+    # that saves by replacing the file. It changed; nothing moved.
+    replaced = removed & added
+    if replaced.any?
+      removed -= replaced
+      added -= replaced
+      modified |= replaced
+    end
+
     # Check for renames (removed + added happening together)
     potential_renames = detect_renames(added, removed)
 
@@ -306,31 +315,13 @@ class ContentWatcher
   end
 
   def self.detect_renames(added, removed)
-    renames = {}
+    renames = content_renames(added, removed)
 
     removed.each do |old_file|
-      # Handle markdown files
-      if old_file.end_with?(".md")
-        old_basename = File.basename(old_file, ".md")
-
-        new_file = added.find do |file|
-          next unless file.end_with?(".md")
-          new_basename = File.basename(file, ".md")
-
-          new_basename.include?(old_basename) ||
-            old_basename.include?(new_basename.sub(/^\d+-/, ""))
-        end
-        # A new name that shares nothing with the old one (`welcome.md` →
-        # `hello.md`): the same text as the record the old file was is the
-        # same file.
-        new_file ||= (added - renames.values).find { |file| same_text?(old_file, file) }
-
-        renames[old_file] = new_file if new_file
-
-      # Handle media files. Third copy of the same list until now — a type
-      # missing here isn't seen as a rename, so it reads as a delete plus an
-      # add and the record is destroyed and recreated instead of moved.
-      elsif old_file.match?(MEDIA_PATTERN)
+      # Media files. Third copy of the same list until now — a type missing
+      # here isn't seen as a rename, so it reads as a delete plus an add and
+      # the record is destroyed and recreated instead of moved.
+      if old_file.match?(MEDIA_PATTERN)
         old_basename = File.basename(old_file, File.extname(old_file))
         old_ext = File.extname(old_file)
 
@@ -349,17 +340,21 @@ class ContentWatcher
     renames
   end
 
-  # Is `new_file` the content `old_file` held, by the record still stored for
-  # the old file: same body, front matter aside.
-  def self.same_text?(old_file, new_file)
-    return false unless new_file.end_with?(".md") && File.file?(new_file)
+  # Removed content files that were renamed, by their records (RenameMatch).
+  # Content files that share a name aren't matched by name: `music.md` →
+  # `music-2.md` could as well be a new post.
+  def self.content_renames(added, removed)
+    records = removed.select { |file| file.end_with?(".md") }.filter_map do |old_file|
+      record = [ Post, Page, Documentation, Product ].lazy.map { |model| content_record(model, old_file) }.find(&:itself)
+      [ old_file, record ] if record
+    end.to_h
+    return {} if records.empty?
 
-    record = [ Post, Page, Documentation, Product ].lazy.map { |model| content_record(model, old_file) }.find(&:itself)
-    return false unless record && record.content.to_s.strip.present?
-
-    File.read(new_file).sub(/\A---\s*\n.*?\n---\s*\n/m, "").strip == record.content.to_s.strip
-  rescue StandardError
-    false
+    renames, unsure = RenameMatch.pairs(records, added.select { |file| file.end_with?(".md") })
+    unsure.each do |old_file|
+      puts "   ⚠️  #{File.basename(old_file)} may have been renamed, but more than one file matches it; treating it as removed"
+    end
+    renames
   end
 
   # A media file's address in the media table: "/media/video/a.mp4". The

@@ -416,20 +416,19 @@ class ContentSync
   def handle_orphaned_products(markdown_files)
     real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
     relative_paths = markdown_files.map { |path| File.realpath(path).sub(real_site_path + "/", "") }
-    orphaned_products = Product.where.not(file_path: relative_paths)
+    orphaned_products = Product.where.not(file_path: relative_paths).to_a
+    return if orphaned_products.empty?
 
-    if orphaned_products.any?
-      puts "\n🗑️  Found #{orphaned_products.count} orphaned products (deleted from filesystem)"
-      orphaned_products.each do |product|
-        # Renamed while Roe wasn't running: same text, new name.
-        renamed = relative_paths.zip(markdown_files).find do |rel, full|
-          !Product.exists?(file_path: rel) && same_body?(product, full)
-        end
-        if renamed
-          puts "  - Renamed: #{product.file_path} → #{renamed.first}"
-          product.update(file_path: renamed.first)
-          next
-        end
+    puts "\n🗑️  Found #{orphaned_products.count} orphaned products (deleted from filesystem)"
+    added = relative_paths.reject { |rel| Product.exists?(file_path: rel) }
+    renames = follow_renames(orphaned_products.index_by(&:file_path), added.map { |rel| File.join(real_site_path, rel) })
+
+    orphaned_products.each do |product|
+      if (new_file = renames[product.file_path])
+        new_rel = new_file.sub(real_site_path + "/", "")
+        puts "  - Renamed: #{product.file_path} → #{new_rel}"
+        product.update(file_path: new_rel)
+      else
         puts "  - Deleting: #{product.file_path}"
         product.destroy
       end
@@ -438,103 +437,65 @@ class ContentSync
 
   private
 
-  # Is `file` the text `record` was synced from? Same body, front matter aside.
-  def same_body?(record, file)
-    body = record.content.to_s.strip
-    return false if body.empty? || !File.file?(file)
-
-    File.read(file).sub(/\A---\s*\n.*?\n---\s*\n/m, "").strip == body
-  rescue StandardError
-    false
+  # Which removed records were renamed rather than deleted (RenameMatch),
+  # saying so for any it isn't sure about.
+  def follow_renames(orphans_by_path, added)
+    renames, unsure = RenameMatch.pairs(orphans_by_path, added)
+    unsure.each do |old_path|
+      puts "⚠️  #{File.basename(old_path)} may have been renamed, but more than one file matches it; treating it as removed"
+    end
+    renames
   end
 
   def handle_orphaned_posts(current_files)
-    orphans = Post.where.not(file_path: current_files)
+    orphans = Post.where.not(file_path: current_files).to_a
+    return if orphans.empty?
 
-    return unless orphans.any?
+    added = current_files.reject { |file_path| Post.exists?(file_path: file_path) }
+    renames = follow_renames(orphans.index_by(&:file_path), added)
 
     orphans.each do |orphan|
-      old_path = orphan.file_path
-      old_basename = File.basename(old_path, ".md")
-
-      # Try to find a renamed file by matching content or metadata
-      possible_rename = current_files.find do |file_path|
-        # Skip if this file already has a database record
-        next if Post.exists?(file_path: file_path)
-
-        # Check if the new filename is similar (could be just adding a number prefix)
-        new_basename = File.basename(file_path, ".md")
-
-        # Match if the old name is contained in the new name (handles 01-old-name.md)
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
-      end
-      # A new name sharing nothing with the old one: the same text is the
-      # same file.
-      possible_rename ||= current_files.find { |file_path| !Post.exists?(file_path: file_path) && same_body?(orphan, file_path) }
-
-      if possible_rename
-        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
-        orphan.update(file_path: possible_rename)
+      if (new_file = renames[orphan.file_path])
+        puts "🔄 Detected rename: #{File.basename(orphan.file_path)} → #{File.basename(new_file)}"
+        orphan.update(file_path: new_file)
       else
-        puts "🧹 Removing orphaned post: #{File.basename(old_path)}"
+        puts "🧹 Removing orphaned post: #{File.basename(orphan.file_path)}"
         orphan.destroy
       end
     end
   end
 
   def handle_orphaned_pages(current_files)
-    orphans = Page.where.not(file_path: current_files)
+    orphans = Page.where.not(file_path: current_files).to_a
+    return if orphans.empty?
 
-    return unless orphans.any?
+    added = current_files.reject { |file_path| Page.exists?(file_path: file_path) }
+    renames = follow_renames(orphans.index_by(&:file_path), added)
 
     orphans.each do |orphan|
-      old_path = orphan.file_path
-      old_basename = File.basename(old_path, ".md")
-
-      possible_rename = current_files.find do |file_path|
-        next if Page.exists?(file_path: file_path)
-
-        new_basename = File.basename(file_path, ".md")
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
-      end
-      # A new name sharing nothing with the old one: the same text is the
-      # same file.
-      possible_rename ||= current_files.find { |file_path| !Page.exists?(file_path: file_path) && same_body?(orphan, file_path) }
-
-      if possible_rename
-        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
-        orphan.update(file_path: possible_rename)
+      if (new_file = renames[orphan.file_path])
+        puts "🔄 Detected rename: #{File.basename(orphan.file_path)} → #{File.basename(new_file)}"
+        orphan.update(file_path: new_file)
       else
-        puts "🧹 Removing orphaned page: #{File.basename(old_path)}"
+        puts "🧹 Removing orphaned page: #{File.basename(orphan.file_path)}"
         orphan.destroy
       end
     end
   end
 
   def handle_orphaned_documentation(current_files)
-    orphans = Documentation.where.not(file_path: current_files)
+    orphans = Documentation.where.not(file_path: current_files).to_a
+    return if orphans.empty?
 
-    return unless orphans.any?
+    added = current_files.reject { |file_path| Documentation.exists?(file_path: file_path) }
+    renames = follow_renames(orphans.index_by(&:file_path), added)
 
     orphans.each do |orphan|
-      old_path = orphan.file_path
-      old_basename = File.basename(old_path, ".md")
-
-      possible_rename = current_files.find do |file_path|
-        next if Documentation.exists?(file_path: file_path)
-
-        new_basename = File.basename(file_path, ".md")
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
-      end
-      # A new name sharing nothing with the old one: the same text is the
-      # same file.
-      possible_rename ||= current_files.find { |file_path| !Documentation.exists?(file_path: file_path) && same_body?(orphan, file_path) }
-
-      if possible_rename
-        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
-        orphan.update(file_path: possible_rename)
+      if (new_file = renames[orphan.file_path])
+        puts "🔄 Detected rename: #{File.basename(orphan.file_path)} → #{File.basename(new_file)}"
+        orphan.update(file_path: new_file)
       else
-        puts "🧹 Removing orphaned documentation: #{File.basename(old_path)}"
+        puts "🧹 Removing orphaned documentation: #{File.basename(orphan.file_path)}"
         orphan.destroy
       end
     end
