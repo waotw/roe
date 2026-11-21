@@ -4,8 +4,8 @@ import { load, loaded, resolve, spotIn, rank, detail, edits } from "markdown_edi
 // The link list in the metadata fields: the same list as the content editor
 // (link_targets.js), for the fields that take Markdown (FieldText) — a
 // subtitle, an excerpt, a product's description, and fields of the site's
-// own that a layout shows. Opens after `[[` or `](/`, or on clicking an
-// existing link to a post, page, product or doc.
+// own that a layout shows. Opens after `[[` or `](/`, or on clicking where an
+// existing link's target is written (link_targets.js#spotIn).
 //
 // Lives on the metadata panel and listens for every text field in it, so
 // fields added after the page loaded are covered too. Its own controller;

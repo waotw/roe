@@ -500,7 +500,7 @@ class ContentWatcher
     if after
       begin
         count = InternalLinkRewriter.follow(source, after, except: absolute_file)
-        puts "   🔗 Links updated in #{count} #{'file'.pluralize(count)}" if count.positive?
+        puts "   🔗 Updated #{count} #{'link'.pluralize(count)} to it" if count.positive?
       rescue StandardError => e
         Rails.logger.error("[ContentWatcher] links to #{absolute_file}: #{e.class}: #{e.message}")
       end

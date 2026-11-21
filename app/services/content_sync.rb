@@ -4,14 +4,48 @@ class ContentSync
   end
 
   def sync_all
+    link_sources = link_snapshot
     sync_configs
     sync_posts
     sync_pages
     sync_documentation
     sync_media
     sync_products
+    follow_links(link_sources)
     reconcile_tags
     prune_variant_cache
+  end
+
+  # Files renamed, or given a new url_name or title, while Roe wasn't
+  # running: the links to them follow, as they do when Roe sees the change
+  # happen (ContentWatcher) or makes it (the admin). Where each item's links
+  # pointed before the sync, by record.
+  CONTENT_MODELS = [ Post, Page, Documentation, Product ].freeze
+
+  def link_snapshot
+    CONTENT_MODELS.each_with_object({}) do |model, out|
+      model.select(:id, :metadata, :file_path).find_each do |record|
+        out[[ model.name, record.id ]] = InternalLinkRewriter.source_for(record)
+      end
+    end
+  rescue => e
+    Rails.logger.warn "[ContentSync] links not checked: #{e.class} #{e.message}"
+    nil
+  end
+
+  def follow_links(sources)
+    return unless sources
+
+    sources.each do |(name, id), source|
+      record = name.constantize.select(:id, :metadata, :file_path).find_by(id: id)
+      next unless record
+      next if InternalLinkRewriter.source_for(record) == source
+
+      count = InternalLinkRewriter.follow(source, record)
+      puts "🔗 #{File.basename(record.file_path.to_s)}: updated #{count} #{'link'.pluralize(count)} to it" if count.positive?
+    end
+  rescue => e
+    Rails.logger.warn "[ContentSync] links not updated: #{e.class} #{e.message}"
   end
 
   # Every save already updates content.yml's tags: list (TracksTags). This
@@ -387,6 +421,15 @@ class ContentSync
     if orphaned_products.any?
       puts "\n🗑️  Found #{orphaned_products.count} orphaned products (deleted from filesystem)"
       orphaned_products.each do |product|
+        # Renamed while Roe wasn't running: same text, new name.
+        renamed = relative_paths.zip(markdown_files).find do |rel, full|
+          !Product.exists?(file_path: rel) && same_body?(product, full)
+        end
+        if renamed
+          puts "  - Renamed: #{product.file_path} → #{renamed.first}"
+          product.update(file_path: renamed.first)
+          next
+        end
         puts "  - Deleting: #{product.file_path}"
         product.destroy
       end
@@ -394,6 +437,16 @@ class ContentSync
   end
 
   private
+
+  # Is `file` the text `record` was synced from? Same body, front matter aside.
+  def same_body?(record, file)
+    body = record.content.to_s.strip
+    return false if body.empty? || !File.file?(file)
+
+    File.read(file).sub(/\A---\s*\n.*?\n---\s*\n/m, "").strip == body
+  rescue StandardError
+    false
+  end
 
   def handle_orphaned_posts(current_files)
     orphans = Post.where.not(file_path: current_files)
@@ -415,6 +468,9 @@ class ContentSync
         # Match if the old name is contained in the new name (handles 01-old-name.md)
         new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
       end
+      # A new name sharing nothing with the old one: the same text is the
+      # same file.
+      possible_rename ||= current_files.find { |file_path| !Post.exists?(file_path: file_path) && same_body?(orphan, file_path) }
 
       if possible_rename
         puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
@@ -441,6 +497,9 @@ class ContentSync
         new_basename = File.basename(file_path, ".md")
         new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
       end
+      # A new name sharing nothing with the old one: the same text is the
+      # same file.
+      possible_rename ||= current_files.find { |file_path| !Page.exists?(file_path: file_path) && same_body?(orphan, file_path) }
 
       if possible_rename
         puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
@@ -467,6 +526,9 @@ class ContentSync
         new_basename = File.basename(file_path, ".md")
         new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
       end
+      # A new name sharing nothing with the old one: the same text is the
+      # same file.
+      possible_rename ||= current_files.find { |file_path| !Documentation.exists?(file_path: file_path) && same_body?(orphan, file_path) }
 
       if possible_rename
         puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"

@@ -66,7 +66,7 @@ module RenameRedirect
     count = InternalLinkRewriter.follow(source, record.reload, except: own_file)
     return if count.zero?
 
-    updated = "Links updated in #{count} #{'file'.pluralize(count)}."
+    updated = "Updated #{count} #{'link'.pluralize(count)} to it."
     flash[:notice] = flash[:notice].present? ? "#{flash[:notice]}. #{updated}" : updated
   rescue StandardError => e
     Rails.logger.error("[internal links] #{e.class}: #{e.message}")

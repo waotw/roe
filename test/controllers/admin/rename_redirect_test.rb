@@ -150,7 +150,7 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
       metadata: "title: About Us\nstatus: published\nurl_name: links-moved\n", content: "Body."
     }
     assert_includes File.read(linker.file_path), "[a](/links-moved) [b](/pages/rename-redirect-links-target.md)"
-    assert_equal "Links updated in 1 file.", flash[:notice]
+    assert_equal "Updated 1 link to it.", flash[:notice]
 
     patch rename_admin_page_path(page), params: { new_filename: "rename-redirect-links-renamed" }
     @files << File.join(RoeSitePaths::SITE_PATH, "pages", "rename-redirect-links-renamed.md")

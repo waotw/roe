@@ -111,7 +111,7 @@
   unique_conflicts = {}
   unique_exclude = nil
   if resource_type == 'post'
-    unique_exclude = item.url_name if defined?(item) && item.respond_to?(:url_name)
+    unique_exclude = item.id.to_s if defined?(item) && item.present? && item.persisted?
     Post::UNIQUE_FIELDS.each do |unique_name, scope_fields|
       next if metadata_hash[unique_name].to_s.strip.blank?
 
@@ -119,7 +119,7 @@
         field: unique_name,
         value: metadata_hash[unique_name],
         scopes: scope_fields.index_with { |sf| metadata_hash[sf] },
-        exclude_url_name: unique_exclude
+        exclude_id: unique_exclude
       )
       unique_conflicts[unique_name] = found.title if found
     end

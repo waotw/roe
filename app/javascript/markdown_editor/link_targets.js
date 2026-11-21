@@ -9,7 +9,8 @@
 const LIST_URL = "/admin/internal_links";
 
 // What the LINK button and ⌘K put between the brackets when nothing is
-// selected (editor_controller#insertLink). Picking a link replaces it.
+// selected (editor_controller#insertLink). Typing / in the () they leave
+// opens the list, and picking a link replaces this with the title.
 const PLACEHOLDER_TEXT = "link text";
 
 let items = null;
@@ -80,16 +81,18 @@ export function internalUrl(url) {
 }
 
 export const WIKI = /\[\[([^[\]|\n]*)(\|[^[\]\n]*)?\]\]/g;
-const MD_LINK = /\[([^\]\n]*)\]\(([^()\s]*)\)/g;
 
 // The link target at `col` in one line of text, with offsets in that line:
 //   { kind: "wiki" | "md", from, to, query, closed, current, text }
 // `text` (Markdown links) is the [text] range, set when it's empty or the
 // LINK button's placeholder, so picking fills in the title.
 //
-// While typing (`explicit` false), only right after `[[` or `](/`. When
-// opened on purpose — a click, the LINK button, Ctrl-Space — anywhere on an
-// internal link, or in the empty () the LINK button leaves.
+// Only where the link's target is written, never its text:
+//   [[here|not here]]   [[here]]   [not here](here)
+// While typing (`explicit` false), a Markdown link's target has to start
+// with /: most links go to other sites, and `https:` mustn't open the list.
+// On a click (or Ctrl-Space), the () must already hold an address on this
+// site.
 export function spotIn(line, col, explicit) {
   const before = line.slice(0, col);
   const after = line.slice(col);
@@ -108,18 +111,13 @@ export function spotIn(line, col, explicit) {
     };
   }
 
-  // The address part, up to the caret. Spaces are allowed while the list is
-  // open, so `/lab full` can narrow it by two words; picking replaces them.
+  // The address part, up to the caret. Spaces are allowed after the /, so
+  // `/lab full` can narrow the list by two words; picking replaces them.
   m = before.match(/\]\(([^()\n]*)$/);
   if (m) {
     const rest = after.match(/^[^()\s]*/)[0];
     const url = m[1] + rest;
-    if (!explicit && !m[1].startsWith("/")) return null;
-    // Opened on purpose (the LINK button), words narrow the list too: `lab`.
-    // Anything that looks like an address elsewhere (`https://…`, `#notes`,
-    // `file.pdf`) isn't for the list.
-    const words = explicit && /^[^/:.#?]+$/.test(url);
-    if (url && !internalUrl(url) && !words) return null;
+    if (explicit ? !internalUrl(url) : !m[1].startsWith("/")) return null;
     const close = before.length - m[0].length; // the ]
     const open = before.lastIndexOf("[", close);
     const label = open >= 0 ? before.slice(open + 1, close) : null;
@@ -134,19 +132,6 @@ export function spotIn(line, col, explicit) {
     };
   }
 
-  if (!explicit) return null;
-
-  // Anywhere else on a link: the click that opens it lands on the text.
-  for (const w of line.matchAll(WIKI)) {
-    if (col < w.index || col > w.index + w[0].length) continue;
-    const from = w.index + 2;
-    return { kind: "wiki", from, to: from + w[1].length, query: "", closed: true, current: w[1] };
-  }
-  for (const l of line.matchAll(MD_LINK)) {
-    if (col < l.index || col > l.index + l[0].length || !internalUrl(l[2])) continue;
-    const from = l.index + l[1].length + 3;
-    return { kind: "md", from, to: from + l[2].length, query: "", closed: true, current: l[2], text: null };
-  }
   return null;
 }
 

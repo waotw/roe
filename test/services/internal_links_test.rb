@@ -79,7 +79,7 @@ class InternalLinksTest < ActiveSupport::TestCase
 
     count = InternalLinkRewriter.file_renamed("posts/il-old-name", "posts/il-new-name")
 
-    assert_equal 1, count
+    assert_equal 3, count, "three links, in one file"
     body = File.read(linker.file_path)
     assert_includes body, "[[posts/il-new-name|a]] [[posts/il-new-name]] [b](/posts/il-new-name.md#x)"
     assert_includes body, "`[[posts/il-old-name]]`"
@@ -105,6 +105,7 @@ class InternalLinksTest < ActiveSupport::TestCase
 
     ContentWatcher.send(:handle_changes, [], [ new_path ], [ target.file_path ])
 
+    assert_equal target.id, Post.find_by(file_path: RoeSitePaths.normalize(new_path))&.id, "same record, new name"
     assert_includes File.read(linker.file_path), "[[posts/il-ext-new]] and [x](/posts/il-ext-new.md)"
   end
 
@@ -116,6 +117,24 @@ class InternalLinksTest < ActiveSupport::TestCase
     ContentWatcher.send(:handle_changes, [ target.file_path ], [], [])
 
     assert_includes File.read(linker.file_path), "[old](/posts/il-ext-after)"
+  end
+
+  # Roe wasn't running: nothing saw the change happen, so the sync at start
+  # catches up — the same record, found by its text, and links that follow.
+  test "changes made while Roe was off are caught up when it starts" do
+    renamed = make(:post, "il-off-old", body: "A body only this post has.\n")
+    moved = make(:page, "il-off-page", url_name: "il-off-before")
+    linker = make(:post, "il-off-linker", body: "[[posts/il-off-old]] and [p](/il-off-before)\n")
+
+    new_path = File.join(RoeSitePaths::SITE_POSTS_PATH, "il-off-new.md")
+    @created << new_path
+    File.rename(renamed.file_path, new_path)
+    File.write(moved.file_path, File.read(moved.file_path).sub("url_name: \"il-off-before\"", "url_name: \"il-off-after\""))
+
+    ContentSync.sync_all
+
+    assert_equal renamed.id, Post.find_by(file_path: RoeSitePaths.normalize(new_path))&.id
+    assert_includes File.read(linker.file_path), "[[posts/il-off-new]] and [p](/il-off-after)"
   end
 
   # ── Metadata fields ──────────────────────────────────────────────────────

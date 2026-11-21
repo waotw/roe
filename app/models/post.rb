@@ -189,13 +189,15 @@ class Post < ApplicationRecord
   }.freeze
 
   # The first other post already using this value, or nil. `scopes` is a hash of
-  # scope field => value; `exclude_url_name` keeps a post from flagging itself.
+  # scope field => value; `exclude_id` keeps a post from flagging itself.
+  # (`exclude_url_name` did that before, but it also hid every other post with
+  # the same url_name — the clash it was there to find.)
   #
   # Everything is compared AS TEXT because YAML decides the type for us:
   # `episode_number: 1` stores an Integer and `episode_number: "1"` a String,
   # and in SQLite those don't compare equal — which silently hid every conflict
   # between a hand-written episode and one Roe created.
-  def self.conflicting_post(field:, value:, scopes: {}, exclude_url_name: nil)
+  def self.conflicting_post(field:, value:, scopes: {}, exclude_id: nil, exclude_url_name: nil)
     field = field.to_s
     scope_fields = UNIQUE_FIELDS[field] # whitelist: names are interpolated below
     return nil unless scope_fields
@@ -214,6 +216,7 @@ class Post < ApplicationRecord
       )
     end
 
+    rel = rel.where.not(id: exclude_id) if exclude_id.present?
     if exclude_url_name.present?
       rel = rel.where("IFNULL(json_extract(metadata, '$.url_name'), '') != ?", exclude_url_name.to_s.strip)
     end

@@ -5,9 +5,11 @@
 //   - after `](/` in a Markdown link: picking one writes `/posts/x.md)`,
 //     and fills in the link text with the title when the brackets are empty;
 //   - after `[[`: picking one writes `posts/x]]`;
-//   - after the LINK button or ⌘K, in the () they leave;
-//   - on clicking an existing link to one of them, new style or old
-//     (`[x](/posts/lab-full)`), so it can be pointed somewhere else.
+//   - on clicking where an existing link's target is written — inside the
+//     () of a link to this site, old style (`/posts/lab-full`) or new, or
+//     between [[ and | — so it can be pointed somewhere else.
+// Never on a link's text, and never for a link to another site: after the
+// LINK button or ⌘K, typing / in the () is what opens it.
 //
 // Wikilinks are also drawn here: in SOURCE as written, coloured; in LIVE as
 // the link alone (its text, or the item's title), with the brackets back
@@ -86,40 +88,13 @@ const draftLabel = {
   position: 90,
 };
 
-// Opening the list on purpose: clicking an internal link, or the LINK
-// button / ⌘K. The button types `[text]()` and then puts the caret between
-// the brackets — two separate changes — so the () it wrote is remembered
-// until the caret arrives there.
-const awaitingCaret = new WeakMap();
 // What was before the caret in the link when it was clicked.
 const clickedAt = new WeakMap();
 
-const openOnPurpose = EditorView.updateListener.of((update) => {
+// Clicking where a link's target is written opens the list for it.
+const openOnClick = EditorView.updateListener.of((update) => {
   const { view } = update;
-  let pending = awaitingCaret.get(view) ?? null;
-  let wroteLink = false;
-
-  if (update.docChanged) {
-    if (pending != null) pending = update.changes.mapPos(pending);
-    update.changes.iterChanges((_fromA, _toA, _fromB, toB, inserted) => {
-      if (inserted.toString().endsWith("]()")) {
-        pending = toB - 1;
-        wroteLink = true;
-      }
-    });
-  }
-
   const sel = update.state.selection.main;
-  if (pending != null && sel.empty && sel.head === pending) {
-    awaitingCaret.delete(view);
-    setTimeout(() => startCompletion(view), 0);
-    return;
-  }
-  // Anything else moved the caret: the button's two steps are over.
-  if (pending != null && update.selectionSet && !wroteLink) pending = null;
-  if (pending != null) awaitingCaret.set(view, pending);
-  else awaitingCaret.delete(view);
-
   const clicked = update.transactions.some((tr) => tr.isUserEvent("select.pointer"));
   const spot = clicked && sel.empty ? spotAt(update.state, sel.head, true) : null;
   if (spot) {
@@ -138,7 +113,7 @@ export function internalLinks() {
       tooltipClass: () => "roe-link-picker",
       maxRenderedOptions: 100,
     }),
-    openOnPurpose,
+    openOnClick,
   ];
 }
 

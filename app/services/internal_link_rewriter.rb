@@ -10,8 +10,14 @@
 #
 # Looks in posts, pages, products, the site's own docs and the layout files
 # (header, footer, sidebar). Code is left alone, both fenced and inline. Each
-# changed file is re-read into its record. Returns the number of files
+# changed file is re-read into its record. Returns the number of links
 # changed.
+#
+# Runs whenever Roe sees an item move: a save or rename in the admin (which
+# says how many links it updated), a file changed outside Roe while it runs
+# (ContentWatcher), and changes made while it wasn't running, at the sync
+# when it starts (ContentSync#follow_links). Broken links are the worse
+# surprise.
 #
 # The redirect a rename can add (RenameRedirect) is separate: it's for
 # visitors arriving from outside — bookmarks, search engines, other sites.
@@ -26,7 +32,7 @@ class InternalLinkRewriter
 
   # Points links at the record's new file name and address, if either moved.
   # `except`: a file to leave alone (the record's own, whose text an editor
-  # may hold). Returns the number of files changed.
+  # may hold). Returns the number of links changed.
   def self.follow(source, record, except: nil)
     return 0 unless source && record
 
@@ -47,10 +53,12 @@ class InternalLinkRewriter
     wiki = /\[\[(\s*)\/?(?:#{targets.join('|')})(?:\.md)?(\s*(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]/
     md = %r{\]\(\s*/?#{Regexp.escape(old_ref)}\.md((?:#[^)\s]*)?(?:\s+"[^"]*")?\s*)\)}
 
+    links = 0
     new(except: except).rewrite do |text|
-      text.gsub(wiki) { "[[#{Regexp.last_match(1)}#{new_ref}#{Regexp.last_match(2)}]]" }
-          .gsub(md) { "](/#{new_ref}.md#{Regexp.last_match(1)})" }
+      text.gsub(wiki) { links += 1; "[[#{Regexp.last_match(1)}#{new_ref}#{Regexp.last_match(2)}]]" }
+          .gsub(md) { links += 1; "](/#{new_ref}.md#{Regexp.last_match(1)})" }
     end
+    links
   end
 
   def self.address_changed(old_address, new_address, except: nil)
@@ -61,10 +69,12 @@ class InternalLinkRewriter
     md = %r{\]\(\s*#{Regexp.escape(old_address)}((?:#[^)\s]*)?(?:\s+"[^"]*")?\s*)\)}
     href = /href=(["'])#{Regexp.escape(old_address)}(#[^"']*)?\1/
 
+    links = 0
     new(except: except).rewrite do |text|
-      text.gsub(md) { "](#{new_address}#{Regexp.last_match(1)})" }
-          .gsub(href) { "href=#{Regexp.last_match(1)}#{new_address}#{Regexp.last_match(2)}#{Regexp.last_match(1)}" }
+      text.gsub(md) { links += 1; "](#{new_address}#{Regexp.last_match(1)})" }
+          .gsub(href) { links += 1; "href=#{Regexp.last_match(1)}#{new_address}#{Regexp.last_match(2)}#{Regexp.last_match(1)}" }
     end
+    links
   end
 
   def initialize(except: nil)

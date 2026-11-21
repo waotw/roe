@@ -163,7 +163,7 @@ class Admin::PostsController < Admin::BaseController
       field: params[:field],
       value: params[:value],
       scopes: scopes,
-      exclude_url_name: params[:exclude]
+      exclude_id: params[:exclude]
     )
 
     render json: { taken: conflict.present?, conflict: conflict&.title }

@@ -17,8 +17,8 @@ import { Controller } from "@hotwired/stimulus";
 // Values:
 //   field       — which field this is (episode_number, url_name, …)
 //   scopeFields — the metadata fields that scope it (podcast + season, release)
-//   exclude     — this post's url_name (a page's or product's id), so it
-//                 doesn't flag itself
+//   exclude     — this post's (page's, product's) id, so it doesn't flag
+//                 itself
 //   url         — where to ask; posts by default, pages and products have
 //                 their own (UrlNameClash)
 export default class extends Controller {
