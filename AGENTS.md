@@ -16,7 +16,7 @@ Write the migration, draft the commit message — then hand it over.
 3. **Don't run git commands that change state** unless asked for that specific
    action. Read-only git (`status`, `diff`, `log`, `show`) is always fine. When
    asked to commit, output the message text and let a person run it.
-4. **Be conservative with the admin editor JavaScript.** Don't modify existing
+4. **Be conservative with the admin editor JavaScript.** Be careful with existing
    Stimulus controllers on the editor pages; prefer a new isolated controller.
    Those pages carry many interlocking behaviours and small changes cascade.
 5. **No `#` comments in YAML config files** — put help text in the admin config
