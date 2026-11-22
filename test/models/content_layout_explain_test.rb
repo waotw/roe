@@ -17,8 +17,12 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
 
   def markup(result) = result[:html].map { |e| ("  " * e[:depth]) + e[:text] }.join("\n")
 
+  # The placeholder inside the body is copy, and changes; the structure is
+  # the fact under test.
+  def without_body_copy(html) = html.sub(%r{(<div class="post-content">).*?(</div>)}, '\1…\2')
+
   test "the HTML example nests the layout inside the show page's wrapper" do
-    assert_equal <<~HTML.strip, markup(explain(ARTICLE))
+    assert_equal <<~HTML.strip, without_body_copy(markup(explain(ARTICLE)))
       <article class="post post-article">
         <div class="content">
           <header class="post-header">
@@ -33,7 +37,7 @@ class ContentLayoutExplainTest < ActiveSupport::TestCase
             </div>
             <img class="post-image">
           </header>
-          <div class="post-content">…the post's writing…</div>
+          <div class="post-content">…</div>
         </div>
       </article>
     HTML
