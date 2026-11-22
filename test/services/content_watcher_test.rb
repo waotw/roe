@@ -427,4 +427,25 @@ class ContentWatcherTest < ActiveSupport::TestCase
     FileUtils.rm_f(old_file)
     FileUtils.rm_f(new_file)
   end
+
+  # The listen gem's debug lines ("(silenced): <path>" for every ignored
+  # image variant) flooded the log; its warnings and errors still belong there.
+  test "the watcher passes on listen's warnings and errors, not its debug lines" do
+    log = StringIO.new
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log)
+    listen = ContentWatcher::ListenLog.new
+
+    listen.debug { "(silenced): \"images/variants/a-small.webp\"" }
+    listen.info "Listen loglevel set to: 0"
+    listen.warn "adapter fell back to polling"
+    listen.error { "callback failed" }
+
+    assert_not_includes log.string, "silenced"
+    assert_not_includes log.string, "loglevel"
+    assert_includes log.string, "[listen] adapter fell back to polling"
+    assert_includes log.string, "[listen] callback failed"
+  ensure
+    Rails.logger = original
+  end
 end

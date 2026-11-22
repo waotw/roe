@@ -56,8 +56,9 @@ class ContentWatcher
     # settled; anything still wrong is recorded again when it changes.
     write_errors({})
     # Anything the listen gem catches itself goes to the Rails log too, not
-    # only to the background log.
-    Listen.logger = Rails.logger
+    # only to the background log: its warnings and errors, not its chatter
+    # (ListenLog).
+    Listen.logger = ListenLog.new
 
     listener = Listen.to(*paths, ignore: /\/variants\//) do |modified, added, removed|
       handle_changes(modified, added, removed)
@@ -311,6 +312,23 @@ class ContentWatcher
           puts "   🖼️  Queued for variant generation\n"
         end
       end
+    end
+  end
+
+  # The listen gem's warnings and errors, passed to the Rails log. Its debug
+  # and info lines are dropped: at debug level (every local install) it
+  # writes "(silenced): <path>" for each ignored file, and Roe writes image
+  # variants by the thousand on a first start or an import.
+  class ListenLog < ::Logger
+    def initialize
+      super(nil, level: ::Logger::WARN)
+    end
+
+    def add(severity, message = nil, progname = nil)
+      return true if severity.to_i < level
+
+      message ||= block_given? ? yield : progname
+      Rails.logger.add(severity, "[listen] #{message}")
     end
   end
 
