@@ -306,7 +306,7 @@ module ContentMetadataSchema
 
   # Purposes Roe knows how to look for. A page naming one of these can be
   # moved, renamed and re-titled and still be found.
-  PAGE_TYPES = %w[signin signup upgrade account donate unsubscribe store].freeze
+  PAGE_TYPES = (%w[signin signup upgrade account donate unsubscribe store] + SystemPages::TYPES.keys).uniq.freeze
 
   def self.pages_fields(metadata = {})
     {

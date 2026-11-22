@@ -123,17 +123,42 @@ module InternalLinks
 
   # `<a href="/posts/lab-full.md">` → the post's address. A link to a file
   # that's missing or not published keeps its text and loses the link.
+  #
+  # Without `.md`, `/posts/lab-full` is an address first, as it always was;
+  # only when no post has that url_name is it read as the file. `/pages/…`
+  # and `/products/…` aren't addresses at all, so they're read as names
+  # (ItemName). These keep the link when nothing matches: a typo in an old
+  # address shouldn't silently lose its link.
+  FOLDER_HREF = %r{\A/(posts|pages|products)/[^?#]+?(#.*)?\z}
+
   def rewrite_file_hrefs(html)
-    return html unless html.include?(".md")
+    return html unless html.include?(".md") || html.match?(%r{href="/(?:posts|pages|products)/})
 
     html.gsub(%r{<a\s+href="([^"]*)"([^>]*)>(.*?)</a>}m) do
       match = Regexp.last_match
       target = CGI.unescapeHTML(match[1])
+      if !target.match?(MD_HREF) && (folder = target.match(FOLDER_HREF))
+        url = folder_href(target, folder[2].to_s)
+        next url ? %(<a href="#{ERB::Util.html_escape(url)}"#{match[2]}>#{match[3]}</a>) : match[0]
+      end
       next match[0] unless target.match?(MD_HREF)
 
       url = href(target)
       url ? %(<a href="#{ERB::Util.html_escape(url)}"#{match[2]}>#{match[3]}</a>) : match[3]
     end
+  end
+
+  # A link written `/posts/x`, `/pages/x` or `/products/x`: the item's
+  # address, or nil to leave the link as written.
+  def folder_href(target, anchor)
+    parsed = ItemName.parse(target)
+    return nil if parsed.folder == "posts" && ItemName.by_url_name(parsed).any?
+
+    record = ItemName.find(target)
+    return nil unless record.respond_to?(:published?) && record.published?
+
+    url = record.public_url
+    url == target.split("#").first ? nil : url + anchor
   end
 
   def link_html(target, text)
@@ -157,29 +182,6 @@ module InternalLinks
   end
 
   # ── Lookup ───────────────────────────────────────────────────────────────
-
-  # Cards (`post:`, `product:`), collections (`order:`) and `related:` name
-  # items by url_name or by file. A value is a file name when it ends in
-  # `.md` (`posts/lab-full.md`, `lab-full.md`) or starts with a content
-  # folder (`posts/lab-full`). A url_name has neither, and `/posts/lab-full`
-  # is an address, as it always was.
-  def file_name?(value)
-    v = value.to_s.strip
-    return false if v.empty?
-    return true if v.match?(/\.md(#.*)?\z/i)
-
-    !v.start_with?("/") && MODELS.keys.any? { |folder| v.start_with?("#{folder}/") }
-  end
-
-  # The file a card, collection or `related:` value names, as a lowercase
-  # ref (`posts/lab-full`), or nil when it isn't a file name or names
-  # nothing.
-  def named_ref(value)
-    return nil unless file_name?(value)
-
-    item = lookup(value)
-    item.is_a?(Item) ? item.ref.downcase : nil
-  end
 
   # An Item, an Array of refs when a folderless name matches several, or nil.
   def lookup(target)

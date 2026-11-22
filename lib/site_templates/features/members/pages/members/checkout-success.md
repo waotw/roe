@@ -1,6 +1,7 @@
 ---
 title: "Checkout - Success"
 url_name: "checkout-success"
+page_type: checkout-success
 status: published
 audience: "everyone"
 ---

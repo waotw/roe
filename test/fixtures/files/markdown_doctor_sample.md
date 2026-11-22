@@ -126,6 +126,13 @@ and ends on the next line==, so both sets of `==` show on the page.
 [the shared one](/sample-shared.md) could be a post or a page. On the page all
 three show as plain text.
 
+A card's name can be just as unclear: `about` is a page and a post.
+
+```card
+type: post-link
+post: about
+```
+
 ## 11. Single backtick alone on a line
 
 A lone backtick isn't a fence — three or more are needed.

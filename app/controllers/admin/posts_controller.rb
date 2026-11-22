@@ -531,16 +531,25 @@ class Admin::PostsController < Admin::BaseController
                         .where("file_path NOT LIKE '%/roe/%'")
                         .limit(5)
 
-    results = posts.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/posts/#{r.url_name}", type: "Post" } } +
-              pages.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Page" } } +
-              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/store/#{r.url_name}", type: "Product" } } +
-              docs.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/documentation/#{r.url_name}", type: "Doc" } }
+    results = posts.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/posts/#{r.url_name}", type: "Post", ref: card_ref(r) } } +
+              pages.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Page", ref: card_ref(r) } } +
+              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/store/#{r.url_name}", type: "Product", ref: card_ref(r) } } +
+              docs.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/documentation/#{r.url_name}", type: "Doc", ref: card_ref(r) } }
 
     render json: results
   rescue => e
     Rails.logger.error "Post search error: #{e.message}"
     render json: { error: e.message }, status: :internal_server_error
   end
+
+  # How the card builder names what was picked: its file, as a Markdown
+  # link would (`/posts/lab-full.md`). It survives a retitle, and the
+  # rewrite follows a rename (ItemName, InternalLinkRewriter).
+  def card_ref(record)
+    ref = InternalLinks.ref_for(record)
+    ref.present? ? "/#{ref}.md" : record.url_name
+  end
+  private :card_ref
 
   # The values a post-link card would inherit from `params[:post]` (title,
   # excerpt, author, date, image, url, subtitle) — the card builder shows them

@@ -203,6 +203,7 @@ class Admin::ProductsController < Admin::BaseController
       id: product.id,
       title: product.title,
       url_name: product.url_name,
+      ref: (ref = InternalLinks.ref_for(product)).present? ? "/#{ref}.md" : product.url_name,
       price: product.price,
       variant: product.variant,
       primary: primary,

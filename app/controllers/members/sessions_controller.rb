@@ -57,7 +57,7 @@ module Members
         end
       else
         flash.now[:alert] = "No account found with that email"
-        @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")
+        @page = SystemPages.find("signin")
         render "pages/show", status: :unprocessable_entity
       end
     end
@@ -79,7 +79,7 @@ module Members
         redirect_pending_payment
       else
         flash.now[:alert] = "Incorrect email or password"
-        @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-in")
+        @page = SystemPages.find("signin")
         render "pages/show", status: :unprocessable_entity
       end
     end
@@ -95,8 +95,8 @@ module Members
     # not a render, like the failed-send message above: a missing page would
     # otherwise blow up on the template.
     def redirect_pending_payment
-      signup = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-up")
-      redirect_to signup ? "/sign-up" : "/sign-in",
+      signup = SystemPages.find("signup")
+      redirect_to signup ? signup.public_url : SystemPages.path("signin", fallback: "/sign-in"),
                   alert: "This account isn't active, the payment hasn't gone through yet. " \
                          "Sign up again with the same email to finish."
     end
@@ -108,9 +108,9 @@ module Members
     end
 
     def redirect_to_check_email(notice: nil)
-      page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "check-email")
+      page = SystemPages.find("check-email")
       if page
-        redirect_to "/#{page.url_name}", notice: notice
+        redirect_to page.public_url, notice: notice
       else
         redirect_to root_path, notice: notice || "Check your email for a sign-in link!"
       end

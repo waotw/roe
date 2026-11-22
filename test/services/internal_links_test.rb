@@ -81,7 +81,7 @@ class InternalLinksTest < ActiveSupport::TestCase
 
     assert_equal 3, count, "three links, in one file"
     body = File.read(linker.file_path)
-    assert_includes body, "[[posts/il-new-name|a]] [[posts/il-new-name]] [b](/posts/il-new-name.md#x)"
+    assert_includes body, "[[posts/il-new-name|a]] [[il-new-name]] [b](/posts/il-new-name.md#x)"
     assert_includes body, "`[[posts/il-old-name]]`"
     assert target
   end

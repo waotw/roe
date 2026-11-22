@@ -29,17 +29,17 @@ You can use the `+ Add Field` button to see a list of suggested fields as well a
 
 ### Keyboard Shortcuts
 
-| Command       | Action           |
-| ------------- | ---------------- |
-| cmd/ctrl–s    | Save             |
-| cmd/ctrl–p    | Open Preview     |
-| cmd/ctrl–b    | Bold             |
-| cmd/ctrl–i    | Italic           |
-| cmd/ctrl–~    | Strikethrough    |
-| cmd/ctrl–k    | Link             |
-| cmd/ctrl-z    | Undo             |
-| cmd/ctrl–f    | Find and replace (Live editor only) |
-| cmd/ctrl–e    | Switch between Live and Source (Live editor only) |
+| Command    | Action                                                  |
+| ---------- | ------------------------------------------------------- |
+| cmd/ctrl–s | Save                                                    |
+| cmd/ctrl–p | Open Preview                                            |
+| cmd/ctrl–b | Bold                                                    |
+| cmd/ctrl–i | Italic                                                  |
+| cmd/ctrl–~ | Strikethrough                                           |
+| cmd/ctrl–k | Link (type `/` inside `()` to link to an internal page) |
+| cmd/ctrl-z | Undo                                                    |
+| cmd/ctrl–f | Find and replace (Live editor only)                     |
+| cmd/ctrl–e | Switch between Live and Source (Live editor only)       |
 
 ### The Live Editor (beta)
 
@@ -65,7 +65,7 @@ If you have any trouble with the new editor, set `Writing editor` back to `Plain
 
 Roe does no auto-save; you're in control. Use `cmd/ctrl–s` (or the `SAVE` button). A small **status dot** next to Save shows where you stand: **amber** when you have unsaved changes, **green** once everything's saved.
 
-Hit `cmd/ctrl–p` (or the `PREVIEW` button) to open a live preview in a new tab. It shows your work *including unsaved changes*, so you can see how things look before you save. Put The Editor and the Preview tab side-by-side, while you write and it **refreshes as you type**, so you can see how things will look as you go.
+Hit `cmd/ctrl–p` (or the `PREVIEW` button) to open a live preview in a new tab. It shows your work _including unsaved changes_, so you can see how things look before you save. Put The Editor and the Preview tab side-by-side, while you write and it **refreshes as you type**, so you can see how things will look as you go.
 
 ### Table of Contents and Markdown Check
 
@@ -104,7 +104,57 @@ The `1. LIST` and `• LIST` buttons will start an ordered or unordered list:
 - hit enter once to create the next item
 - hit enter twice to exit out of the list
 
-The `🔗` button will wrap the selected text in Markdown link syntax and move the cursor between the parenthesis so you're ready to paste the URL.
+#### Links
+
+The `🔗` button will wrap the selected text in Markdown link syntax and move the cursor between the parenthesis so you're ready to paste the URL. The keyboard shortcut `command-K`(mac) or `ctrl-k`(linux/windows) will do the same.
+
+##### Linking to an internal page
+
+A couple notes about how internal links work:
+
+- You can link to `draft` posts but these will be plain text in the preview/site until those drafts are `published`.
+- Renaming the file will rename all internal links to that file.
+- Changing the `url_name` will also rename any internal links that used the previous `url_name`.
+
+There are 2 ways to link to internal pages. 
+
+**Markdown links to internal files**
+
+- Put your cursor/caret inside the `()` and type `/`
+- This will open a search of all the possible pages and posts in your site
+- Find the one you're looking for, click it or press `enter/return`
+
+This will format the link correctly to that page or post:
+
+```markdown
+[link text](/posts/filename.md)
+```
+
+The `.md` is optional.
+
+**Wikilinks**
+
+To create a wikilink link:
+
+- Type `[[` anywhere in the editor
+- This will bring up the search list of every possible page or post
+- Find what you're looking for and click it or press enter
+
+Wikilinks use a different syntax:
+
+```markdown
+[[posts/filename]]
+```
+
+This will link to that file in Roe and use its `title` as the link text. You can add your own link text like this:
+
+```markdown
+[[posts/filename|link text]]
+```
+
+Everything after the `|` is the link text.
+
+#### Footnotes
 
 The <code>F<sup>1</sup></code> button creates a footnote:
 
@@ -149,10 +199,10 @@ Only the options your enabled features support are listed (e.g. Product needs th
 - **Audio**
 - **Video**
 - Select media type. From there you can:
-    - Search
-    - Click one or more items to select them
-    - Upload new files directly
-    - Click `Insert Selected` to insert the Markdown at your cursor position
+  - Search
+  - Click one or more items to select them
+  - Upload new files directly
+  - Click `Insert Selected` to insert the Markdown at your cursor position
 
 Selecting 3 files to insert will add them one per line, which in the case of images creates a simple gallery:
 

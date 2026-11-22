@@ -53,6 +53,14 @@ The Admin shows product metadata as a simple form.
 | `digital` | No | Tick to sell a downloadable file — see [Digital goods](#digital-goods) |
 | `file_guid` | Yes, if `digital` is toggled on | The file's GUID from your Snipcart dashboard |
 
+## Apply tags to multiple products
+
+On the Products page, there is a `SELECT` button:
+
+- Select multiple products
+- Click `TAGS ▼`
+- Add or remove tags from all selected products.
+
 ## Digital goods
 
 A Product can be a file Snipcart delivers after payment — an album, a PDF, a sample pack — instead of something you post.

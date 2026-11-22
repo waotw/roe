@@ -389,6 +389,7 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     issues = MarkdownDoctor.diagnose(
       File.read(Rails.root.join("test/fixtures/files/markdown_doctor_sample.md")),
       link_status: link_status,
+      name_matches: ->(name) { name == "about" ? [ "the page “About”", "the post “About”" ] : [] },
     )
 
     # Text after the notes can't be shown here: it needs the notes to be the
@@ -410,6 +411,17 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     assert_predicate applied.size, :positive?
     assert_empty MarkdownDoctor.diagnose(fixed).select { |i| i[:fixable] }
     assert_equal fixed, MarkdownDoctor.new(fixed).fix.first, "and running it again changes nothing"
+  end
+
+  test "a card's name that could be two items says which Roe uses, and examples don't count" do
+    matches = ->(name) { name == "about" ? [ "the page “About”", "the post “About”" ] : [ "the post “X”" ] }
+    content = "```card\ntype: post-link\npost: about\n```\n\n````markdown\n```card\npost: about\n```\n````\n\n```card\npost: x\n```\n"
+    issues = MarkdownDoctor.diagnose(content, name_matches: matches)
+
+    assert_equal 1, issues.size
+    assert_equal :unclear_name, issues.first[:type]
+    assert_equal 3, issues.first[:line]
+    assert_includes issues.first[:message], "Roe uses the page “About”"
   end
 
   test "indentation inside a code block is content" do

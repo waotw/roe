@@ -1,6 +1,7 @@
 ---
 title: You've Been Unsubscribed
 url_name: unsubscribed
+page_type: unsubscribed
 status: published
 audience: everyone
 ---

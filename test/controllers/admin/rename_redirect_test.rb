@@ -168,4 +168,17 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     get check_unique_admin_pages_path, params: { field: "url_name", value: "clash-one", exclude: first.id }
     assert_equal false, response.parsed_body["taken"], "a page doesn't clash with itself"
   end
+
+  test "a page Roe finds by its page_type says so in the editor" do
+    sign_in_as(@admin)
+    page = page_with("whatever-it-is-called")
+    File.write(page.file_path, File.read(page.file_path).sub("status:", "page_type: checkout-success\nstatus:"))
+    ContentSync.sync_file(page.file_path)
+
+    get edit_admin_page_path(page)
+    assert_includes response.body, "finds it by the page_type <code>checkout-success</code>"
+
+    get edit_admin_page_path(page_with("plain-page"))
+    assert_not_includes response.body, "finds it by the page_type"
+  end
 end

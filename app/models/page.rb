@@ -118,7 +118,9 @@ class Page < ApplicationRecord
 
   # A page belongs to the members feature. Declared type first; the old path
   # check stays for every page written before page_type existed.
-  MEMBER_PAGE_TYPES = %w[signin signup upgrade donate unsubscribe account].freeze
+  MEMBER_PAGE_TYPES = %w[signin signup upgrade donate unsubscribe account
+                         check-email recovery unsubscribed checkout-success
+                         checkout-cancel donation-success donation-cancel].freeze
 
   def member_page?
     return true if page_type.in?(MEMBER_PAGE_TYPES)

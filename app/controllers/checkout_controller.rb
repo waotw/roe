@@ -54,12 +54,12 @@ class CheckoutController < ApplicationController
       return
     end
     # Load page for sidebar
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-success")
+    @page = SystemPages.find("checkout-success")
   end
 
   def success
     # Load the checkout success markdown page
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-success")
+    @page = SystemPages.find("checkout-success")
     if @page
       render "pages/show"
     else
@@ -69,7 +69,7 @@ class CheckoutController < ApplicationController
 
   def cancel
     # Load page for sidebar
-    @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "checkout-cancel")
+    @page = SystemPages.find("checkout-cancel")
     # A paid-only sign-up that left Stripe without paying: say the account
     # waits on the payment, and Try Again picks it up.
     @pending_member = pending_member_from_session

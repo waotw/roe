@@ -1,6 +1,7 @@
 ---
 title: Check Your Email
 url_name: check-email
+page_type: check-email
 status: published
 audience: everyone
 ---

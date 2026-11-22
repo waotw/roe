@@ -152,7 +152,7 @@ post: collection-full
 | Option | Required | Description |
 |--------|----------|-------------|
 | `type` | Yes | Must be `post-link` |
-| `post` | Yes | Reference a post by its url_name — auto-populates all fields |
+| `post` | Yes | Reference a post by its url_name or filename with `.md` or without — auto-populates all fields |
 | `style` | No | `small` (default), `medium`, or `large` |
 | `title` | No | Override or provide custom title |
 | `subtitle` | No | Override subtitle (medium/large only) |
@@ -373,7 +373,7 @@ A Product Link works just like a [Post Link](#post-link), but points at a produc
 | Option | Required | Description |
 |--------|----------|-------------|
 | `type` | Yes | Must be `product-link` |
-| `product` | Yes | Reference a product by its url_name — auto-populates all fields |
+| `product` | Yes | Reference a product by its url_name or filename with `.md` or without — auto-populates all fields |
 | `style` | No | `small` (default), `medium`, or `large` |
 | `title` | No | Override the title pulled from the product |
 | `description` | No | Override the description pulled from the product |

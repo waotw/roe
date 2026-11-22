@@ -19,7 +19,7 @@ module Members
       end
 
       # Query JSON metadata for url_name
-      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "unsubscribe")
+      @page = SystemPages.find("unsubscribe")
 
       if @page
         render template: "pages/show", layout: "site"
@@ -39,7 +39,7 @@ module Members
       @member.unsubscribe_from_newsletter!
 
       # Redirect to unsubscribed success page
-      redirect_to "/unsubscribed"
+      redirect_to SystemPages.path("unsubscribed", fallback: "/unsubscribed")
     end
   end
 end

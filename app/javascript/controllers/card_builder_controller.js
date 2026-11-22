@@ -465,7 +465,10 @@ export default class extends Controller {
         "px-2 py-1 cursor-pointer hover:bg-gray-100 flex justify-between gap-2 items-center";
       // Products come grouped: variants are indented under their primary.
       if (item.indent) li.classList.add("pl-6");
-      li.dataset.urlName = item.url_name;
+      // The card names its item by file (`/posts/x.md`) when it can: that
+      // survives a retitle. url_names still work in cards written by hand.
+      const name = item.ref || item.url_name;
+      li.dataset.urlName = name;
 
       const title = document.createElement("span");
       title.textContent = item.title;
@@ -481,7 +484,7 @@ export default class extends Controller {
       // mousedown (not click) so selection fires before the input blurs.
       li.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        this.selectRef(input, ul, group, item.url_name);
+        this.selectRef(input, ul, group, name);
       });
       ul.append(li);
     });

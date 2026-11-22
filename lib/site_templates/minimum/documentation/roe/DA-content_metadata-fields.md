@@ -54,7 +54,7 @@ These properties work across posts, pages, and products.
 | `status` | `draft` `published` `unlisted` | Controls visibility. Defaults to `draft` if not set. |
 | `excerpt` | Any text | Short summary. Used in collections, SEO, and social sharing. |
 | `image` | `/media/images/...` | Featured image path. Used in collections, social sharing, and post headers. |
-| `tags` | `[tag-one, tag-two]` | Tags for filtering collections. Use a YAML list. |
+| `tags` | `[tag-one, tag-two]` | Tags for filtering collections. Managed from [Settings → Tags](/admin/tags/). |
 
 `subtitle`, `excerpt` and a product's `description` can…
 

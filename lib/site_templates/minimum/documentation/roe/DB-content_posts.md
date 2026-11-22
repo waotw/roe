@@ -130,7 +130,13 @@ Use [The Editor](/documentation/roe/the-editor) to write posts. The editor shows
 4. Set `status: published` when ready
 5. If newsletters are enabled, choose `published_to: both` to email subscribers
 
-## Audience on a new post
+You can also manage tags for multiple posts from the [Posts](/admin/posts) page:
+
+1. Click `SELECT` in the Posts table
+2. Select the posts you want to edit
+3. Click `TAGS ▼` to add or remove tags for the selected items
+
+### Audience on a new post
 
 When Members is on, the `NEW POST` form asks for an `audience`. The default is `everyone`, unless you have a `paid` podcast or release and you choose it — then it defaults to `paid`. Paid podcasts can have free episodes. Set the `audience` to whatever you like.
 

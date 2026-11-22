@@ -56,8 +56,11 @@ class InternalLinkNamesTest < ActiveSupport::TestCase
     assert_equal [ target, other ], ordered
   end
 
+  # The url_name differs from the file name, so `posts/iln-old` can only mean
+  # the file. (Were it also the url_name, it would mean that, and a file
+  # rename wouldn't touch it.)
   test "renaming the file updates file names in cards, collections and related:" do
-    target = make(:post, "iln-old")
+    target = make(:post, "iln-old", url_name: "iln-address")
     linker = make(:page, "iln-linker", related: [ "posts/iln-old", "something-else" ],
                   body: format(BLOCKS, card: "posts/iln-old.md", order: "iln-other, posts/iln-old"))
 
@@ -102,5 +105,22 @@ class InternalLinkNamesTest < ActiveSupport::TestCase
     change_url_name(target, "iln-ex-after")
 
     assert_includes File.read(linker.file_path), "post: iln-ex-before"
+  end
+
+  # Bare stays bare after a rename; a name that's also a url_name means the
+  # url_name, which a file rename doesn't change.
+  test "a file rename keeps bare names bare and leaves url_names alone" do
+    target = make(:post, "iln-bare-old", url_name: "iln-bare-address")
+    linker = make(:page, "iln-bare-linker", related: [ "iln-bare-old.md", "iln-bare-address" ],
+                  body: "[x](/posts/iln-bare-old) [y](/posts/iln-bare-address)\n\n" + format(BLOCKS, card: "iln-bare-old", order: "iln-bare-old"))
+
+    rename_file(target, "iln-bare-new")
+
+    text = File.read(linker.file_path)
+    assert_includes text, "- iln-bare-new.md"
+    assert_includes text, "- iln-bare-address"
+    assert_includes text, "post: iln-bare-new\n"
+    assert_includes text, "order: iln-bare-new\n"
+    assert_includes text, "[x](/posts/iln-bare-new) [y](/posts/iln-bare-address)"
   end
 end

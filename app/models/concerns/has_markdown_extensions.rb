@@ -1287,18 +1287,15 @@ module HasMarkdownExtensions
       my_related_slugs = Array(metadata["related"]).map(&:to_s).reject(&:empty?)
 
       items_array = items.to_a
-      by_slug     = items_array.index_by(&:url_name)
-      # `related:` can name an item by file too (`posts/lab-full`).
-      by_ref      = items_array.index_by { |item| InternalLinks.ref_for(item).to_s.downcase }
-      my_ref      = InternalLinks.ref_for(self).to_s.downcase
 
-      # Forward: items I declare as related, in my declared order.
-      forward = my_related_slugs.map { |slug| by_slug[slug] || by_ref[InternalLinks.named_ref(slug)] }.compact
+      # Forward: items I declare as related, in my declared order. A name is
+      # a url_name or a file name (ItemName).
+      forward = my_related_slugs.map { |slug| ItemName.pick(slug, items_array) }.compact
 
       # Backward: items that declare *me* as related.
       backward = items_array.select do |item|
         Array(item.metadata["related"]).map(&:to_s).any? do |slug|
-          slug == my_url_name || (my_ref.present? && InternalLinks.named_ref(slug) == my_ref)
+          slug == my_url_name || ItemName.pick(slug, [ self ]).present?
         end
       end
 
@@ -1536,8 +1533,6 @@ module HasMarkdownExtensions
 
     listed = []
     if has_list
-      by_slug  = all.index_by { |item| item.url_name.to_s.downcase }
-      by_ref   = all.index_by { |item| InternalLinks.ref_for(item).to_s.downcase }
       missing  = []
 
       # Each entry is a page's url_name or, in the same position, an inline
@@ -1546,7 +1541,7 @@ module HasMarkdownExtensions
         if (m = MENU_LINK_RE.match(entry))
           MenuLink.new(title: m[1].strip, path: m[2])
         else
-          by_slug[entry.downcase] || by_ref[InternalLinks.named_ref(entry)] || (missing << entry; nil)
+          ItemName.pick(entry, all) || (missing << entry; nil)
         end
       end
 
@@ -2599,8 +2594,7 @@ module HasMarkdownExtensions
       "/collections/#{segments.join('/')}"
     else
       # No filters, no heading = general archive
-      archive_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "archive")
-      archive_page ? "/archive" : "/posts"
+      SystemPages.path("archive", fallback: "/posts")
     end
 
     # Build query params (NEW)
@@ -4077,24 +4071,12 @@ module HasMarkdownExtensions
   # (most common), then pages, products, and user documentation.
   # Roe's own docs (file_path contains /roe/) are excluded — those are
   # system docs and not intended as link targets in content.
+  # A card's `post:` / `product:`: a url_name, a file name, either with a
+  # folder (ItemName). An address prefix (`/posts/x`) that finds nothing in
+  # that folder still finds `x` anywhere, as it always did.
   def find_post_by_slug(slug_or_path)
     raw = slug_or_path.to_s.strip
-    # By file (`posts/lab-full`, `lab-full.md`): survives a url_name change.
-    return InternalLinks.resolve(raw) if InternalLinks.file_name?(raw)
-
-    # Strip known prefixes to get the bare slug
-    slug = raw
-      .sub(%r{^/posts/}, "")
-      .sub(%r{^/pages/}, "")
-      .sub(%r{^/store/}, "")
-      .sub(%r{^/documentation/}, "")
-      .sub(%r{^/}, "")
-
-    Post.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
-      Page.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
-      Product.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
-      Documentation.where("json_extract(metadata, '$.url_name') = ?", slug)
-                   .where("file_path NOT LIKE '%/roe/%'").first
+    ItemName.find(raw) || (ItemName.find(ItemName.parse(raw).name) if ItemName.parse(raw).folder)
   end
 
   def render_error_card(message)

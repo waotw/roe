@@ -50,7 +50,8 @@ class PostLinkPreview
   # prefix-stripped url_name across the four content types; bundled Roe docs
   # excluded).
   def find_record
-    return InternalLinks.resolve(@slug) if InternalLinks.file_name?(@slug)
+    found = ItemName.find(@slug)
+    return found if found
 
     slug = @slug
       .sub(%r{^/posts/}, "")

@@ -43,6 +43,7 @@ class MarkdownDoctor
     broken_anchor_link: "Link to a heading that isn't on the page",
     broken_internal_link: "Link to a file that isn't there",
     unclear_internal_link: "Link that matches more than one file",
+    unclear_name: "Name that matches more than one item",
     draft_link: "Link to a draft"
   }.freeze
 
@@ -113,8 +114,8 @@ class MarkdownDoctor
   # when soft line breaks are on (HasMarkdownExtensions#to_html). The two
   # parsers nest lists differently, and a rule that's right for one is a
   # false alarm for the other.
-  def self.diagnose(content, page_ids: nil, gfm: false, link_status: nil)
-    new(content, page_ids: page_ids, gfm: gfm, link_status: link_status).diagnose
+  def self.diagnose(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil)
+    new(content, page_ids: page_ids, gfm: gfm, link_status: link_status, name_matches: name_matches).diagnose
   end
 
   def self.diagnose_file(path, gfm: false)
@@ -132,11 +133,16 @@ class MarkdownDoctor
   # link_status: a callable taking a link target and returning what
   # InternalLinks.status does ([:ok | :draft | :missing | :ambiguous, detail]),
   # for checking links to the site's files. Optional, like page_ids.
-  def initialize(content, page_ids: nil, gfm: false, link_status: nil)
+  #
+  # name_matches: a callable taking a card's `post:`/`product:` value and
+  # returning a description of every item it could mean, the one Roe uses
+  # first (ItemName.matches). Optional too.
+  def initialize(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil)
     @lines = content.to_s.lines
     @issues = []
     @page_ids = page_ids
     @link_status = link_status
+    @name_matches = name_matches
     @gfm = gfm
   end
 
@@ -152,6 +158,7 @@ class MarkdownDoctor
     check_markers_across_lines
     check_anchor_links if @page_ids
     check_internal_links if @link_status
+    check_card_names if @name_matches
     @issues.each do |issue|
       issue[:fixable] = self.class.fixable?(issue[:type]) && !issue.delete(:unsafe)
     end
@@ -337,12 +344,46 @@ class MarkdownDoctor
     end
   end
 
+  # A card names its post or product by url_name or file name. A short name
+  # can mean two things (a page and a post both called `about`); Roe uses the
+  # first, and this says which.
+  CARD_FENCE_RE = /\A {0,3}(`{3,}|~{3,})[ \t]*card\b/
+  CARD_NAME_RE = /\A\s*(?:post|product):[ \t]*["']?([^"'\n]+?)["']?\s*\z/
+
+  def check_card_names
+    fence = nil
+    card = false
+    effective_lines.each_with_index do |line, idx|
+      if (open = line.match(/\A {0,3}(`{3,}|~{3,})(.*?)\s*\z/))
+        if fence.nil?
+          fence = open[1]
+          card = line.match?(CARD_FENCE_RE)
+          next
+        elsif open[1][0] == fence[0] && open[1].length >= fence.length && open[2].strip.empty?
+          fence = nil
+          card = false
+          next
+        end
+      end
+      next unless card
+
+      name = line[CARD_NAME_RE, 1]
+      next unless name
+
+      found = Array(@name_matches.call(name))
+      next unless found.size > 1
+
+      @issues << { type: :unclear_name, line: effective_line_number(idx),
+                   message: "#{name} could be #{found.join(' or ')}. Roe uses #{found.first}. Add the folder to clarify which #{name}" }
+    end
+  end
+
   def internal_link_issue(state, detail, shown)
     case state
     when :missing
       { type: :broken_internal_link, message: "#{shown} doesn't match a post, page, product or doc, so it shows as plain text" }
     when :ambiguous
-      { type: :unclear_internal_link, message: "#{shown} could be #{detail.join(' or ')}. Add the folder to say which" }
+      { type: :unclear_internal_link, message: "#{shown} could be #{detail.join(' or ')}. Add the folder to clarify which #{shown}." }
     when :draft
       { type: :draft_link, message: "#{shown} is a draft, so it shows as plain text until it's published" }
     end

@@ -59,20 +59,13 @@ class InternalLinkRewriter
     name_moved = old_name.present? && new_name.present? && old_name != new_name && !url_name_taken?(old_name)
     return 0 unless file_moved || name_moved
 
-    # A folderless `old.md` meant this file only if no other file is called that.
-    base = File.basename(old_ref)
-    bare = file_moved && InternalLinks.index.last.fetch(base, []).none? { |item| ![ old_ref, new_ref ].include?(item.ref) }
-
+    rename = file_moved ? file_rename(old_ref, new_ref) : nil
     links = 0
     swap = lambda do |value|
-      replaced = if file_moved && InternalLinks.file_name?(value)
-        ref = InternalLinks.split(value).first
-        if ref.casecmp?(old_ref) || (bare && ref.casecmp?(base))
-          "#{'/' if value.start_with?('/')}#{new_ref}#{'.md' if value.match?(/\.md\z/i)}"
-        end
-      elsif name_moved && (named = value.match(%r{\A(/(?:posts|pages|store|documentation)/|/)?(.+)\z})) && named[2].casecmp?(old_name)
+      replaced = rename&.call(value)
+      if replaced.nil? && name_moved && (named = value.match(%r{\A(/(?:posts|pages|store|documentation)/|/)?(.+)\z})) && named[2].casecmp?(old_name)
         # A card's `post:` may carry the address prefix: `/posts/old-name`.
-        "#{named[1]}#{new_name}"
+        replaced = "#{named[1]}#{new_name}"
       end
       next value unless replaced
 
@@ -82,6 +75,38 @@ class InternalLinkRewriter
 
     new(except: except).rewrite(raw: true) { |text| swap_names(text, swap) }
     links
+  end
+
+  # A name (ItemName) that meant the renamed file → the same name for the new
+  # one, written the same way: bare stays bare (unless the new name is
+  # shared), a folder stays, `.md` stays. Without `.md`, a name means a
+  # url_name first, so it only meant the file if no item has that url_name.
+  # Returns a callable giving the new name, or nil for "not this file".
+  def self.file_rename(old_ref, new_ref)
+    by_name = InternalLinks.index.last
+    old_base = File.basename(old_ref)
+    new_base = File.basename(new_ref)
+    unique = ->(base) { by_name.fetch(base, []).none? { |item| ![ old_ref, new_ref ].include?(item.ref) } }
+    old_unique = unique.call(old_base)
+    new_unique = unique.call(new_base)
+
+    lambda do |value|
+      parsed = ItemName.parse(value)
+      next nil if parsed.name.blank?
+      next nil unless parsed.file || !url_name_taken?(parsed.name)
+
+      lead = value.start_with?("/") ? "/" : ""
+      ext = parsed.file ? value[/\.md\z/i] : ""
+      if parsed.folder
+        next nil unless parsed.ref.casecmp?(old_ref)
+
+        "#{lead}#{new_ref}#{ext}"
+      elsif parsed.name.casecmp?(old_ref)
+        "#{lead}#{new_ref}#{ext}"
+      elsif parsed.name.casecmp?(old_base) && old_unique
+        new_unique ? "#{lead}#{new_base}#{ext}" : "#{lead}#{new_ref}#{ext}"
+      end
+    end
   end
 
   # Is a url_name in use by any item? (Roe's own docs aside.)
@@ -164,18 +189,32 @@ class InternalLinkRewriter
     new_ref = new_ref.to_s.delete_prefix("/")
     return 0 if old_ref.blank? || new_ref.blank? || old_ref == new_ref
 
+    by_name = InternalLinks.index.last
     name = File.basename(old_ref)
-    # A bare [[name]] meant this file only if no other file is called that.
-    bare = InternalLinks.index.last.fetch(name, []).none? { |item| ![ old_ref, new_ref ].include?(item.ref) }
+    new_name = File.basename(new_ref)
+    others = ->(base) { by_name.fetch(base, []).any? { |item| ![ old_ref, new_ref ].include?(item.ref) } }
+    # A bare [[name]] meant this file only if no other file is called that,
+    # and stays bare if the new name is just as clear.
+    bare = !others.call(name)
+    bare_new = bare && !others.call(new_name)
     targets = [ Regexp.escape(old_ref) ]
     targets << Regexp.escape(name) if bare
-    wiki = /\[\[(\s*)\/?(?:#{targets.join('|')})(?:\.md)?(\s*(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]/
-    md = %r{\]\(\s*/?#{Regexp.escape(old_ref)}\.md((?:#[^)\s]*)?(?:\s+"[^"]*")?\s*)\)}
+    wiki = /\[\[(\s*)(\/?)(#{targets.join('|')})(\.md)?(\s*(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]/i
+    md = %r{\]\(\s*/?#{Regexp.escape(old_ref)}\.md((?:#[^)\s]*)?(?:\s+"[^"]*")?\s*)\)}i
+    # `[x](/posts/old)` without `.md` meant the file only when no item has
+    # that url_name (ItemName: a url_name comes first).
+    plain = !url_name_taken?(name) && %r{\]\(\s*/#{Regexp.escape(old_ref)}((?:#[^)\s]*)?(?:\s+"[^"]*")?\s*)\)}i
 
     links = 0
     new(except: except).rewrite do |text|
-      text.gsub(wiki) { links += 1; "[[#{Regexp.last_match(1)}#{new_ref}#{Regexp.last_match(2)}]]" }
-          .gsub(md) { links += 1; "](/#{new_ref}.md#{Regexp.last_match(1)})" }
+      text = text.gsub(wiki) do
+        m = Regexp.last_match
+        links += 1
+        target = m[3].include?("/") || !bare_new ? new_ref : new_name
+        "[[#{m[1]}#{m[2]}#{target}#{m[4]}#{m[5]}]]"
+      end
+      text = text.gsub(md) { links += 1; "](/#{new_ref}.md#{Regexp.last_match(1)})" }
+      plain ? text.gsub(plain) { links += 1; "](/#{new_ref}#{Regexp.last_match(1)})" } : text
     end
     links
   end
