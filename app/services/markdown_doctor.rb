@@ -383,7 +383,7 @@ class MarkdownDoctor
     when :missing
       { type: :broken_internal_link, message: "#{shown} doesn't match a post, page, product or doc, so it shows as plain text" }
     when :ambiguous
-      { type: :unclear_internal_link, message: "#{shown} could be #{detail.join(' or ')}. Add the folder to clarify which #{shown}." }
+      { type: :unclear_internal_link, message: "#{shown} could be #{detail.join(' or ')}. Add the folder to clarify which #{shown}" }
     when :draft
       { type: :draft_link, message: "#{shown} is a draft, so it shows as plain text until it's published" }
     end
