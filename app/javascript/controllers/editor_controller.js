@@ -2871,6 +2871,16 @@ export default class extends Controller {
     this.formTarget.requestSubmit();
   }
 
+  // "Save new URL" — save the rename with no redirect. The site's own links
+  // still follow it (the server rewrites them on every save).
+  saveNewUrl(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    if (this.hasRedirectFromFieldTarget) this.redirectFromFieldTarget.value = "";
+    this._redirectDecisionMade = true;
+    this._closeRedirectDecision();
+    this.formTarget.requestSubmit();
+  }
+
   // "Keep old URL" — revert the slug field to its saved value, then save. No
   // redirect is written (the URL never changed).
   keepOldUrlAndSave(event) {

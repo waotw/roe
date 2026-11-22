@@ -158,6 +158,29 @@ module InternalLinks
 
   # ── Lookup ───────────────────────────────────────────────────────────────
 
+  # Cards (`post:`, `product:`), collections (`order:`) and `related:` name
+  # items by url_name or by file. A value is a file name when it ends in
+  # `.md` (`posts/lab-full.md`, `lab-full.md`) or starts with a content
+  # folder (`posts/lab-full`). A url_name has neither, and `/posts/lab-full`
+  # is an address, as it always was.
+  def file_name?(value)
+    v = value.to_s.strip
+    return false if v.empty?
+    return true if v.match?(/\.md(#.*)?\z/i)
+
+    !v.start_with?("/") && MODELS.keys.any? { |folder| v.start_with?("#{folder}/") }
+  end
+
+  # The file a card, collection or `related:` value names, as a lowercase
+  # ref (`posts/lab-full`), or nil when it isn't a file name or names
+  # nothing.
+  def named_ref(value)
+    return nil unless file_name?(value)
+
+    item = lookup(value)
+    item.is_a?(Item) ? item.ref.downcase : nil
+  end
+
   # An Item, an Array of refs when a folderless name matches several, or nil.
   def lookup(target)
     ref, = split(target)

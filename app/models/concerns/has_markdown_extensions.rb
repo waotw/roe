@@ -1288,13 +1288,18 @@ module HasMarkdownExtensions
 
       items_array = items.to_a
       by_slug     = items_array.index_by(&:url_name)
+      # `related:` can name an item by file too (`posts/lab-full`).
+      by_ref      = items_array.index_by { |item| InternalLinks.ref_for(item).to_s.downcase }
+      my_ref      = InternalLinks.ref_for(self).to_s.downcase
 
       # Forward: items I declare as related, in my declared order.
-      forward = my_related_slugs.map { |slug| by_slug[slug] }.compact
+      forward = my_related_slugs.map { |slug| by_slug[slug] || by_ref[InternalLinks.named_ref(slug)] }.compact
 
       # Backward: items that declare *me* as related.
       backward = items_array.select do |item|
-        Array(item.metadata["related"]).map(&:to_s).include?(my_url_name)
+        Array(item.metadata["related"]).map(&:to_s).any? do |slug|
+          slug == my_url_name || (my_ref.present? && InternalLinks.named_ref(slug) == my_ref)
+        end
       end
 
       items = (forward + backward)
@@ -1532,6 +1537,7 @@ module HasMarkdownExtensions
     listed = []
     if has_list
       by_slug  = all.index_by { |item| item.url_name.to_s.downcase }
+      by_ref   = all.index_by { |item| InternalLinks.ref_for(item).to_s.downcase }
       missing  = []
 
       # Each entry is a page's url_name or, in the same position, an inline
@@ -1540,7 +1546,7 @@ module HasMarkdownExtensions
         if (m = MENU_LINK_RE.match(entry))
           MenuLink.new(title: m[1].strip, path: m[2])
         else
-          by_slug[entry.downcase] || (missing << entry; nil)
+          by_slug[entry.downcase] || by_ref[InternalLinks.named_ref(entry)] || (missing << entry; nil)
         end
       end
 
@@ -4073,6 +4079,8 @@ module HasMarkdownExtensions
   # system docs and not intended as link targets in content.
   def find_post_by_slug(slug_or_path)
     raw = slug_or_path.to_s.strip
+    # By file (`posts/lab-full`, `lab-full.md`): survives a url_name change.
+    return InternalLinks.resolve(raw) if InternalLinks.file_name?(raw)
 
     # Strip known prefixes to get the bare slug
     slug = raw

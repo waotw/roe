@@ -111,11 +111,12 @@ class CollectionQuery
     (item.respond_to?(:url_name) ? item.url_name : nil).to_s
   end
 
-  # Order by an explicit, comma-separated list of url_names. Listed items come
+  # Order by an explicit, comma-separated list of url_names or file names
+  # (`posts/lab-full`). Listed items come
   # first, in list order; the rest fall to the end alphabetically by title, so
   # nothing is dropped. A blank list falls back to date-descending.
   def self.explicit_order(items, order_list)
-    wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
+    wanted = order_list.to_s.split(",").map { |s| InternalLinks.named_ref(s) || s.strip.downcase }.reject(&:empty?)
 
     if wanted.empty?
       return items.to_a.sort_by { |i| date_key(i, descending: true) }
@@ -126,7 +127,8 @@ class CollectionQuery
 
     items.to_a.sort_by do |item|
       slug = item.respond_to?(:url_name) ? item.url_name.to_s.downcase : ""
-      [ position.fetch(slug, Float::INFINITY), item.title.to_s.downcase ]
+      ref = InternalLinks.ref_for(item).to_s.downcase
+      [ [ position.fetch(slug, Float::INFINITY), position.fetch(ref, Float::INFINITY) ].min, item.title.to_s.downcase ]
     end
   end
 

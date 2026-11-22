@@ -46,9 +46,12 @@ class PostLinkPreview
 
   private
 
-  # Mirrors HasMarkdownExtensions#find_post_by_slug (prefix-stripped url_name
-  # across the four content types; bundled Roe docs excluded).
+  # Mirrors HasMarkdownExtensions#find_post_by_slug (a file name, else the
+  # prefix-stripped url_name across the four content types; bundled Roe docs
+  # excluded).
   def find_record
+    return InternalLinks.resolve(@slug) if InternalLinks.file_name?(@slug)
+
     slug = @slug
       .sub(%r{^/posts/}, "")
       .sub(%r{^/pages/}, "")
