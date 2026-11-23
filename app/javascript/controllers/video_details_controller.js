@@ -115,6 +115,7 @@ export default class extends Controller {
     video.pause();
     const fps = parseFloat(this.panelTarget.dataset.fps) || 30;
     video.currentTime = Math.max(0, Math.min(this.duration(), video.currentTime + direction / fps));
+    this.tick();
   }
 
   seek() {
@@ -139,10 +140,13 @@ export default class extends Controller {
   tick() {
     if (!this.hasVideoTarget) return;
     const at = this.videoTarget.currentTime || 0;
-    this.timeTarget.textContent = this.formatTime(at);
+    this.timeTarget.textContent = this.formatTime(at, true);
     if (document.activeElement !== this.scrubTarget) this.scrubTarget.value = at;
-    // COPY: play button
-    this.playTarget.textContent = this.videoTarget.paused ? "▶ PLAY" : "❚❚ PAUSE";
+    const paused = this.videoTarget.paused;
+    this.playTarget.querySelector("[data-icon=play]").toggleAttribute("hidden", !paused);
+    this.playTarget.querySelector("[data-icon=pause]").toggleAttribute("hidden", paused);
+    // COPY: play button label (read aloud, not shown)
+    this.playTarget.setAttribute("aria-label", paused ? "Play" : "Pause");
     const nearest = this.jumpTargets.reduce((best, el) => {
       const d = Math.abs(parseFloat(el.dataset.at) - at);
       return !best || d < best.d ? { el, d } : best;
@@ -224,11 +228,16 @@ export default class extends Controller {
     this.closeButtonTarget.textContent = "CLOSE";
   }
 
-  formatTime(seconds) {
-    const total = Math.max(0, Math.floor(seconds || 0));
+  // 42.96 → "0:42" or, with hundredths, "0:42.96". The readout shows
+  // hundredths so a one-frame step visibly moves it; whole seconds stayed
+  // on "0:42" for a step and the buttons looked dead.
+  formatTime(seconds, hundredths = false) {
+    const value = Math.max(0, seconds || 0);
+    const total = Math.floor(value);
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
-    const s = String(total % 60).padStart(2, "0");
+    let s = String(total % 60).padStart(2, "0");
+    if (hundredths) s += `.${String(Math.floor((value - total) * 100)).padStart(2, "0")}`;
     return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
   }
 }

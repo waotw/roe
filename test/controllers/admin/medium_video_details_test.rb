@@ -30,9 +30,12 @@ class Admin::MediumVideoDetailsTest < ActionDispatch::IntegrationTest
     assert details, "the card has a DETAILS button"
     assert_equal video.id.to_s, details["data-video-details-id-param"]
     assert_equal 2, details.parent.css("> div > button").size, "COPY URL and MARKDOWN LINK share the other half"
+    assert_equal "MD Link", html.at_css("button[onclick^=copyMarkdown]").text.strip, "short enough for half width"
 
     get card_admin_medium_path(image)
-    assert_nil Nokogiri::HTML(response.parsed_body["card_html"]).at_css("[data-action='video-details#open']")
+    html = Nokogiri::HTML(response.parsed_body["card_html"])
+    assert_nil html.at_css("[data-action='video-details#open']")
+    assert_equal "Markdown Link", html.at_css("button[onclick^=copyMarkdown]").text.strip, "the full name at full width"
   end
 
   test "the window shows the poster now, where it came from, and both ways to choose" do

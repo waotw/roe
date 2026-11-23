@@ -17,7 +17,10 @@
 <% preview = media.media_type == "images" ? media_grid_preview(media.file_path) : nil %>
 <% variants_pending = (preview && preview.first == :placeholder) ||
                      (media.media_type == 'video' && VideoVariantGenerator.status_for(media)[:state] == 'optimizing') %>
-<div class="border border-gray-300 p-2 hover:bg-gray-50 group relative [content-visibility:auto] [contain-intrinsic-size:auto_16rem]"
+<%# content-visibility:auto keeps a big library quick, but it also clips
+    anything drawn outside the card, the "Used in" list among them; so it's
+    switched off, and the card raised, while the pointer is over it. %>
+<div class="border border-gray-300 p-2 hover:bg-gray-50 group relative [content-visibility:auto] [contain-intrinsic-size:auto_16rem] hover:[content-visibility:visible] hover:z-20"
      data-media-filter-target="item"
      data-variants-pending="<%= variants_pending %>"
      data-media-type="<%= media.media_type %>"
@@ -84,20 +87,27 @@
     </div>
 
     <!-- Action Buttons -->
-    <%# A video card adds DETAILS (its window: poster, length, versions):
-        COPY URL and MARKDOWN LINK share the left half, DETAILS takes the
-        right half at the height of both. Same 4px gaps, same overall size. %>
+    <%# A card with a DETAILS button (videos, for now: the window with the
+        poster, length and versions) puts COPY URL and MARKDOWN LINK in the
+        left half and DETAILS in the right half at the height of both. Same
+        4px gaps, same overall size. At half width MARKDOWN LINK is too long
+        for one line, so it reads MD LINK there; full width keeps the whole
+        name. Another type that gets DETAILS only needs adding to
+        `with_details`. %>
+    <% with_details = media.media_type == 'video' %>
     <% copy_buttons = capture do %>
       <button onclick="copyUrl(event, '<%= j(media.file_path) %>')"
-            class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">
+            class="flex-1 uppercase text-xs px-1 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">
           Copy URL
         </button>
       <button onclick="copyMarkdown(event, '<%= j(media.file_path) %>', '<%= j(File.basename(media.file_path)) %>')"
-          class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
-        Markdown Link
+          <% if with_details %>title="Copy a Markdown link"<% end %>
+          class="flex-1 uppercase text-xs px-1 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
+        <%# COPY: Markdown button, full and half width %>
+        <%= with_details ? "MD Link" : "Markdown Link" %>
       </button>
     <% end %>
-    <% if media.media_type == 'video' %>
+    <% if with_details %>
       <div class="grid grid-cols-2 gap-1">
         <div class="flex flex-col gap-1 min-w-0"><%= copy_buttons %></div>
         <%# COPY: DETAILS button %>

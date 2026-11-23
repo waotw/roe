@@ -14,7 +14,7 @@
 <% poster_file = VideoVariantGenerator.variant_path_for(VideoVariantGenerator.normalize_path(medium.file_path), VideoVariantGenerator::POSTER) %>
 <% poster_url = status[:poster] %>
 <% human = ->(bytes) { bytes ? number_to_human_size(bytes, precision: 3) : "?" } %>
-<% btn = "uppercase text-xs px-3 py-1 border border-gray-800 font-mono rounded-xs disabled:opacity-40 disabled:cursor-not-allowed" %>
+<% btn = "uppercase text-nowrap text-xs px-3 py-1 border border-gray-800 font-mono rounded-xs disabled:opacity-40 disabled:cursor-not-allowed" %>
 <div data-video-details-target="panel"
      data-id="<%= medium.id %>"
      data-poster-url="<%= poster_admin_medium_path(medium) %>"
@@ -54,7 +54,7 @@
                class="w-full bg-black" style="aspect-ratio: <%= aspect %>"></video>
 
         <div class="flex items-center gap-2.5 font-mono text-xs">
-          <span data-video-details-target="time" class="tabular-nums text-gray-800">0:00</span>
+          <span data-video-details-target="time" class="tabular-nums text-gray-800">0:00.00</span>
           <input type="range" min="0" max="<%= duration %>" step="any" value="0"
                  data-video-details-target="scrub" data-action="input->video-details#seek"
                  class="flex-1 accent-gray-800" aria-label="Position in the video">
@@ -62,8 +62,13 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <%# COPY: player buttons %>
-          <button type="button" data-video-details-target="play" data-action="video-details#togglePlay" class="<%= btn %> bg-gray-200 hover:bg-gray-300 w-20">▶ PLAY</button>
+          <%# The two symbols are drawn the same size, so the button never
+              changes width. COPY: player buttons (aria-label) %>
+          <button type="button" data-video-details-target="play" data-action="video-details#togglePlay" aria-label="Play"
+                  class="<%= btn %> bg-gray-200 hover:bg-gray-300 inline-flex items-center justify-center w-10 self-stretch">
+            <svg data-icon="play" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor"/></svg>
+            <svg data-icon="pause" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true" hidden><rect x="2" y="1" width="3" height="10" fill="currentColor"/><rect x="7" y="1" width="3" height="10" fill="currentColor"/></svg>
+          </button>
           <button type="button" data-action="video-details#stepBack" class="<%= btn %> bg-gray-200 hover:bg-gray-300">‹ FRAME</button>
           <button type="button" data-action="video-details#stepForward" class="<%= btn %> bg-gray-200 hover:bg-gray-300">FRAME ›</button>
           <span class="text-xs text-gray-500">← → step one frame</span>
