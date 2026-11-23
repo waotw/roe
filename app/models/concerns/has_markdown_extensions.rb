@@ -99,9 +99,14 @@ module HasMarkdownExtensions
     code_blocks.each do |token, html_code|
       html.gsub!(%r{<p>\s*#{Regexp.escape(token)}\s*</p>}) { html_code }
       # With soft line breaks, a fence right under a list item's text (no
-      # blank line) leaves a <br> before the block. The block starts its own
-      # line anyway, so the break goes.
-      html.gsub!(%r{<br\s*/?>\s*#{Regexp.escape(token)}}) { "\n#{html_code}" }
+      # blank line) leaves a <br> before the block, and text right under the
+      # closing fence leaves one after it. The block is on its own lines
+      # anyway, so neither break does anything but add an empty line.
+      # One pass for both: replacing the break before swaps the token out, so
+      # a second pass couldn't find the break after.
+      html.gsub!(%r{(<br\s*/?>\s*)?#{Regexp.escape(token)}(\s*<br\s*/?>)?}) do
+        "#{"\n" if Regexp.last_match(1)}#{html_code}#{"\n" if Regexp.last_match(2)}"
+      end
       html.gsub!(token) { html_code }
     end
 
