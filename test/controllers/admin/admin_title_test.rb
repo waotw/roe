@@ -1,6 +1,6 @@
 require "test_helper"
 
-# Admin tabs say which site and which page: "Roe - <site> - <page>".
+# Admin tabs say which page and which site: "Roe - <page> - <site>".
 class AdminTitleTest < ActionDispatch::IntegrationTest
   setup { sign_in_as(User.take) }
 
@@ -8,17 +8,17 @@ class AdminTitleTest < ActionDispatch::IntegrationTest
 
   test "an admin page is named by its heading" do
     get admin_links_path
-    assert_select "title", [ "Roe", site, "Links" ].compact.join(" - ")
+    assert_select "title", [ "Roe", "Links", site ].compact.join(" - ")
   end
 
   test "a heading's badges are left out" do
     get admin_orders_path
-    assert_select "title", [ "Roe", site, "Summary of Orders" ].compact.join(" - ")
+    assert_select "title", [ "Roe", "Summary of Orders", site ].compact.join(" - ")
   end
 
   test "a page that sets its own title keeps it" do
     get admin_tags_path
-    assert_select "title", [ "Roe", site, "Tags" ].compact.join(" - ")
+    assert_select "title", [ "Roe", "Tags", site ].compact.join(" - ")
   end
 
   test "the editor names the item being edited" do
@@ -29,7 +29,7 @@ class AdminTitleTest < ActionDispatch::IntegrationTest
     ContentSync.sync_file(path)
 
     get edit_admin_post_path(Post.find_by(file_path: RoeSitePaths.normalize(path)))
-    assert_select "head title", [ "Roe", site, "Edit Post: At Titled" ].compact.join(" - ")
+    assert_select "head title", [ "Roe", "Edit Post: At Titled", site ].compact.join(" - ")
   ensure
     File.delete(path) if path && File.exist?(path)
   end
