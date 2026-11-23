@@ -84,7 +84,10 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="flex flex-col gap-1">
+    <%# A video card adds DETAILS (its window: poster, length, versions):
+        COPY URL and MARKDOWN LINK share the left half, DETAILS takes the
+        right half at the height of both. Same 4px gaps, same overall size. %>
+    <% copy_buttons = capture do %>
       <button onclick="copyUrl(event, '<%= j(media.file_path) %>')"
             class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-100 hover:bg-blue-300 font-mono rounded-xs">
           Copy URL
@@ -93,7 +96,22 @@
           class="flex-1 uppercase text-xs px-1.5 py-1 border border-gray-800 bg-gray-200 hover:bg-gray-300 font-mono rounded-xs">
         Markdown Link
       </button>
-    </div>
+    <% end %>
+    <% if media.media_type == 'video' %>
+      <div class="grid grid-cols-2 gap-1">
+        <div class="flex flex-col gap-1 min-w-0"><%= copy_buttons %></div>
+        <%# COPY: DETAILS button %>
+        <button type="button"
+                data-action="video-details#open"
+                data-video-details-id-param="<%= media.id %>"
+                title="Poster and details"
+                class="uppercase text-xs px-1.5 py-1 border border-gray-800 bg-amber-300 hover:bg-amber-400 font-mono rounded-xs">
+          Details
+        </button>
+      </div>
+    <% else %>
+      <div class="flex flex-col gap-1"><%= copy_buttons %></div>
+    <% end %>
 
     <!-- Usage Badge: posts, pages, docs, products, and config files -->
     <% if usages.any? && local_assigns[:lazy_usages] %>

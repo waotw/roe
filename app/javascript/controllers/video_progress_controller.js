@@ -23,7 +23,7 @@ import { Controller } from "@hotwired/stimulus";
 // the server has it. openFor is also how clicking an optimizing card
 // reopens it.
 export default class extends Controller {
-  static targets = ["dialog", "name", "rows", "summary", "footer"];
+  static targets = ["dialog", "name", "rows", "summary", "footer", "poster", "posterImage"];
 
   static BAR = 24;
   static POLL_MS = 1500;
@@ -45,6 +45,7 @@ export default class extends Controller {
     this.nameTarget.textContent = name;
     this.summaryTarget.textContent = "";
     this.footerTarget.hidden = false;
+    this.hidePoster();
     this.show();
     this.drawUpload();
     this.startSpinner(() => this.uploading && this.drawUpload());
@@ -95,6 +96,7 @@ export default class extends Controller {
     if (!sameVideo) {
       this.rowsTarget.textContent = "  reading the video…";
       this.summaryTarget.textContent = "";
+      this.hidePoster();
     }
     this.footerTarget.hidden = false;
     this.show();
@@ -162,6 +164,7 @@ export default class extends Controller {
   render(status) {
     const rows = (status.steps || []).map((step) => this.row(step));
     this.rowsTarget.textContent = rows.join("\n");
+    this.showPoster(status);
 
     // COPY: modal status lines
     if (status.state === "done") {
@@ -180,6 +183,28 @@ export default class extends Controller {
     } else {
       this.summaryTarget.textContent = `  overall ${String(status.percent).padStart(3)}%`;
     }
+  }
+
+  // The poster is the first thing made, so it can show while the web
+  // versions are still on their way. data-video-poster lets the video
+  // window swap in a newly chosen one.
+  showPoster(status) {
+    if (!this.hasPosterTarget) return;
+    if (!status.poster) return this.hidePoster();
+    const img = this.posterImageTarget;
+    img.dataset.videoPoster = status.id;
+    if (img.getAttribute("src") !== status.poster) img.src = status.poster;
+    this.posterTarget.hidden = false;
+  }
+
+  hidePoster() {
+    if (this.hasPosterTarget) this.posterTarget.hidden = true;
+  }
+
+  // CHANGE: the video window opens over this one (the Media Browser's
+  // video-details controller listens for this).
+  changePoster() {
+    if (this.id) this.dispatch("change-poster", { detail: { id: this.id } });
   }
 
   row(step) {

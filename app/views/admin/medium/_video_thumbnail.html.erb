@@ -18,7 +18,8 @@
      data-video-progress-name="<%= File.basename(media.file_path) %>"
      <% if optimizing %>title="Optimizing — click to see progress"<% end %>>
   <% if video[:poster].present? %>
-    <%= image_tag video[:poster], alt: File.basename(media.file_path), class: "w-full #{height} object-cover", loading: "lazy" %>
+    <%= image_tag video[:poster], alt: File.basename(media.file_path), class: "w-full #{height} object-cover", loading: "lazy",
+                  data: { video_poster: media.id } %>
     <span class="absolute inset-0 flex items-center justify-center pointer-events-none">
       <span class="text-white/90 text-2xl drop-shadow">▶</span>
     </span>

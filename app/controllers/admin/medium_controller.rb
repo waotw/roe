@@ -428,6 +428,65 @@ class Admin::MediumController < Admin::BaseController
     render json: status
   end
 
+  # The video window (DETAILS on a video card): its poster and where the
+  # poster came from, what the video is, and the two ways to choose
+  # another poster. HTML for the video-details controller to show.
+  def details
+    medium = Medium.find(params[:id])
+    return head :not_found unless medium.video?
+
+    source = VideoVariantGenerator.normalize_path(medium.file_path)
+    manifest = VideoVariantGenerator.on_disk(VideoVariantGenerator.current_manifest(source), source)
+    status = VideoVariantGenerator.status_for(medium)
+    probe = MediaProbe.call(source) if File.file?(source)
+    smallest = VideoVariantGenerator.available_renditions(source).first
+    images = Medium.images.originals_only.order(created_at: :desc).select do |image|
+      VideoVariantGenerator::POSTER_IMAGE_EXTENSIONS.include?(File.extname(image.file_path).downcase)
+    end
+
+    render partial: "admin/medium/video_details", formats: [ :html ], locals: {
+      medium: medium, manifest: manifest, status: status, probe: probe,
+      play_path: smallest ? smallest["path"] : medium.file_path,
+      choice: VideoVariantGenerator.poster_choice(manifest),
+      usages: MediaUsageIndex.fetch[medium.file_path] || [],
+      images: images,
+      can_choose: VideoVariantGenerator.available?
+    }
+  end
+
+  # A small still for the video window's JUMP TO strip.
+  def frame
+    medium = Medium.find(params[:id])
+    return head :not_found unless medium.video?
+
+    send_file VideoVariantGenerator.frame_preview(medium.file_path, params[:at]),
+              type: "image/jpeg", disposition: "inline"
+  rescue VideoVariantGenerator::Error
+    head :unprocessable_entity
+  end
+
+  # USE THIS FRAME (at: seconds) or USE THIS IMAGE (image: /media/...).
+  # Saves at once; the answer carries the new poster for the window and the
+  # page to show.
+  def poster
+    medium = Medium.find(params[:id])
+    return head :not_found unless medium.video?
+
+    manifest =
+      if params[:image].present?
+        VideoVariantGenerator.choose_poster_image!(medium.file_path, params[:image])
+      else
+        VideoVariantGenerator.choose_poster_frame!(medium.file_path, params.require(:at))
+      end
+    path = VideoVariantGenerator.variant_path_for(VideoVariantGenerator.normalize_path(medium.file_path), VideoVariantGenerator::POSTER)
+    render json: {
+      poster: "#{manifest['poster']}?v=#{File.mtime(path).to_i}",
+      caption: helpers.video_poster_caption(VideoVariantGenerator.poster_choice(manifest))
+    }
+  rescue VideoVariantGenerator::Error, ActionController::ParameterMissing => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  end
+
   # The Media Browser's "videos are ready" notice stays until this.
   def dismiss_video_notices
     VideoVariantGenerator.dismiss_notices!

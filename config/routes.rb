@@ -215,6 +215,9 @@ Rails.application.routes.draw do
         post :regenerate_variants
         get :card
         get :video_status
+        get :details
+        get :frame
+        post :poster
       end
     end
 
