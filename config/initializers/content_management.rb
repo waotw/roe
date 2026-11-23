@@ -98,6 +98,11 @@ if should_run
         ContentWatcher.start
         puts "✓ Watcher started - monitoring site/ folder for changes"
 
+        # The dashboard's links check, against what's on disk now (renames
+        # made while Roe was off were caught up by the sync above). In the
+        # background, so it doesn't hold up the start.
+        LinkCheck.request("startup")
+
         puts "\n" + "=" * 60
         puts "✅ Content Management System Ready!"
         puts "=" * 60 + "\n"

@@ -133,6 +133,10 @@ type: post-link
 post: about
 ```
 
+An image that isn't in the media library shows as a broken image:
+
+![gone](/media/images/no-such-image.jpg)
+
 ## 11. Single backtick alone on a line
 
 A lone backtick isn't a fence — three or more are needed.

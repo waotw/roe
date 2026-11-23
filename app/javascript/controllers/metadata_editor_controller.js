@@ -710,17 +710,25 @@ export default class extends Controller {
                        data-controller="${acControllers}"
                        data-media-field-kind-value="${kind}"
                        ${acOptionsAttr}>
+                    <div class="flex gap-1">
                     <input type="text"
                            id="metadata-field-${fieldName}"
                            name="metadata_fields[${fieldName}]"
                            value="${escapedValue}"
                            autocomplete="off"
-                           class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                           class="w-full min-w-0 font-mono text-xs px-2 py-1 border border-gray-300"
                            data-metadata-field="${fieldName}"
                            data-media-field-target="input"
                            ${acTargetAttr}
                            data-action="input->media-field#checkDebounced ${acActionFragment} blur->media-field#check change->media-field#check"
                            ${config.hint ? `placeholder="${config.hint}"` : ""}>
+                    ${
+                      kind === "file"
+                        ? ""
+                        : `<button type="button" data-action="click->media-field#choose" data-test="metadata-choose-media"
+                                   class="shrink-0 uppercase text-xs px-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Choose…</button>`
+                    }
+                    </div>
                     ${dropdown}
                     <p class="text-xs text-red-600 hidden" data-media-field-target="warning">
                       ⚠ File not found under <code>site/media/</code>.

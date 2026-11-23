@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Checks the links and media in Roe's own docs (site/documentation/roe), the
+# docs that ship with every release. Prints what's broken and exits 1 when
+# something is; a name that could mean two things still works, so it's
+# listed but doesn't fail the check. bin/release runs this; `roe links`
+# prints the same report after the site's.
+#
+#   bin/roe-docs-links                 site/documentation/roe
+#   bin/roe-docs-links <folder>        another docs folder
+#
+# Runs without Rails (RoeDocsLinks and MarkdownDoctor are plain Ruby), so it
+# reads the files as they are now.
+require_relative "../app/services/roe_docs_links"
+
+def default_dir
+  app_dir = File.expand_path("..", __dir__)
+  root = File.basename(app_dir) == "current" ? File.expand_path("..", app_dir) : app_dir
+  File.join(ENV["ROE_SITE_PATH"] || File.join(root, "site"), "documentation", "roe")
+end
+
+dir = ARGV.first || default_dir
+unless Dir.exist?(dir)
+  warn "No docs folder at #{dir}"
+  exit 2
+end
+
+check = RoeDocsLinks.new(dir).call
+puts check.report_lines
+exit(check.broken? ? 1 : 0)

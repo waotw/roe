@@ -159,6 +159,19 @@ class ContentWatcher
     # peer ping so the other side learns within seconds (instead
     # of waiting up to an hour for the recurring exchange).
     notify_site_sync if (modified + added + removed).any?
+
+    # Links and media files may have changed: check the site's links again
+    # (in the background, once the batch settles).
+    LinkCheck.request("change") if (modified + added + removed).any? { |file| link_check_file?(file) }
+  end
+
+  # Content, or an original media file. Variants come and go with their
+  # originals, and config and theme files hold no links the check reads.
+  def self.link_check_file?(file)
+    path = relative_site_path(file).to_s
+    return false if path.include?("/variants/")
+
+    path.match?(%r{\A(posts|pages|products|documentation|media)/})
   end
 
   def self.notify_site_sync

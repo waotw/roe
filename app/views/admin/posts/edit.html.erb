@@ -58,6 +58,9 @@
        data-editor-product-template-value="<%= SiteConfig.feature('store', 'product_button_template') %>"
        data-editor-currency-symbol-value="<%= store_currency_symbol %>"
        data-editor-highlight-media-value="<%= params[:highlight] %>"
+       data-editor-highlight-line-value="<%= params[:line].to_i %>"
+       data-editor-highlight-field-value="<%= params[:field] %>"
+       data-editor-highlight-link-value="<%= params[:link].present? %>"
        data-editor-original-url-name-value="<%= @post.url_name %>"
        data-editor-filename-slug-value="<%= File.basename(@post.file_path.to_s, '.md') %>"
        data-editor-published-value="<%= @post.published? %>">

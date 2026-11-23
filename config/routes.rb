@@ -347,6 +347,11 @@ Rails.application.routes.draw do
     # linked from the dashboard — but a real top-level page.
     resources :orders, only: [ :index, :show ]
 
+    # The site-wide links check (LinkCheck). Linked from the dashboard's
+    # LINKS box. CHECK NOW runs it again.
+    get "links", to: "links#index", as: :links
+    post "links/check", to: "links#check", as: :check_links
+
     resources :imports, only: [ :index, :new, :create, :show, :destroy ] do
       member do
         get :phase_2

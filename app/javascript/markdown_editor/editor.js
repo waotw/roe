@@ -47,6 +47,7 @@ import {
   isolateHistory,
 } from "@codemirror/commands";
 import { syntaxHighlighting } from "@codemirror/language";
+import { startCompletion } from "@codemirror/autocomplete";
 import {
   search,
   searchKeymap,
@@ -343,6 +344,13 @@ export class MarkdownEditor {
       requestAnimationFrame(() => requestAnimationFrame(step));
     };
     step();
+  }
+
+  // The list of the site's posts, pages, products and docs, for the link at
+  // the caret (internal_links.js). Used when the Links page opens a broken
+  // link here, so a replacement is one click away.
+  openLinkList() {
+    setTimeout(() => startCompletion(this.view), 0);
   }
 
   goToLine(lineNumber, { select = false, ...options } = {}) {

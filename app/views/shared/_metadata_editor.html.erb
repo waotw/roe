@@ -346,17 +346,28 @@
                          data-controller="media-field<%= ' autocomplete' if ac_enabled %>"
                          data-media-field-kind-value="<%= media_field_kinds[field_name] %>"
                          <% if ac_enabled %>data-autocomplete-options-value="<%= ERB::Util.html_escape(ac_paths.to_json) %>"<% end %>>
+                      <div class="flex gap-1">
                       <input type="text"
                               id="metadata-field-<%= field_name %>"
                               name="metadata_fields[<%= field_name %>]"
                               value="<%= ERB::Util.html_escape(display_value) %>"
                               <% if ac_enabled %>autocomplete="off"<% end %>
-                              class="w-full font-mono text-xs px-2 py-1 border border-gray-300 <%= 'border-red-400' if initial_missing_media[field_name] %>"
+                              class="w-full min-w-0 font-mono text-xs px-2 py-1 border border-gray-300 <%= 'border-red-400' if initial_missing_media[field_name] %>"
                               data-metadata-field="<%= field_name %>"
                               data-media-field-target="input"
                               <% if ac_enabled %>data-autocomplete-target="input"<% end %>
                               data-action="input->media-field#checkDebounced<% if ac_enabled %> input->autocomplete#filter keydown->autocomplete#navigate<% end %> blur->media-field#check change->media-field#check"
                               <% if config[:hint] %>placeholder="<%= config[:hint] %>"<% end %>>
+                      <%# CHOOSE…: the media picker for this kind of file, to
+                          choose or upload one. Not for captions, which aren't
+                          in the media library. COPY: button label %>
+                      <% if media_field_kinds[field_name] != 'file' %>
+                        <button type="button"
+                                data-action="click->media-field#choose"
+                                data-test="metadata-choose-media"
+                                class="shrink-0 uppercase text-xs px-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Choose…</button>
+                      <% end %>
+                      </div>
                       <% if ac_enabled %>
                         <div data-autocomplete-target="dropdown"
                              class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto">

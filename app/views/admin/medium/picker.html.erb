@@ -60,15 +60,35 @@
             Add to Gallery
           </button>
         <% elsif @picker_for == "card" %>
-          <%# Opened from a card builder field (the player's Audio or Video):
-              the file goes back into that field. One file — if several are
+          <%# Opened from a card builder field (the player's Audio or Video, a
+              card's Image): the file goes back into that field. One file — if several are
               ticked, the first is used. COPY: button label %>
           <button type="button"
                   data-action="click->media-bulk-select#submitToCard"
                   class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">
-            Use in Player
+            <%= @media_type == "images" ? "Use This File" : "Use in Player" %>
+          </button>
+        <% elsif @picker_for == "field" %>
+          <%# Opened from a metadata field's CHOOSE… (image, audio, video): the
+              file goes into that field, replacing what's there. One file —
+              if several are ticked, the first is used. COPY: button label %>
+          <button type="button"
+                  data-action="click->media-bulk-select#submitToField"
+                  data-test="picker-use-in-field"
+                  class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">
+            Use This File
           </button>
         <% else %>
+          <%# The caret is in a media file's path in the text: REPLACE swaps
+              that path for the file chosen (undo puts it back). COPY: button label %>
+          <% if params[:replace].present? %>
+            <button type="button"
+                    data-action="click->media-bulk-select#submitReplace"
+                    data-test="picker-replace"
+                    class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">
+              Replace
+            </button>
+          <% end %>
           <button type="button"
                   data-action="click->media-bulk-select#submitInsert"
                   class="text-xs px-3 py-1 border border-blue-800 bg-blue-200 hover:bg-blue-300 rounded-xs font-mono uppercase">

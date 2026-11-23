@@ -144,6 +144,7 @@ roe open the-briefcase      # opens the home page and the admin
 roe admin the-briefcase     # just the admin
 roe folder                  # the cd command for each site's folder
 roe install libvips         # install an optional tool Roe can use
+roe links                   # broken links and missing media, site and Roe's docs
 roe start --all
 roe                         # help
 ```
