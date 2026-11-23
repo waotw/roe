@@ -349,8 +349,8 @@ class MarkdownDoctor
   # or a draft. The first two show as plain text on the site; a draft link
   # does too, until the draft is published.
   def check_internal_links
-    scan_lines do |line, line_num, inside_code_block|
-      next if inside_code_block
+    scan_blocks do |line, line_num, block|
+      next if block
 
       line.gsub(INLINE_CODE_RE, "").scan(INTERNAL_LINK_RE).each do |wiki, file|
         target = (wiki || file).strip
@@ -364,30 +364,14 @@ class MarkdownDoctor
   # A card names its post or product by url_name or file name. A short name
   # can mean two things (a page and a post both called `about`); Roe uses the
   # first, and this says which.
-  CARD_FENCE_RE = /\A {0,3}(`{3,}|~{3,})[ \t]*card\b/
   CARD_NAME_RE = /\A\s*(?:post|product):[ \t]*["']?([^"'\n]+?)["']?\s*\z/
 
   def check_card_names
-    fence = nil
-    card = false
-    effective_lines.each_with_index do |line, idx|
-      if (open = line.match(/\A {0,3}(`{3,}|~{3,})(.*?)\s*\z/))
-        if fence.nil?
-          fence = open[1]
-          card = line.match?(CARD_FENCE_RE)
-          next
-        elsif open[1][0] == fence[0] && open[1].length >= fence.length && open[2].strip.empty?
-          fence = nil
-          card = false
-          next
-        end
-      end
-      next unless card
+    scan_blocks do |line, line_num, block|
+      next unless block == "card"
 
       name = line[CARD_NAME_RE, 1]
-      next unless name
-
-      name_issue(name, effective_line_number(idx), missing: "so the card can't show it")
+      name_issue(name, line_num, missing: "so the card can't show it") if name
     end
   end
 
@@ -460,8 +444,8 @@ class MarkdownDoctor
   ADDRESS_LINK_RE = %r{\]\(<?(/(?!/)[^)\s>]*)>?(?:\s+"[^"]*")?\)|href=["'](/(?!/)[^"']*)["']}
 
   def check_address_links
-    scan_lines do |line, line_num, inside_code_block|
-      next if inside_code_block
+    scan_blocks do |line, line_num, block|
+      next if block
 
       line.gsub(INLINE_CODE_RE, "").scan(ADDRESS_LINK_RE).each do |md, html|
         target = (md || html).strip
@@ -512,11 +496,16 @@ class MarkdownDoctor
   # Each body line with the fenced block it sits in: nil outside one, else
   # the fence's first word (`card`, `ruby`, "" for a bare fence). Fence lines
   # themselves aren't yielded.
+  #
+  # A fence may be indented any amount: inside a list item it's indented to
+  # the item's text, and Roe's renderer (protect_fenced_code) still reads it
+  # as code. Counting only fences at column 0–3 took the examples in a list
+  # for real links and images.
   def scan_blocks
     fence = nil
     info = nil
     effective_lines.each_with_index do |line, idx|
-      if (open = line.match(/\A {0,3}(`{3,}|~{3,})(.*?)\s*\z/))
+      if (open = line.match(/\A[ \t]*(`{3,}|~{3,})(.*?)\s*\z/))
         if fence.nil?
           fence = open[1]
           info = open[2].strip.split(/\s+/).first.to_s.downcase

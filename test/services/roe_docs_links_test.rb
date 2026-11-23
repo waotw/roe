@@ -41,6 +41,31 @@ class RoeDocsLinksTest < ActiveSupport::TestCase
     assert_includes check.report_lines, "MISSING MEDIA (1)"
   end
 
+  test "problems in a draft doc are listed but don't fail the check" do
+    doc("a.md", "title: A\nstatus: draft\n", "[gone](/documentation/roe/gone) ![x](/media/images/lost.png)\n")
+
+    check = RoeDocsLinks.new(@dir).call
+
+    assert_equal %w[in_drafts in_drafts], check.problems.map { |p| p[:section] }
+    refute check.broken?
+    assert check.report_lines.any? { |l| l.start_with?("IN DRAFTS (2,") }
+  end
+
+  test "examples in a code block inside a list item aren't checked" do
+    doc("a.md", "title: A\n", <<~MD)
+      1. Like this:
+          ````markdown
+          ```gallery
+          ![x](/media/images/lost.png)
+          ```
+          [gone](/documentation/roe/gone)
+          ````
+          The above is an example.
+    MD
+
+    assert_empty RoeDocsLinks.new(@dir).call.problems
+  end
+
   test "clean docs pass" do
     doc("a.md", "title: A\n", "[B](/documentation/roe/b)\n")
     doc("b.md", "title: B\n", "[A](/documentation/roe/a)\n")

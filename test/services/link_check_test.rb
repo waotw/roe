@@ -55,12 +55,17 @@ class LinkCheckTest < ActiveSupport::TestCase
     assert_equal 6, found.size, "and nothing about the image that's there"
   end
 
-  test "a draft's own broken links are listed, marked as a draft" do
-    draft = make(:page, "lc-draft-page", status: "draft", body: "[[posts/lc-missing-too]]\n")
+  test "a draft's own problems get their own section and don't count" do
+    draft = make(:page, "lc-draft-page", status: "draft", body: "[[posts/lc-missing-too]]\n![x](/media/images/lc-draft-gone.jpg)\n")
 
-    problem = problems_for(draft).first
-    assert problem["draft"]
-    assert_equal "Page", problem["item_type"]
+    result = LinkCheck.run!
+    problems = problems_for(draft, result)
+    assert_equal [ "in_drafts" ], problems.map { |p| p["section"] }.uniq
+    assert_equal %w[broken_internal_link missing_media], problems.map { |p| p["type"] }.sort
+    assert problems.all? { |p| p["draft"] }
+    assert_equal 0, result.dig("counts", "broken")
+    assert_equal 0, result.dig("counts", "media")
+    assert_equal 2, result.dig("counts", "in_drafts")
   end
 
   test "counts what the dashboard shows and keeps the result in tmp/" do

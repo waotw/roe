@@ -19,7 +19,7 @@ module LinksHelper
     params = { highlight: problem["target"].presence }
     params[:line] = problem["line"] if problem["line"]
     params[:field] = problem["field"] if problem["field"]
-    params[:link] = 1 if problem["section"] != "media" && problem["line"]
+    params[:link] = 1 if problem["type"] != "missing_media" && problem["line"]
     public_send(helper, record, params.compact)
   end
 

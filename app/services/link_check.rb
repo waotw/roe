@@ -39,6 +39,11 @@ class LinkCheck
   # counted as broken.
   WARNINGS = %i[unclear_internal_link unclear_name].freeze
 
+  # Anything wrong inside a draft goes in its own section: nobody sees it
+  # until it's published, so it's listed but doesn't count and doesn't fail
+  # `roe links`.
+  IN_DRAFTS = "in_drafts"
+
   @lock = Mutex.new
 
   class << self
@@ -83,7 +88,7 @@ class LinkCheck
       # COPY: roe links heading
       io.puts RoeDocsLinks.report_lines(heading: "SITE  #{result.dig('counts', 'total')} links and media files", problems: site)
       io.puts docs.report_lines
-      broken = site.any? { |p| !p[:warning] } || docs.broken?
+      broken = site.any? { |p| RoeDocsLinks.blocking?(p) } || docs.broken?
       # COPY: roe links last line
       io.puts broken ? "Something is broken: fix it, then run roe links again." : "Nothing broken."
       broken ? 1 : 0
@@ -221,7 +226,7 @@ class LinkCheck
   def add(item, issue, line: nil, field: nil)
     item = item_for(item) unless item.is_a?(Hash)
     @problems << item.merge(
-      "section" => SECTIONS.fetch(issue[:type]),
+      "section" => item["draft"] ? IN_DRAFTS : SECTIONS.fetch(issue[:type]),
       "type" => issue[:type].to_s,
       "warning" => WARNINGS.include?(issue[:type]),
       "line" => line,
@@ -247,6 +252,7 @@ class LinkCheck
       "broken" => by.call("links"),
       "unclear" => by.call("links", warning: true),
       "drafts" => by.call("drafts"),
+      "in_drafts" => @problems.count { |p| p["section"] == IN_DRAFTS },
       "total" => @links + @media
     }
   end

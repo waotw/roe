@@ -35,6 +35,7 @@ class RoeDocsLinks
     missing_media: "media"
   }.freeze
   WARNINGS = %i[unclear_internal_link unclear_name].freeze
+  IN_DRAFTS = "in_drafts"
 
   attr_reader :dir, :problems, :links, :media
 
@@ -63,10 +64,14 @@ class RoeDocsLinks
     self
   end
 
-  # Something to fix: anything but a name that could mean two things, which
-  # still works.
+  # Something to fix: anything but a name that could mean two things (it
+  # still works) or a problem inside a draft (nobody sees it yet).
   def broken?
-    @problems.any? { |p| !p[:warning] }
+    @problems.any? { |p| self.class.blocking?(p) }
+  end
+
+  def self.blocking?(problem)
+    !problem[:warning] && problem[:section] != IN_DRAFTS
   end
 
   # The report `roe links` and bin/release print. Same shape as the site's
@@ -82,9 +87,12 @@ class RoeDocsLinks
   def self.report_lines(heading:, problems:)
     lines = [ heading, "" ]
     # COPY: report sections
-    [ [ "media", "MISSING MEDIA" ], [ "links", "BROKEN LINKS" ], [ "drafts", "LINKS TO DRAFTS" ] ].each do |section, title|
+    [ [ "media", "MISSING MEDIA" ], [ "links", "BROKEN LINKS" ], [ "drafts", "LINKS TO DRAFTS" ],
+      [ IN_DRAFTS, "IN DRAFTS (listed only, nothing is blocked)" ] ].each do |section, title|
       rows = problems.select { |p| p[:section] == section }
-      lines << "#{title} (#{rows.count { |p| !p[:warning] }})"
+      next if section == IN_DRAFTS && rows.empty?
+
+      lines << (section == IN_DRAFTS ? title.sub("(", "(#{rows.size}, ") : "#{title} (#{rows.count { |p| !p[:warning] }})")
       rows.each do |p|
         lines << "  #{p[:where]}"
         lines << "    #{p[:warning] ? '(still works) ' : ''}#{p[:message]}"
@@ -150,7 +158,7 @@ class RoeDocsLinks
   def add(doc, issue, line: nil, field: nil)
     file = doc.file.delete_prefix("#{@dir}/")
     @problems << {
-      section: TYPES.fetch(issue[:type]),
+      section: doc.status == "draft" ? IN_DRAFTS : TYPES.fetch(issue[:type]),
       type: issue[:type],
       warning: WARNINGS.include?(issue[:type]),
       file: file,
