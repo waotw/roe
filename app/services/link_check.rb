@@ -11,6 +11,9 @@
 #   related:                             names in the metadata
 #   /media/... in the text and metadata  media files
 #
+# The header, footer and sidebar layouts are checked too: their menus name
+# pages in `order:`.
+#
 # Links to other sites are never checked. Roe's own docs (documentation/roe)
 # aren't part of the site's check; RoeDocsLinks checks those for releases.
 #
@@ -126,6 +129,7 @@ class LinkCheck
 
   def call
     records.each { |record| check(record) }
+    layouts.each { |key, path| check_layout(key, path) }
     {
       "counts" => counts,
       "problems" => @problems.sort_by { |p| [ p["section"], p["title"].to_s.downcase, p["line"].to_i ] }
@@ -142,6 +146,21 @@ class LinkCheck
       scope = scope.where("file_path NOT LIKE ?", "%/documentation/roe/%") if model == Documentation
       scope.to_a
     end
+  end
+
+  # The header, footer and sidebar: on every page, and the menus in them
+  # name pages by `order:`. Files, not records, so they're read from disk.
+  def layouts
+    LayoutFiles::KEYS.filter_map { |key| [ key, LayoutFiles.path(key) ] if LayoutFiles.exist?(key) }
+  end
+
+  def check_layout(key, path)
+    item = { "item_type" => "Layout", "item_id" => key, "title" => key.capitalize, "draft" => false }
+    MarkdownDoctor.diagnose(File.read(path), **counted_options).each do |issue|
+      add(item, issue, line: issue[:line]) if SECTIONS.key?(issue[:type])
+    end
+  rescue StandardError => e
+    Rails.logger.warn("[LinkCheck] layout #{key}: #{e.class}: #{e.message}")
   end
 
   def check(record)
@@ -198,19 +217,26 @@ class LinkCheck
     end
   end
 
-  def add(record, issue, line: nil, field: nil)
-    @problems << {
+  # item: a record, or a layout's own { "item_type", "item_id", ... }.
+  def add(item, issue, line: nil, field: nil)
+    item = item_for(item) unless item.is_a?(Hash)
+    @problems << item.merge(
       "section" => SECTIONS.fetch(issue[:type]),
       "type" => issue[:type].to_s,
       "warning" => WARNINGS.include?(issue[:type]),
-      "item_type" => record.class.name,
-      "item_id" => record.id,
-      "title" => record.title.to_s.presence || File.basename(record.file_path.to_s, ".md"),
-      "draft" => !record.published?,
       "line" => line,
       "field" => field,
       "target" => issue[:target].to_s,
       "message" => issue[:message].to_s
+    )
+  end
+
+  def item_for(record)
+    {
+      "item_type" => record.class.name,
+      "item_id" => record.id,
+      "title" => record.title.to_s.presence || File.basename(record.file_path.to_s, ".md"),
+      "draft" => !record.published?
     }
   end
 

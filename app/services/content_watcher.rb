@@ -165,13 +165,13 @@ class ContentWatcher
     LinkCheck.request("change") if (modified + added + removed).any? { |file| link_check_file?(file) }
   end
 
-  # Content, or an original media file. Variants come and go with their
-  # originals, and config and theme files hold no links the check reads.
+  # Content, a layout, or an original media file. Variants come and go with
+  # their originals, and config and theme files hold no links the check reads.
   def self.link_check_file?(file)
     path = relative_site_path(file).to_s
     return false if path.include?("/variants/")
 
-    path.match?(%r{\A(posts|pages|products|documentation|media)/})
+    path.match?(%r{\A(posts|pages|products|documentation|media|layout)/})
   end
 
   def self.notify_site_sync

@@ -82,6 +82,20 @@ class LinkCheckTest < ActiveSupport::TestCase
     assert_empty result["problems"].select { |p| p["item_type"] == "Documentation" && roe_ids.include?(p["item_id"]) }
   end
 
+  test "the header's menu names are checked, and the problem opens the layout editor on its line" do
+    path = LayoutFiles.path("header")
+    before = File.exist?(path) ? File.read(path) : nil
+    File.write(path, "[Site](/)\n\n```collection\ntemplate: menu\norder: lc-no-such-page\n```\n")
+
+    problem = LinkCheck.run!["problems"].find { |p| p["item_type"] == "Layout" }
+
+    assert_equal [ "header", 5, "lc-no-such-page", "links" ], problem.values_at("item_id", "line", "target", "section")
+    assert_equal "/admin/layout/header/edit?highlight=lc-no-such-page&line=5",
+                 ApplicationController.helpers.link_problem_path(problem, {})
+  ensure
+    before ? File.write(path, before) : File.delete(path)
+  end
+
   test "nothing stored yet reads as nil" do
     assert_nil LinkCheck.latest
   end
@@ -91,6 +105,7 @@ class LinkCheckTest < ActiveSupport::TestCase
     assert ContentWatcher.link_check_file?(File.join(site, "posts", "a.md"))
     assert ContentWatcher.link_check_file?(File.join(site, "media", "images", "a.jpg"))
     refute ContentWatcher.link_check_file?(File.join(site, "media", "images", "variants", "a-small.webp"))
+    assert ContentWatcher.link_check_file?(File.join(site, "layout", "header.md"))
     refute ContentWatcher.link_check_file?(File.join(site, "system", "global", "site.yml"))
     refute ContentWatcher.link_check_file?(File.join(site, "theme", "default.css"))
   end

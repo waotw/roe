@@ -208,6 +208,28 @@
       sessionStorage.removeItem('cursorPosition');
     }
 
+    // Arriving from the Links page (?highlight=…&line=N): select that
+    // reference, starting the search at its line.
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get('highlight');
+    if (wanted) {
+      const textarea = document.querySelector('[name="content"]');
+      const text = textarea.value;
+      let from = 0;
+      for (let n = 1; n < (parseInt(params.get('line'), 10) || 0) && from !== -1; n++) {
+        const next = text.indexOf('\n', from);
+        from = next === -1 ? -1 : next + 1;
+      }
+      let at = from === -1 ? -1 : text.indexOf(wanted, from);
+      if (at === -1) at = text.indexOf(wanted);
+      if (at !== -1) {
+        textarea.focus();
+        textarea.setSelectionRange(at, at + wanted.length);
+        textarea.blur(); // focusing again scrolls the selection into view
+        textarea.focus();
+      }
+    }
+
     // Hide flash notice on any input
     const flashNotice = document.querySelector('.flash-notice');
     if (flashNotice) {

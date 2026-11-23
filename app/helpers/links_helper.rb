@@ -7,6 +7,8 @@ module LinksHelper
   # in the admin, so it goes to the doc's page. nil when the item has gone
   # since the check.
   def link_problem_path(problem, records)
+    return layout_problem_path(problem) if problem["item_type"] == "Layout"
+
     record = records[[ problem["item_type"], problem["item_id"] ]]
     return nil unless record
     return record.public_url if record.is_a?(Documentation)
@@ -19,6 +21,13 @@ module LinksHelper
     params[:field] = problem["field"] if problem["field"]
     params[:link] = 1 if problem["section"] != "media" && problem["line"]
     public_send(helper, record, params.compact)
+  end
+
+  # The layout editor (a plain textarea) selects the reference on that line.
+  def layout_problem_path(problem)
+    return nil unless LayoutFiles::KEYS.include?(problem["item_id"])
+
+    "/admin/layout/#{problem['item_id']}/edit?" + { highlight: problem["target"], line: problem["line"] }.compact.to_query
   end
 
   # Every item the problems name, loaded once: { [type, id] => record }.
