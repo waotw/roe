@@ -1,5 +1,5 @@
 ---
-title: Settings → Collections
+title: "Settings: Collections"
 status: published
 url_name: settings-collections
 tags: settings

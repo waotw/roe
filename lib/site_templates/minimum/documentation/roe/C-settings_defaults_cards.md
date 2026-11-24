@@ -1,5 +1,5 @@
 ---
-title: Settings → Cards
+title: "Settings: Cards"
 status: published
 url_name: settings-cards
 tags: settings

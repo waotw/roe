@@ -2,7 +2,16 @@
 title: Video Optimization
 status: published
 tags: tool
+related: media
 ---
+
+##### Related documentation
+
+```collection
+source: documentation/roe
+related: true
+template: links
+```
 
 # Video optimization in Roe
 
@@ -20,7 +29,7 @@ Roe makes the web variants on your computer, and [Site Sync](/documentation/roe/
 
 When you upload a video, Roe creates variants in the background, one video at a time. You can watch the progress on the video's card on the [Media](/admin/medium) page in Admin.
 
-| File | What it's for |
+| File | Details |
 |---|---|
 | `720p` | Played by default |
 | `1080p` | Offered as a second, sharper version, only when your original is at least 1080p |
@@ -34,7 +43,7 @@ A few things Roe takes care of along the way:
 - **It starts quickly.** Videos are set up so they can start playing before they've finished downloading.
 - **It removes your location.** Phones save where a video was filmed. Roe leaves that out of the web variants; the original is untouched.
 - **It skips a variant that wouldn't help.** If your original is already a small, web-ready MP4 and a variant would save less than 10%, Roe plays your original instead.
-- **It picks a good poster.** The poster frame comes from somewhere in the middle of the video, skipping black or very dark frames.
+- **It picks a poster.** Roe will generate a thumbnail/poster for the video on upload. You can edit this yourself by clicking `DETAILS` on the [Media](/admin/medium/browse?type=video) page.
 
 Your original is never changed. Roe keeps it as the archive copy and doesn't put it on the page once the variants are ready.
 

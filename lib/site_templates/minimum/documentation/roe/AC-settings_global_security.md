@@ -1,5 +1,5 @@
 ---
-title: "Settings → Security"
+title: "Settings: Security"
 status: published
 tags: settings
 related:

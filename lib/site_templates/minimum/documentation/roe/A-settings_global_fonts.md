@@ -1,5 +1,5 @@
 ---
-title: "Settings → Custom Fonts"
+title: "Settings: Custom Fonts"
 status: published
 tags: settings
 ---

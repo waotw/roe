@@ -31,6 +31,7 @@ roe <command> [name | --all]
 - `open` -       Open the site — both home and admin — in your browser
 - `home` -       Open the home page
 - `admin` -      Open the admin page
+- `links` -      Check for any broken internal or media links in your site
 - `stripe` -     Forward Stripe (CLI) test webhooks to a running site, for local testing
 - `folder` -     Show the `cd` command for each site's folder
 - `install` -    Install an optional tool Roe can use (libvips, …)

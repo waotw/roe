@@ -1,5 +1,6 @@
 ---
-title: "Settings → Site"
+title: "Settings: Site"
+url_name: global-settings
 status: published
 tags: settings
 ---

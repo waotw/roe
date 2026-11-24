@@ -2,6 +2,7 @@
 title: Feeds (RSS & Atom)
 status: published
 tags: system
+url_name: system-feeds
 related:
   - podcasts
   - posts

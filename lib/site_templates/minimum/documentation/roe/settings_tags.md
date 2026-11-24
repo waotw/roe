@@ -1,5 +1,5 @@
 ---
-title: "Settings → Tags"
+title: "Settings: Tags"
 url_name: tags
 status: published
 tags: settings

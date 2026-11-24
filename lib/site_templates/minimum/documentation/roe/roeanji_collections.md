@@ -181,7 +181,7 @@ style: horizontal
 - `template: menu` outputs a bare list of links — no headings, no dates, no excerpts.
 - The source defaults to `pages` (the usual case). Use `source: posts` or `products` to build the menu from those instead.
 - `style: horizontal` lays the links out in a row; the default, `vertical`, stacks them.
-- A `url_name` the list can't find is skipped (but will show up on the local site as a typo so you'll notice it).
+- A `url_name` that Roe can't find is skipped but you'll see an error when signed in as the admin.
 - A `menu` shows every link you give it — no `limit` for this Collection.
 - In the `header` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
 - You can add `show_active: true` or `show_active: false` to turn this on/off for any `menu` Collection.

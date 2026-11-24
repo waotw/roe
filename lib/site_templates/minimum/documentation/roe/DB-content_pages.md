@@ -61,17 +61,17 @@ See [Metadata Fields](/documentation/roe/metadata-properties) for the full list.
 
 ### Homepage
 
-Create a page with `url_name: home` to use it as your homepage:
+Roe creates a homepage (`home.md`) when you first install it. The homepage is the page with `page_type: home` in the metadata. You can rename or create your own, just make sure to include `page_type: home` in the metadata:
 
 ```yaml
 ---
 title: Welcome
-url_name: home
+page_type: home
 status: published
 ---
 ```
 
-If no homepage exists, Roe shows a default empty-site message.
+If Roe doesn't find any page with `page_type: home`, it will create a new one.
 
 ### 404 Page
 

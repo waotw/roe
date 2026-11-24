@@ -1,5 +1,5 @@
 ---
-title: "Settings → Redirects"
+title: "Settings: Redirects"
 url_name: redirects
 status: published
 tags: settings
