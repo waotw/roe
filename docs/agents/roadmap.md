@@ -6,6 +6,7 @@ Where the larger pieces of work stand. Statuses checked against the code on
 | Work | Status |
 |---|---|
 | Ruby 4.0.5 upgrade | **Shipped** |
+| Ruby 4.0.10 (security fix) | **Shipped** in 0.5.0 |
 | Bi-directional Site Sync over HTTP | **Shipped** |
 | Update as redeploy for container hosts | Goal, host-agnostic |
 | First-boot bootstrap | Partly shipped (`RoeSecrets::Bootstrap`) |
@@ -52,6 +53,62 @@ Gemfile declares `csv` and `ostruct`, which were default gems extracted in Ruby
 at boot with `LoadError: cannot load such file -- csv`.
 
 No application code changes were needed. Only those two gem declarations.
+
+---
+
+## Changing the Ruby version: how each install gets it
+
+`current/.ruby-version` is the one place the Ruby version is set. A release that
+changes it (4.0.5 → 4.0.10 in 0.5.0, for CVE-2026-132825, which Brakeman flags)
+also changes `ARG RUBY_VERSION` in the `Dockerfile`, the `|| echo` fallbacks in
+`roe.sh`, and the version named in `README.md` and `AGENTS.md`. Nothing reads
+the Ruby version from the Gemfile, so it isn't pinned there.
+
+How each kind of install picks it up:
+
+- **The in-app updater (user installs).** Handled by
+  `RoeUpdater::UpdateOrchestrator`. Right after downloading, `checking_ruby`
+  reads `staging/.ruby-version`. If that exact Ruby isn't installed (mise or
+  rbenv), the update pauses at `awaiting_ruby` with an Install / Cancel panel;
+  nothing is switched or migrated yet. On Install it installs mise if needed,
+  sets mise to read `.ruby-version` and to use precompiled Rubies, and runs
+  `mise install ruby@<version>` (the global Ruby is left alone). After the
+  switch, `installing_gems` and `building_assets` run under the new Ruby
+  (`mise exec ruby@<version> --`), so native gems are built for it. The update
+  is run by the *old* version's updater, so this only works because every
+  release since the 4.0.5 move has had `checking_ruby`.
+- **`roe start` / `roe restart` (an install updated with `git pull`).**
+  `roe.sh`'s `ensure_app_ruby_and_gems` runs first. If the Ruby in
+  `.ruby-version` isn't the one being found, it offers to install it with
+  mise (`mise install`, same as the updater), then offers `bundle install` if
+  `bundle check` fails, and carries on starting. On restart it runs before the
+  server is stopped, so saying no leaves the running server up. The global
+  `roe restart` stops and starts in two steps, so it asks first through
+  `roe.sh ruby-ready` (only when the install's `roe.sh` has it). With nobody
+  at the keyboard it prints the commands and stops. An install the updater
+  brought up to date passes both checks without a word. Before this, a pulled
+  install quietly kept running on the old Ruby: `mise env -C` only warns about
+  a missing version, and the next Ruby on the PATH was used.
+- **`./roe.sh check` / a fresh install.** Installs the Ruby with
+  `mise use --global` (the installer's path, which also sets the global).
+- **Live sites (Fly, Kamal).** Built from the `Dockerfile`, so deploying the new
+  release builds an image on the new Ruby.
+
+On a development checkout (a git branch) the updater refuses to run, so after
+changing `.ruby-version`: `mise install ruby@<version>`, `bundle install` in
+`current/`, the full suite, then `roe restart` (which would also offer both).
+Old Rubies stay installed until `mise uninstall ruby@<old>`.
+
+**Precompiled Rubies and older macOS.** Roe sets mise's `ruby.compile false`
+(fast, no build tools). mise's precompiled Ruby 4.0.10 for macOS is built on
+macOS 26 (`RUBY_PLATFORM` `arm64-darwin25`), and its headers include
+`<stdckdint.h>`, which the Command Line Tools for macOS 14 (Apple clang 16)
+don't have. Ruby itself runs, but every gem with C code fails to build
+(`ed25519` first, reported as "You have to install development tools
+first"). On such a Mac, build Ruby from source instead:
+`mise uninstall ruby@4.0.10 && MISE_RUBY_COMPILE=true mise install ruby@4.0.10`
+(a few minutes; uses Homebrew's openssl, libyaml and gmp). Test for the
+problem with `echo '#include <stdckdint.h>' | cc -x c -fsyntax-only -`.
 
 ---
 

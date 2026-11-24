@@ -57,5 +57,7 @@ Checked again on 2026-11-13 for 0.5.0:
   syncs no longer take a local snapshot. See [site-sync.md](site-sync.md).
 - **Resolving conflicts finishes the sync** in the same run; the roadmap's old
   "run the sync again afterwards" follow-up is done.
+- **Ruby is 4.0.10** (`current/.ruby-version`), a security update from 4.0.5.
+  How a Ruby change reaches each install: [roadmap.md](roadmap.md#changing-the-ruby-version-how-each-install-gets-it).
 
 Nothing in `conventions.md` has expired. Those still stand.

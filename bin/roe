@@ -368,6 +368,13 @@ cmd_restart() {
     if pid="$(server_pid_for "$(_conf_get "$f" ROOT)")"; then
         running_port="$(port_for_pid "$pid")"
     fi
+    # After a `git pull`, the Ruby and gems it needs are asked about before
+    # the server is stopped, so saying no leaves it running. Only an
+    # install whose roe.sh knows how (older ones don't have ruby-ready).
+    local script
+    if script="$(roe_sh_for "$f")" && grep -q "ruby-ready)" "$script"; then
+        run_in "$f" ruby-ready || return 1
+    fi
     cmd_stop "$1"
     sleep 1
     ROE_PREFERRED_PORT="$running_port" cmd_start "$1"
