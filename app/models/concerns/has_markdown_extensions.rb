@@ -1107,10 +1107,30 @@ module HasMarkdownExtensions
   end
 
   def render_collection(config)
+    @menu_missing = nil
     display_items, total_count, warning = resolve_collection_items(config)
     return warning if warning
 
-    render_resolved_collection(config, display_items, total_count)
+    html = render_resolved_collection(config, display_items, total_count)
+    "#{menu_missing_warning(config)}#{html}"
+  end
+
+  # A menu's order: names that match nothing are left out of the menu. Say
+  # which, above it, so a typo (or a page that's gone) is seen, not just
+  # missed. curate_menu collects them in @menu_missing.
+  def menu_missing_warning(config)
+    missing = @menu_missing
+    @menu_missing = nil
+    return "" if missing.blank?
+
+    noun = collection_source_noun(collection_source(config))
+    names = missing.map { |name| "`#{name}`" }.to_sentence
+    # COPY: menu names that match nothing
+    dev_warning(
+      "Menu #{'name'.pluralize(missing.size)} not found",
+      "#{names} #{missing.size == 1 ? "doesn't" : "don't"} match a #{noun}, so #{missing.size == 1 ? "it's" : "they're"} left out of this menu.",
+      "Check the url_name or file name. ADD NAVIGATION in the layout editor lists every name you can use."
+    )
   end
 
   # Default source for a collection, shared by resolve_collection_items and
@@ -1553,6 +1573,7 @@ module HasMarkdownExtensions
       if Rails.env.development? && missing.any?
         Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}")
       end
+      @menu_missing = missing
     end
 
     tagged = []
@@ -4339,11 +4360,21 @@ module HasMarkdownExtensions
   # alone isn't enough of a test: a feed rendered on a dev machine was shipping
   # the "Stripe isn't connected" notice into content:encoded, so it arrived in
   # a real reader as part of the article.
+  #
+  # Roe's own docs are the exception: they show them everywhere but feeds,
+  # live and static included. There the warning is part of the example: a
+  # block that needs the site's own post shows why it's empty on a site that
+  # hasn't got one, so "That block ↑ looks like this ↓" stays true.
   def show_block_warnings?
-    return false if @rendering_static
     return false if @rendering_feed
+    return true if roe_doc?
+    return false if @rendering_static
 
     Rails.env.development? || @rendering_preview.present?
+  end
+
+  def roe_doc?
+    is_a?(Documentation) && file_path.to_s.include?("/documentation/roe/")
   end
 
   # The closest term in `vocabulary`, or nil if nothing is close. Ruby's own

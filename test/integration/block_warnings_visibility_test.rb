@@ -94,6 +94,21 @@ class BlockWarningsVisibilityTest < ActionDispatch::IntegrationTest
       "a local author browsing their own site is the case this was built for"
   end
 
+  # Roe's own docs ship to every site, and an example that needs the site's
+  # own post is empty on a site without one. The warning is what tells the
+  # reader why, so it shows there on live and in static output too.
+  test "Roe's own docs show the warning everywhere but feeds" do
+    doc = Documentation.new(file_path: File.join(RoeSitePaths::SITE_PATH, "documentation/roe/zz-example.md"),
+                            content: "```card\ntype: post-link\npost: no-such-post\n```\n")
+    mine = Documentation.new(file_path: File.join(RoeSitePaths::SITE_PATH, "documentation/mine/zz-example.md"),
+                             content: doc.content)
+
+    assert warning?(doc.to_html.to_s)
+    assert warning?(doc.to_html(static: true).to_s)
+    assert_not warning?(doc.to_html(feed: true).to_s)
+    assert_not warning?(mine.to_html.to_s), "the site's own docs follow the usual rule"
+  end
+
   # Static output outlives the request that made it, so it's excluded outright
   # rather than by trusting the preview flag to be false.
   test "a static render is silent whatever it is asked for" do
