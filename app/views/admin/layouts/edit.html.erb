@@ -20,7 +20,7 @@
     converting either way or updating in kind. Its own Stimulus controller;
     the inline script below (save, preview, cursor restore) is unchanged. %>
 <% links_for_picker = useful_links %>
-<% page_options = Page.published.map { |pg| [ pg.title.to_s.presence || pg.url_name, pg.url_name.to_s, "/#{pg.url_name}" ] }.sort_by { |l, _, _| l.downcase } %>
+<% page_options = Page.published.map { |pg| [ pg.title.to_s.presence || pg.url_name, pg.url_name.to_s, pg.public_url ] }.sort_by { |l, _, _| l.downcase } %>
 <div class="mb-5 flex gap-2.5 items-center"
      data-controller="site-links"
      data-site-links-convert-url-value="<%= admin_layouts_menu_builder_path %>"

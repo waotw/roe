@@ -43,6 +43,7 @@
        data-editor-original-url-name-value="<%= @page.url_name %>"
        data-editor-filename-slug-value="<%= File.basename(@page.file_path.to_s, '.md') %>"
        data-editor-published-value="<%= @page.published? %>"
+       data-editor-home-page-value="<%= @page.home? %>"
        data-editor-public-path-prefix-value="/">
 
     <%# Set by the editor when the user picks "Save new URL & redirect" in the

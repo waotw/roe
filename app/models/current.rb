@@ -12,6 +12,10 @@ class Current < ActiveSupport::CurrentAttributes
   # posts only pay for one directory glob, not one File.exist? per ref.
   attribute :media_file_set
 
+  # Per-request answer to "which page is the home page" (Page.home), as
+  # [id] so a site with none is remembered too. Cleared when a page is saved.
+  attribute :home_page_lookup
+
   # Admin helpers
   def admin?
     user.present?

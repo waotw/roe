@@ -8,6 +8,9 @@
 #                     (or pages/checkout-success.md).
 #   3. its url_name — what every site before page_type relied on.
 #
+# The home page is one of them: `page_type: home` lets it have any file
+# name and url_name and still be the page at `/` (Page.home).
+#
 # signin, signup, upgrade, donate and unsubscribe go through MemberPages, which also
 # recognises a page by the form it carries.
 #
@@ -17,6 +20,7 @@ module SystemPages
   # page_type => when Roe shows it, the file it's installed as, and the
   # url_name it was found by before page_type.
   TYPES = {
+    "home" => { purpose: "as the home page, at /", file: "home", url_name: "home" },
     "signin" => { purpose: "for signing in", file: "signin", url_name: "sign-in" },
     "signup" => { purpose: "for signing up", file: "signup", url_name: "sign-up" },
     "upgrade" => { purpose: "for upgrading a membership", file: "upgrade", url_name: "upgrade" },

@@ -6,7 +6,7 @@ module CollectionsHelper
     when Documentation
       item.public_url
     when Page
-      "/#{item.url_name}"
+      item.public_url
     else
       "#"
     end

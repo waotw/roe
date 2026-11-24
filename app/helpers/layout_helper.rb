@@ -212,7 +212,8 @@ module LayoutHelper
 
       # Handle root/home - href is '/' or empty
       if href == "/" || href == "./" || href.end_with?("index.html") || normalized_href.empty?
-        if current_url_name == "home" || current_path == "/"
+        home_page = current_page.is_a?(Page) ? current_page : (@page if defined?(@page))
+        if current_path == "/" || current_url_name == "home" || (home_page.is_a?(Page) && home_page.home?)
           add_active_class(link)
         end
         next

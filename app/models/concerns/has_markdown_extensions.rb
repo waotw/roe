@@ -2569,6 +2569,8 @@ module HasMarkdownExtensions
       item.public_url
     elsif item.is_a?(Product)
       "/store/#{item.url_name}"
+    elsif item.is_a?(Page)
+      item.public_url
     else
       "/#{item.url_name}"
     end

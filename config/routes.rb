@@ -544,9 +544,9 @@ Rails.application.routes.draw do
   get "donate/cancel", to: "donations#cancel", as: :donation_cancel
 
   # Public site
-  # Root renders home.md as a regular page through PagesController#show.
-  # Same code path as any other public page — no special-case template.
-  root to: "pages#show", defaults: { url_name: "home" }
+  # Root renders the home page (Page.home: page_type home, else home.md,
+  # else url_name home) with the same template as any other page.
+  root to: "pages#home"
 
   # Redirect post ID to slug (preserves anchor in browser)
   get "p/:id", to: "posts#show_by_id", constraints: { id: /\d+/ }, as: :post_by_id

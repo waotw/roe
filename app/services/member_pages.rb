@@ -41,7 +41,7 @@ class MemberPages
       page = find(stem)
       return nil unless page
 
-      "/#{page.url_name}"
+      page.public_url
     end
 
     # Falls back to the conventional path when the page is missing, for callers

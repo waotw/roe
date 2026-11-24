@@ -128,6 +128,7 @@ export default class extends Controller {
     // Where this kind of content lives: "/posts/", "/" for pages, "/store/"
     // for products. Used only by the slug-change redirect modal.
     publicPathPrefix: { type: String, default: "/posts/" },
+    homePage: Boolean,
   };
 
   connect() {
@@ -2934,10 +2935,11 @@ export default class extends Controller {
   }
 
   // The public address for a slug, mirroring each model's public_url_for
-  // (a page called "home" is the site's front page).
+  // (a page called "home" is the site's front page). The home page itself is
+  // at "/" whatever its url_name (Page#home?).
   _publicPath(slug) {
     const prefix = this.publicPathPrefixValue;
-    if (prefix === "/" && slug === "home") return "/";
+    if (prefix === "/" && (slug === "home" || this.homePageValue)) return "/";
     return `${prefix}${slug}`;
   }
 

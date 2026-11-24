@@ -35,6 +35,8 @@ module RenameRedirect
   # (back to the title) counts.
   def add_rename_redirect(model, old_address, metadata, file_path)
     return if params[:create_redirect_from].blank? || old_address.blank?
+    # The home page stays at "/" whatever it's renamed to.
+    return if old_address == "/"
     return unless metadata["status"].to_s.strip == "published"
 
     new_slug = metadata["url_name"].to_s.strip.presence ||

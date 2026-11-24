@@ -8,18 +8,33 @@ class Page < ApplicationRecord
   include TouchesMediaUsageIndex
   include IndexesMediaReferences
 
-  # Public URL for the page on the live site. The `home` page renders
-  # at the root path (per config/routes.rb → root to: "pages#show",
-  # defaults: { url_name: "home" }) so we special-case it; everything
-  # else uses the catch-all `:url_name` route.
+  after_save    { Current.home_page_lookup = nil }
+  after_destroy { Current.home_page_lookup = nil }
+
+  # Public URL for the page on the live site. The home page is at `/`
+  # (PagesController#home), whatever its url_name; everything else uses the
+  # catch-all `:url_name` route.
   def public_url
-    self.class.public_url_for(url_name)
+    home? ? "/" : self.class.public_url_for(url_name)
   end
 
   # The address a page with this url_name has. Also used to work out the new
   # address when a page is renamed (RenameRedirect).
   def self.public_url_for(slug)
     slug.to_s == "home" ? "/" : "/#{slug}"
+  end
+
+  # The site's home page: `page_type: home`, else the file pages/home.md,
+  # else the page with url_name `home` (SystemPages). It's the page at `/`
+  # and in every link to it, so it can be renamed without losing either.
+  def self.home
+    Current.home_page_lookup ||= [ SystemPages.find("home")&.id ]
+    id = Current.home_page_lookup.first
+    id && find_by(id: id)
+  end
+
+  def home?
+    id.present? && id == (Current.home_page_lookup ||= [ SystemPages.find("home")&.id ]).first
   end
 
   # The page's own class on its <article>, `page-<url_name>` (themes target

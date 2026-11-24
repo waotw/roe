@@ -10,6 +10,10 @@
 #                        item share a name
 #   /pages/home.md       its file, in that folder
 #
+# `home` (or `pages/home`) also means the site's home page when no item has
+# that url_name or file name, so `order: home` keeps working after the home
+# page is renamed.
+#
 # A url_name wins over a file name: that's what every name written before
 # file names meant, so old cards and orders keep meaning the same thing. When
 # a short name could be two items, Roe uses the first and the Markdown check
@@ -55,7 +59,8 @@ module ItemName
     found = []
     found.concat(by_url_name(parsed)) unless parsed.file
     found.concat(by_file(parsed))
-    found.uniq
+    found << Page.home if found.empty? && home_name?(parsed)
+    found.compact.uniq
   end
 
   # Among `items` (a collection's), the one a name means: url_name first,
@@ -72,7 +77,12 @@ module ItemName
       hit = pool.find { |item| item.respond_to?(:url_name) && item.url_name.to_s.downcase == name }
       return hit if hit
     end
-    pool.find { |item| file_matches?(item, parsed) }
+    pool.find { |item| file_matches?(item, parsed) } ||
+      (home_name?(parsed) ? pool.find { |item| item.is_a?(Page) && item.home? } : nil)
+  end
+
+  def home_name?(parsed)
+    parsed.name.to_s.downcase == "home" && !parsed.file && parsed.folder.in?([ nil, "pages" ])
   end
 
   def by_url_name(parsed)
