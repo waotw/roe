@@ -2742,6 +2742,52 @@
         22
       ],
       "note": "The path comes from SiteSync::VersionPreview.source: a stored object named by a validated SHA-256, or the /site file whose contents match that SHA. params[:id] only picks a recorded change; no request value reaches the path."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "warning_code": 0,
+      "fingerprint": "cae552678800ed40e45d9cb38f6b1eeff8b2cd1b3621a84c9da00be60f336cf5",
+      "check_name": "SQL",
+      "message": "Possible SQL injection",
+      "file": "app/models/concerns/has_metadata.rb",
+      "line": 71,
+      "link": "https://brakemanscanner.org/docs/warning_types/sql_injection/",
+      "code": "where(\"NOT (#{HasMetadata.tag_match_sql(table_name)})\", tag.to_s.strip, tag.to_s.strip)",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "HasMetadata",
+        "method": null
+      },
+      "user_input": "HasMetadata.tag_match_sql(table_name)",
+      "confidence": "Medium",
+      "cwe_id": [
+        89
+      ],
+      "note": "The interpolated SQL is HasMetadata.tag_match_sql(table_name): fixed SQL built from the model's own table name. The tag itself is passed as a bound ? parameter (twice), never interpolated."
+    },
+    {
+      "warning_type": "File Access",
+      "warning_code": 16,
+      "fingerprint": "e75855f65e942f87173ace38829a6ddb9ff0ab9e101b079d84e1ac450f18f749",
+      "check_name": "SendFile",
+      "message": "Parameter value used in file name",
+      "file": "app/controllers/admin/medium_controller.rb",
+      "line": 465,
+      "link": "https://brakemanscanner.org/docs/warning_types/file_access/",
+      "code": "send_file(VideoVariantGenerator.frame_preview(Medium.find(params[:id]).file_path, params[:at]), :type => \"image/jpeg\", :disposition => \"inline\")",
+      "render_path": null,
+      "location": {
+        "type": "method",
+        "class": "Admin::MediumController",
+        "method": "frame"
+      },
+      "user_input": "params[:at]",
+      "confidence": "Weak",
+      "cwe_id": [
+        22
+      ],
+      "note": "The path is built by VideoVariantGenerator.frame_preview: tmp/video_variants/frames/<sha1 of the video's own path, size and mtime>-<at>.jpg. params[:at] only reaches it as a Float (to_f, clamped, formatted %.2f); the video comes from Medium.find, never a request path."
     }
   ],
   "brakeman_version": "8.1.0"
