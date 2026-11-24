@@ -725,6 +725,11 @@ end
 def ci_hints(output)
   plain = output.gsub(/\e\[[\d;]*m/, "")
   hints = []
+  # Which steps failed, by name: a failure early on (Brakeman) prints its
+  # report thousands of lines above the end, under all the test output.
+  failed = plain.scan(/^❌ (.+?) failed in /).flatten.uniq - [ "Continuous Integration" ]
+  hints << "Failed: #{failed.join(', ')}." unless failed.empty?
+  brakeman_warnings(plain).each { |w| hints << "  #{w}" }
   if plain.include?("is not the latest version")
     hints << "Brakeman fails until it's the newest release (bin/brakeman adds --ensure-latest):"
     hints << "  #{orange("bundle update brakeman --conservative")}, then commit Gemfile.lock."
@@ -738,6 +743,19 @@ def ci_hints(output)
     failing.first(10).each { |t| hints << "  #{orange("bin/rails test #{t}")}" }
   end
   hints
+end
+
+# Brakeman's warnings, one line each ("Message — file:line"), from its report
+# in the CI output.
+def brakeman_warnings(plain)
+  report = plain[/^== Warnings ==\n(.*?)(?:^❌|^✅|\z)/m, 1].to_s
+  report.split(/\n\s*\n/).filter_map do |block|
+    message = block[/^Message: (.+)$/, 1] or next
+    file = block[/^File: (.+)$/, 1]
+    line = block[/^Line: (\d+)$/, 1]
+    where = [ file, line ].compact.join(":")
+    where.empty? ? message : "#{message} — #{where}"
+  end
 end
 
 # ── Release notes ───────────────────────────────────────────────────────────
