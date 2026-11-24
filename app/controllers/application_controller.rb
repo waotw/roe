@@ -7,6 +7,11 @@ class ApplicationController < ActionController::Base
 
   layout "site"
 
+  # Know whether an admin is signed in on every page, public ones included,
+  # so a broken block's warning shows for them and nobody else
+  # (HasMarkdownExtensions#show_block_warnings?).
+  before_action :resume_session
+
   # Render 404 for RecordNotFound
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 

@@ -8,7 +8,7 @@ module HasMarkdownExtensions
   PRODUCT_GRID_IMAGE_SIZES =
     "(min-width: 901px) 220px, (min-width: 769px) 30vw, (min-width: 401px) 45vw, 100vw".freeze
 
-  def to_html(preview: false, context: nil, static: false, feed: false)
+  def to_html(preview: false, context: nil, static: false, feed: false, email: false)
     # Store context for use by form renderers
     @render_context = context
 
@@ -29,6 +29,11 @@ module HasMarkdownExtensions
     # strips dynamic blocks, and a feed needs the paywall gate marker intact
     # for FeedGenerator#preview_before_gate to split on.
     @rendering_feed = feed
+
+    # Whether this render is going into an email (a newsletter, or its test
+    # send). Like a feed it leaves the building, so it never carries a block
+    # warning, even when a signed-in admin's request renders it.
+    @rendering_email = email
 
     # In static-site mode, strip dynamic blocks that require a Rails
     # backend (forms, paywalls, product buttons). Done before any other
@@ -158,6 +163,7 @@ module HasMarkdownExtensions
     @render_context = nil
     @rendering_static = nil
     @rendering_feed = nil
+    @rendering_email = nil
   end
 
   # IDs that belong to injected third-party mount points and must never be
@@ -4339,12 +4345,11 @@ module HasMarkdownExtensions
   #
   #   dev_warning("Title", "What went wrong", "optional hint or context")
   #
-  # Shown while writing — in development, and in an editor preview whatever the
-  # environment. Silent everywhere else, which is the important half: a
-  # published URL never shows these, so a reader can't be handed a diagnostic
-  # and a self-hosted site can't leak one. Static builds are excluded outright
-  # rather than relying on the preview flag being false, because a generated
-  # file outlives the request that made it.
+  # Shown to whoever can fix it: anyone on a local install, a signed-in admin
+  # on live, and the editor preview. Silent for everyone else, which is the
+  # important half: a visitor is never handed a diagnostic. Static builds,
+  # feeds and emails are excluded outright, because they outlive the request
+  # that made them.
   #
   # Without the preview case these were invisible to anyone not running Roe
   # locally — the writer whose block silently rendered nothing got no
@@ -4361,20 +4366,14 @@ module HasMarkdownExtensions
   # the "Stripe isn't connected" notice into content:encoded, so it arrived in
   # a real reader as part of the article.
   #
-  # Roe's own docs are the exception: they show them everywhere but feeds,
-  # live and static included. There the warning is part of the example: a
-  # block that needs the site's own post shows why it's empty on a site that
-  # hasn't got one, so "That block ↑ looks like this ↓" stays true.
+  # Who sees them: anyone on a local (development) install, and a signed-in
+  # admin anywhere, live included. Nobody else ever does: a visitor on live,
+  # a static file, a feed or an email never carries one.
   def show_block_warnings?
-    return false if @rendering_feed
-    return true if roe_doc?
-    return false if @rendering_static
+    return false if @rendering_static || @rendering_feed || @rendering_email
+    return false if Current.static_generation
 
-    Rails.env.development? || @rendering_preview.present?
-  end
-
-  def roe_doc?
-    is_a?(Documentation) && file_path.to_s.include?("/documentation/roe/")
+    Rails.env.development? || @rendering_preview.present? || Current.user.present?
   end
 
   # The closest term in `vocabulary`, or nil if nothing is close. Ruby's own

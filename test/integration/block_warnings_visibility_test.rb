@@ -6,7 +6,9 @@ require "test_helper"
 # to be development-only, which meant anyone running Roe on a server saw nothing
 # at all when a block quietly rendered empty.
 #
-# They now show in the editor preview in any environment, and nowhere else.
+# They show to whoever can fix the block: anyone on a local install, a
+# signed-in admin on live, and the editor preview. A visitor, a static file, a
+# feed and an email never carry one.
 #
 # This runs in the test environment, where warnings are off, so a bare
 # assert_not passes whether or not suppression works. Assertions here are
@@ -45,13 +47,29 @@ class BlockWarningsVisibilityTest < ActionDispatch::IntegrationTest
       "a reader must never be handed an editor diagnostic"
   end
 
-  test "a published page shows no warning even to a signed-in admin" do
+  test "a signed-in admin sees the warning on the published page" do
     sign_in_as(User.take)
     get "/posts/broken-block"
 
     assert_response :success
-    assert_not warning?(response.body),
-      "the published URL is the published URL, whoever is looking at it"
+    assert warning?(response.body), "the admin is the one who can fix it"
+    assert_includes response.body, "Unknown collection source"
+  end
+
+  test "the same page shows a signed-out visitor nothing" do
+    sign_in_as(User.take)
+    get "/posts/broken-block"
+    sign_out
+    get "/posts/broken-block"
+
+    assert_not warning?(response.body)
+  end
+
+  test "an email never carries a warning, whoever renders it" do
+    in_development do
+      assert_not warning?(@post.to_html(email: true).to_s)
+      assert_not warning?(NewsletterRenderer.new(@post).preview.to_s)
+    end
   end
 
   test "the editor preview explains the block" do
@@ -92,21 +110,6 @@ class BlockWarningsVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert warning?(response.body),
       "a local author browsing their own site is the case this was built for"
-  end
-
-  # Roe's own docs ship to every site, and an example that needs the site's
-  # own post is empty on a site without one. The warning is what tells the
-  # reader why, so it shows there on live and in static output too.
-  test "Roe's own docs show the warning everywhere but feeds" do
-    doc = Documentation.new(file_path: File.join(RoeSitePaths::SITE_PATH, "documentation/roe/zz-example.md"),
-                            content: "```card\ntype: post-link\npost: no-such-post\n```\n")
-    mine = Documentation.new(file_path: File.join(RoeSitePaths::SITE_PATH, "documentation/mine/zz-example.md"),
-                             content: doc.content)
-
-    assert warning?(doc.to_html.to_s)
-    assert warning?(doc.to_html(static: true).to_s)
-    assert_not warning?(doc.to_html(feed: true).to_s)
-    assert_not warning?(mine.to_html.to_s), "the site's own docs follow the usual rule"
   end
 
   # Static output outlives the request that made it, so it's excluded outright
