@@ -92,13 +92,15 @@ class LinkCheckTest < ActiveSupport::TestCase
     before = File.exist?(path) ? File.read(path) : nil
     File.write(path, "[Site](/)\n\n```collection\ntemplate: menu\norder: lc-no-such-page\n```\n")
 
-    problem = LinkCheck.run!["problems"].find { |p| p["item_type"] == "Layout" }
+    layout_problems = LinkCheck.run!["problems"].select { |p| p["item_type"] == "Layout" }
+    problem = layout_problems.find { |p| p["item_id"] == "header" && p["target"] == "lc-no-such-page" }
 
-    assert_equal [ "header", 5, "lc-no-such-page", "links" ], problem.values_at("item_id", "line", "target", "section")
+    assert problem, "no header problem for lc-no-such-page; layout problems: #{layout_problems.inspect}"
+    assert_equal [ 5, "links" ], problem.values_at("line", "section")
     assert_equal "/admin/layout/header/edit?highlight=lc-no-such-page&line=5",
                  ApplicationController.helpers.link_problem_path(problem, {})
   ensure
-    before ? File.write(path, before) : File.delete(path)
+    before ? File.write(path, before) : FileUtils.rm_f(path)
   end
 
   test "nothing stored yet reads as nil" do
