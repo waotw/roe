@@ -45,7 +45,7 @@ Once you're comfortable creating posts and pages, Roe can help you build richer 
 With Roe-anji you can add:
 
 - **Collections.** These are lists of your content (such as 'latest posts' or 'featured articles') which you can place in posts, pages and layouts. [Learn more about Collections →](/documentation/roe/collections)
-- **Cards.** These are ‘content-blocks’ (such as pull-quotes, links to other posts, and asides) you can drop into a page or post. [Learn more about Cards →](cards.md)
+- **Cards.** These are ‘content-blocks’ (such as pull-quotes, links to other posts, and asides) you can drop into a page or post. [Learn more about Cards →](/documentation/roe/cards)
 - **Image galleries.** These are groups of images. [Learn more about Galleries →](/documentation/roe/galleries)
 
 Roe-anji, like markdown, is very easy to learn, and just like markdown, you can learn as you go, which we’ll do now…

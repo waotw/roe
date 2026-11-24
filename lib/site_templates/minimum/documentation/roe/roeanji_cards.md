@@ -133,7 +133,7 @@ Post links are a great way to link to other posts in your site with support for 
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 ````
 
@@ -142,7 +142,7 @@ post: collection-full
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 
 ### Options
@@ -169,7 +169,7 @@ post: collection-full
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 ````
 
@@ -178,7 +178,7 @@ post: collection-full
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 
 And you can change the size (small/medium/large)
@@ -187,7 +187,7 @@ And you can change the size (small/medium/large)
 ```card
 type: post-link
 style: medium
-post: collection-full
+post: welcome
 ```
 ````
 
@@ -196,7 +196,7 @@ post: collection-full
 ```card
 type: post-link
 style: medium
-post: collection-full
+post: welcome
 ```
 
 This simple syntax will pull all the information from the Post itself. You can also override this fully if you want. Just add the fields you'd like to replace ↓ :
@@ -204,7 +204,7 @@ This simple syntax will pull all the information from the Post itself. You can a
 ````markdown
 ```card
 type: post-link
-post: collection-full
+post: welcome
 style: large
 title: Collection Full
 author: Benjamin Welch, Esq.
@@ -218,7 +218,7 @@ link_text: Read more…
 
 ```card
 type: post-link
-post: collection-full
+post: welcome
 style: large
 title: Collection Full
 author: Benjamin Welch, Esq.

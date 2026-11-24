@@ -22,12 +22,11 @@
     </div>
   </div>
 
-  <%# COPY — section titles and empty-section lines %>
   <% [
-       [ "media", "Media", "missing", "None. Every media file is in the media library." ],
+       [ "media", "Media", "missing", "None. Every media file link is working." ],
        [ "links", "Links", "broken", "None. Every link matches a post, page, product or doc." ],
        [ "drafts", "Links to drafts", "", "None. A link to a draft shows as plain text until the draft is published." ],
-       [ "in_drafts", "In drafts", "", "None. Problems in drafts are listed here and don't count until the draft is published." ]
+       [ "in_drafts", "In drafts", "", "None. Problems in drafts are listed here bu aren't an issue until the draft is published." ]
      ].each do |section, title, noun, empty| %>
     <% rows = problems.select { |p| p["section"] == section } %>
     <% counted = section == "in_drafts" ? rows.size : rows.count { |p| !p["warning"] } %>

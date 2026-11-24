@@ -90,7 +90,6 @@ class RoeDocsLinks
   # problems: [{ section:, warning:, where:, message: }]
   def self.report_lines(heading:, problems:)
     lines = [ heading, "" ]
-    # COPY: report sections
     listed_only = [ IN_DRAFTS, "site" ]
     [ [ "media", "MISSING MEDIA" ], [ "links", "BROKEN LINKS" ], [ "drafts", "LINKS TO DRAFTS" ],
       [ IN_DRAFTS, "IN DRAFTS (listed only, nothing is blocked)" ],

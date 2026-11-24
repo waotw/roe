@@ -156,6 +156,47 @@ class VideoVariantGenerator
 
     def manifest_path(source) = variant_path_for(source, nil)
 
+    # Move a renamed video's web versions, poster and manifest to the new
+    # name, and point the manifest at the new paths. Without this the
+    # renamed original had no versions: Roe made them again and the poster
+    # you chose was lost. Returns how many files moved.
+    def rename_variants!(old_source, new_source)
+      old_source = normalize_path(old_source)
+      new_source = normalize_path(new_source)
+      moved = all_variant_paths(old_source).zip(all_variant_paths(new_source)).count do |from, to|
+        next false unless File.file?(from) && !File.exist?(to)
+
+        File.rename(from, to)
+        true
+      end
+
+      path = manifest_path(new_source)
+      return moved unless File.file?(path)
+
+      with_manifest_lock(path) do
+        manifest = JSON.parse(File.read(path))
+        from = web_path_for(old_source)
+        to = web_path_for(new_source)
+        renamed = ->(web) { web.is_a?(String) ? web.sub(variant_web_prefix(from), variant_web_prefix(to)) : web }
+        manifest["source"]["path"] = to if manifest["source"].is_a?(Hash)
+        manifest["poster"] = renamed.(manifest["poster"])
+        [ MANIFEST_LIST, LEGACY_MANIFEST_LIST ].each do |list|
+          Array(manifest[list]).each { |r| r["path"] = renamed.(r["path"]) if r.is_a?(Hash) }
+        end
+        File.write(path, JSON.pretty_generate(manifest) + "\n")
+      end
+      moved
+    rescue JSON::ParserError, SystemCallError => e
+      Rails.logger.warn("[VideoVariantGenerator] rename #{old_source} → #{new_source}: #{e.message}")
+      moved.to_i
+    end
+
+    # "/media/video/variants/clip-" for /media/video/clip.mov: what every
+    # variant's web path starts with.
+    def variant_web_prefix(web)
+      "#{File.dirname(web)}/variants/#{File.basename(web, '.*')}-"
+    end
+
     # Every file name this generator could make for a source, for cleanup
     # and for tracing a variant back to its (possibly paid) original.
     def all_variant_paths(source)

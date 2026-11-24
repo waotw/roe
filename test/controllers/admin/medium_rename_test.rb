@@ -43,6 +43,39 @@ class Admin::MediumRenameTest < ActionDispatch::IntegrationTest
     refute_includes File.read(post_file), old_web
   end
 
+  test "a renamed video keeps its web versions, manifest and chosen poster" do
+    video_dir = File.join(RoeSitePaths::SITE_PATH, "media", "video")
+    vdir = File.join(video_dir, "variants")
+    FileUtils.mkdir_p(vdir)
+    File.write(File.join(video_dir, "zz-old-clip.mp4"), "MP4DATA")
+    File.write(File.join(vdir, "zz-old-clip-720p.mp4"), "720")
+    File.write(File.join(vdir, "zz-old-clip-poster.jpg"), "JPG")
+    File.write(File.join(vdir, "zz-old-clip-video.json"), JSON.pretty_generate(
+      "source" => { "path" => "/media/video/zz-old-clip.mp4", "size" => 7 },
+      "poster" => "/media/video/variants/zz-old-clip-poster.jpg",
+      "poster_from" => "frame", "poster_at" => 12.5,
+      "renditions" => [ { "name" => "720p", "path" => "/media/video/variants/zz-old-clip-720p.mp4" } ]
+    ))
+    medium = Medium.create!(file_path: "/media/video/zz-old-clip.mp4", media_type: "video")
+
+    patch rename_admin_medium_path(medium), params: { new_filename: "zz-new-clip" }
+
+    %w[zz-new-clip-720p.mp4 zz-new-clip-poster.jpg zz-new-clip-video.json].each do |name|
+      assert File.exist?(File.join(vdir, name)), "#{name} should have moved"
+    end
+    assert_empty Dir.glob(File.join(vdir, "zz-old-clip-*"))
+
+    manifest = JSON.parse(File.read(File.join(vdir, "zz-new-clip-video.json")))
+    assert_equal "/media/video/zz-new-clip.mp4", manifest.dig("source", "path")
+    assert_equal "/media/video/variants/zz-new-clip-poster.jpg", manifest["poster"]
+    assert_equal "/media/video/variants/zz-new-clip-720p.mp4", manifest.dig("renditions", 0, "path")
+    assert_equal [ "frame", 12.5 ], manifest.values_at("poster_from", "poster_at")
+    assert_equal({ from: "frame", at: 12.5 }, VideoVariantGenerator.poster_choice(manifest))
+  ensure
+    Dir.glob(File.join(video_dir, "zz-*")).each { |f| File.delete(f) }
+    Dir.glob(File.join(vdir, "zz-*")).each { |f| File.delete(f) }
+  end
+
   test "rejects renaming onto an existing filename" do
     File.write(File.join(@images_dir, "a.jpg"), "A")
     File.write(File.join(@images_dir, "b.jpg"), "B")

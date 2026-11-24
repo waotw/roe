@@ -46,7 +46,7 @@ class MarkdownDoctor
     unclear_name: "Name that matches more than one item",
     draft_link: "Link to a draft",
     missing_media: "Media file that isn't there",
-    site_name: "Name that depends on the site"
+    site_name: "Names one of the site's own posts or pages"
   }.freeze
 
   # Which issues Fix All is allowed to touch.

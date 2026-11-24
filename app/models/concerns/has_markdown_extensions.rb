@@ -1131,11 +1131,10 @@ module HasMarkdownExtensions
 
     noun = collection_source_noun(collection_source(config))
     names = missing.map { |name| "`#{name}`" }.to_sentence
-    # COPY: menu names that match nothing
     dev_warning(
       "Menu #{'name'.pluralize(missing.size)} not found",
       "#{names} #{missing.size == 1 ? "doesn't" : "don't"} match a #{noun}, so #{missing.size == 1 ? "it's" : "they're"} left out of this menu.",
-      "Check the url_name or file name. ADD NAVIGATION in the layout editor lists every name you can use."
+      "Check the url_name or file name. ADD NAVIGATION in the layout editor lists every page you can use."
     )
   end
 

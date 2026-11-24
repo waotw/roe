@@ -1,9 +1,8 @@
-  <%# COPY — "Have Roe set up your Postmark integration" (account-API setup).
-    Placeholder copy the user rewrites before commit. Two shapes by env
-    (postmark_setup_mode): production runs the full live setup and verifies the
-    webhook end-to-end; local runs the sandbox-only setup and discards the
-    account token. Owned by the postmark-setup Stimulus controller; posts to its
-    own endpoints so the rest of the page is untouched. %>
+  <%#
+    Two shapes by env (postmark_setup_mode): production runs the full live setup
+    and verifies the webhook end-to-end; local runs the sandbox-only setup and
+    discards the account token. Owned by the postmark-setup Stimulus controller;
+    posts to its own endpoints so the rest of the page is untouched. %>
 <% mode = postmark_setup_mode %>
 
 <div class="config-section mb-6 p-4 border border-blue-200 bg-blue-50"
@@ -15,17 +14,14 @@
   <p class="text-sm text-gray-700 mb-3">
     <% if mode == :live %>
 
-      <%# COPY %>
       Paste a Postmark <strong>Account API token</strong> and Roe will create your sandbox and
       live servers, connect the delivery webhook, and send a test to confirm everything works.
-      Your account token is stored encrypted on this server so Roe monitor the integration and let you know about any issues. You can remove your Account API Key in the Danger Zone below.
+      Your account token is stored encrypted on this server so Roe can monitor the integration and let you know about any issues. You can remove your Account API Key in the Danger Zone below.
 
     <% else %>
 
-      <%# COPY %>
       Paste your Postmark <strong>Account API token</strong> and Roe will set up your test server
-      and verify everything's connected. A local install of Roe will never keep your account token or live keys, so you'll run this again when you've deployed a live site — but your sandbox will
-      be ready to test right now.
+      and verify everything's connected. A local install of Roe will never keep your account token or live keys, so you'll run this again when you've deployed a live site — but your sandbox will be ready to test on the local site.
 
     <% end %>
   </p>
@@ -52,7 +48,6 @@
     <div data-postmark-setup-target="preview" hidden class="space-y-3 pt-2">
       <div data-postmark-setup-target="reuse" hidden class="p-3 border border-gray-200 bg-white">
         <p class="text-sm text-gray-700 mb-2">
-          <%# COPY %>
           You already have servers on Postmark. Reuse them, or let Roe create new ones.
           (The default <span class="font-mono">My First Server</span> is left alone.)
         </p>
@@ -82,8 +77,7 @@
   <% if @postmark_config&.account_token_present? %>
     <div class="mt-3 pt-3 border-t border-blue-200">
       <p class="text-xs text-gray-600 mb-2">
-        <%# COPY %>
-        Roe checks your webhooks with Postmark. Run it again any time to confirm they still reach your site.
+        Roe checks your Postmark webhooks. Run this again any time to confirm they still reach your site.
       </p>
       <%= button_to "Re-check", admin_postmark_verify_webhooks_config_path,
             method: :post,

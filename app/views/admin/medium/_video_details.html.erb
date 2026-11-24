@@ -24,16 +24,14 @@
      class="bg-white border border-gray-300 rounded-xs shadow-2xl text-sm">
 
   <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-300">
-    <%# COPY: window title %>
     <span class="font-mono text-xs text-gray-500 shrink-0">VIDEO</span>
     <span class="font-mono text-xs text-gray-900 truncate"><%= name %></span>
     <button type="button" data-action="video-details#close" class="ml-auto text-gray-500 hover:text-gray-900 text-lg leading-none px-1" aria-label="Close">×</button>
   </div>
 
   <div class="flex px-4 border-b border-gray-200 font-mono text-xs">
-    <%# COPY: tab labels %>
     <button type="button" data-video-details-target="tab" data-tab="frame" data-action="video-details#tab"
-            class="px-5 pt-2.5 pb-2 border-b-2 border-gray-900 font-bold text-gray-900">FRAME FROM THE VIDEO</button>
+            class="px-5 pt-2.5 pb-2 border-b-2 border-gray-900 font-bold text-gray-900">FRAME FROM VIDEO</button>
     <button type="button" data-video-details-target="tab" data-tab="image" data-action="video-details#tab"
             class="px-5 pt-2.5 pb-2 border-b-2 border-transparent text-gray-500 hover:text-gray-800">IMAGE FROM MEDIA</button>
   </div>
@@ -41,9 +39,8 @@
   <div class="flex flex-col md:flex-row gap-5 p-4">
     <div class="flex-1 min-w-0">
       <% unless can_choose %>
-        <%# COPY: no ffmpeg here %>
         <p class="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-xs">
-          Choosing a poster needs ffmpeg on this computer. Install it with <code>roe install ffmpeg</code>.
+          Choosing a poster needs ffmpeg on this computer. Install it with <code>roe install ffmpeg</code> in any terminal window.
         </p>
       <% end %>
 
@@ -66,8 +63,8 @@
               changes width. COPY: player buttons (aria-label) %>
           <button type="button" data-video-details-target="play" data-action="video-details#togglePlay" aria-label="Play"
                   class="<%= btn %> bg-gray-200 hover:bg-gray-300 inline-flex items-center justify-center w-10 self-stretch">
-            <svg data-icon="play" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor"/></svg>
-            <svg data-icon="pause" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true" hidden><rect x="2" y="1" width="3" height="10" fill="currentColor"/><rect x="7" y="1" width="3" height="10" fill="currentColor"/></svg>
+            <svg data-icon="play" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor" /></svg>
+            <svg data-icon="pause" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true" hidden><rect x="2" y="1" width="3" height="10" fill="currentColor" /><rect x="7" y="1" width="3" height="10" fill="currentColor" /></svg>
           </button>
           <button type="button" data-action="video-details#stepBack" class="<%= btn %> bg-gray-200 hover:bg-gray-300">‹ FRAME</button>
           <button type="button" data-action="video-details#stepForward" class="<%= btn %> bg-gray-200 hover:bg-gray-300">FRAME ›</button>
@@ -76,7 +73,6 @@
 
         <% points = video_jump_points(duration) %>
         <% if points.any? %>
-          <%# COPY: JUMP TO label %>
           <div class="font-mono text-[11px] text-gray-500 mt-1">JUMP TO</div>
           <div class="grid grid-cols-8 gap-1">
             <% points.each do |at| %>
@@ -98,7 +94,6 @@
       <div data-video-details-target="pane" data-tab="image" class="flex flex-col gap-2.5" hidden>
         <input type="search" data-video-details-target="search" data-action="input->video-details#filter"
                placeholder="Search images…" class="w-full border border-gray-300 px-2.5 py-1.5 text-sm rounded-xs">
-        <%# COPY: image tab note %>
         <p class="text-xs text-gray-500">For best results, choose an image that is landscape and close to 16:9.</p>
         <% if images.empty? %>
           <p class="text-xs text-gray-500">No images in the media library yet. Upload one in the Media Browser first.</p>
@@ -166,16 +161,14 @@
   </div>
 
   <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-300">
-    <%# COPY: footer notes, per tab %>
     <span data-video-details-target="footnote" data-tab="frame" class="text-xs text-gray-500 min-w-0">
-      Saves as <span class="font-mono"><%= File.basename(poster_file) %></span>, kept when the web versions are made again.
+      Saves as <span class="font-mono"><%= File.basename(poster_file) %></span>.
     </span>
     <span data-video-details-target="footnote" data-tab="image" class="text-xs text-gray-500 min-w-0" hidden>
-      <span data-video-details-target="pickedNote">Choose an image. It's copied in as the poster.</span>
+      <span data-video-details-target="pickedNote">Choose an image.</span>
     </span>
     <span data-video-details-target="error" class="text-xs text-red-700 min-w-0" hidden></span>
     <span class="ml-auto"></span>
-    <%# COPY: footer buttons %>
     <button type="button" data-video-details-target="closeButton" data-action="video-details#close" class="<%= btn %> bg-gray-200 hover:bg-gray-300">CANCEL</button>
     <button type="button" data-video-details-target="useFrame" data-action="video-details#useFrame"
             class="<%= btn %> bg-blue-100 hover:bg-blue-300" <%= "disabled" unless can_choose %>>USE THIS FRAME</button>

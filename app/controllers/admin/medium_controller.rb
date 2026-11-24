@@ -263,6 +263,9 @@ class Admin::MediumController < Admin::BaseController
       # Images carry responsive variants (variants/<base>-<size>.<ext> plus
       # .webp siblings) that must move with the original or they orphan.
       rename_image_variants(old_path, new_path) if media_type == "images"
+      # A video's web versions, poster and manifest move too, so the poster
+      # chosen for it (and the versions it took minutes to make) stay.
+      VideoVariantGenerator.rename_variants!(old_path, new_path) if media_type == "video"
       @medium.update(file_path: new_file_path)
 
       # A rename would otherwise break every link to the old path, so rewrite
