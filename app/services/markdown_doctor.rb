@@ -45,7 +45,8 @@ class MarkdownDoctor
     unclear_internal_link: "Link that matches more than one file",
     unclear_name: "Name that matches more than one item",
     draft_link: "Link to a draft",
-    missing_media: "Media file that isn't there"
+    missing_media: "Media file that isn't there",
+    site_name: "Name that depends on the site"
   }.freeze
 
   # Which issues Fix All is allowed to touch.
@@ -116,9 +117,9 @@ class MarkdownDoctor
   # parsers nest lists differently, and a rule that's right for one is a
   # false alarm for the other.
   def self.diagnose(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil,
-                    address_status: nil, media_exists: nil)
+                    address_status: nil, media_exists: nil, site_names: nil)
     new(content, page_ids: page_ids, gfm: gfm, link_status: link_status, name_matches: name_matches,
-                 address_status: address_status, media_exists: media_exists).diagnose
+                 address_status: address_status, media_exists: media_exists, site_names: site_names).diagnose
   end
 
   def self.diagnose_file(path, gfm: false)
@@ -148,8 +149,14 @@ class MarkdownDoctor
   #
   # media_exists: a callable taking a `/media/...` path and returning whether
   # the file is there. Optional.
+  #
+  # site_names: for text that ships to many sites (Roe's own docs), a callable
+  # taking where a name is (:card, or :order with the collection's source)
+  # and returning true when names there mean the site's own posts and pages.
+  # Those can't be checked here: the name works on a site that has that item
+  # and nowhere else. Optional; without it every name is checked.
   def initialize(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil,
-                 address_status: nil, media_exists: nil)
+                 address_status: nil, media_exists: nil, site_names: nil)
     @lines = content.to_s.lines
     @issues = []
     @page_ids = page_ids
@@ -157,6 +164,7 @@ class MarkdownDoctor
     @name_matches = name_matches
     @address_status = address_status
     @media_exists = media_exists
+    @site_names = site_names
     @gfm = gfm
   end
 
@@ -371,8 +379,19 @@ class MarkdownDoctor
       next unless block == "card"
 
       name = line[CARD_NAME_RE, 1]
-      name_issue(name, line_num, missing: "so the card can't show it") if name
+      next unless name
+
+      if @site_names&.call(:card, nil)
+        # COPY: card name in text that ships to many sites
+        site_name_issue(name, line_num, "a post on the site, not a doc, so this card only shows on a site that has it")
+      else
+        name_issue(name, line_num, missing: "so the card can't show it")
+      end
     end
+  end
+
+  def site_name_issue(name, line_num, what)
+    @issues << { type: :site_name, line: line_num, target: name, message: "#{name} is #{what}" }
   end
 
   # A name that matches nothing, or more than one thing. Shared by cards and
@@ -399,19 +418,41 @@ class MarkdownDoctor
   MENU_ENTRY_LINK_RE = /\A\[[^\]]*\]\([^)\s]+\)\z/
 
   def check_order_names
+    collection_blocks.each do |lines|
+      source = lines.map { |line, _| line[/\A\s*source:\s*(.+?)\s*\z/, 1] }.compact.first
+      lines.each do |line, line_num|
+        list = line[ORDER_LINE_RE, 1]
+        check_order_list(list, line_num, source) if list
+      end
+    end
+  end
+
+  # Each ```collection block as [[line, line_num], ...]. A block's lines come
+  # one after another; a gap means the next block.
+  def collection_blocks
+    blocks = []
     scan_blocks do |line, line_num, block|
       next unless block == "collection"
 
-      list = line[ORDER_LINE_RE, 1]
-      next unless list
+      blocks << [] if blocks.empty? || blocks.last.last[1] != line_num - 1
+      blocks.last << [ line, line_num ]
+    end
+    blocks
+  end
 
-      list = list.delete_prefix("[").delete_suffix("]") if list.start_with?("[") && !list.match?(/\A\[[^\]]*\]\(/)
-      next if SORT_KEYWORDS.include?(list.strip.downcase)
+  def check_order_list(list, line_num, source)
+    site = @site_names&.call(:order, source)
+    list = list.delete_prefix("[").delete_suffix("]") if list.start_with?("[") && !list.match?(/\A\[[^\]]*\]\(/)
+    return if SORT_KEYWORDS.include?(list.strip.downcase)
 
-      split_order(list).each do |entry|
-        name = entry.strip.delete_prefix('"').delete_suffix('"').delete_prefix("'").delete_suffix("'").strip
-        next if name.empty? || name.match?(MENU_ENTRY_LINK_RE) || SORT_KEYWORDS.include?(name.downcase)
+    split_order(list).each do |entry|
+      name = entry.strip.delete_prefix('"').delete_suffix('"').delete_prefix("'").delete_suffix("'").strip
+      next if name.empty? || name.match?(MENU_ENTRY_LINK_RE) || SORT_KEYWORDS.include?(name.downcase)
 
+      if site
+        # COPY: order name in text that ships to many sites
+        site_name_issue(name, line_num, "a page on the site, not a doc, so this list only shows it on a site that has it")
+      else
         name_issue(name, line_num, missing: "so it's left out")
       end
     end

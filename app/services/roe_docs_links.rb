@@ -32,9 +32,13 @@ class RoeDocsLinks
     unclear_internal_link: "links",
     unclear_name: "links",
     draft_link: "drafts",
-    missing_media: "media"
+    missing_media: "media",
+    site_name: "site"
   }.freeze
-  WARNINGS = %i[unclear_internal_link unclear_name].freeze
+  # Listed, but they don't fail the check: a name that could mean two
+  # things still works, and a site's own post or page in an example works
+  # wherever the site has it.
+  WARNINGS = %i[unclear_internal_link unclear_name site_name].freeze
   IN_DRAFTS = "in_drafts"
 
   attr_reader :dir, :problems, :links, :media
@@ -87,19 +91,28 @@ class RoeDocsLinks
   def self.report_lines(heading:, problems:)
     lines = [ heading, "" ]
     # COPY: report sections
+    listed_only = [ IN_DRAFTS, "site" ]
     [ [ "media", "MISSING MEDIA" ], [ "links", "BROKEN LINKS" ], [ "drafts", "LINKS TO DRAFTS" ],
-      [ IN_DRAFTS, "IN DRAFTS (listed only, nothing is blocked)" ] ].each do |section, title|
+      [ IN_DRAFTS, "IN DRAFTS (listed only, nothing is blocked)" ],
+      [ "site", "NEEDS THE SITE'S OWN POSTS OR PAGES (listed only, nothing is blocked)" ] ].each do |section, title|
       rows = problems.select { |p| p[:section] == section }
-      next if section == IN_DRAFTS && rows.empty?
+      next if listed_only.include?(section) && rows.empty?
 
-      lines << (section == IN_DRAFTS ? title.sub("(", "(#{rows.size}, ") : "#{title} (#{rows.count { |p| !p[:warning] }})")
+      lines << (listed_only.include?(section) ? title.sub("(", "(#{rows.size}, ") : "#{title} (#{rows.count { |p| !p[:warning] }})")
       rows.each do |p|
         lines << "  #{p[:where]}"
-        lines << "    #{p[:warning] ? '(still works) ' : ''}#{p[:message]}"
+        lines << "    #{warning_note(p)}#{p[:message]}"
       end
       lines << ""
     end
     lines
+  end
+
+  # COPY: report notes for problems that don't fail the check
+  def self.warning_note(problem)
+    return "" unless problem[:warning] && problem[:type].to_s != "site_name"
+
+    "(still works) "
   end
 
   private
@@ -109,12 +122,19 @@ class RoeDocsLinks
       link_status: ->(_target) { [ :missing, nil ] },
       name_matches: ->(name) { find(name).map { |doc| "the doc “#{doc.name}”" } },
       address_status: ->(path) { address_status(path) },
-      media_exists: ->(path) { File.file?(File.join(@dir, "media", path.delete_prefix("/media/"))) }
+      media_exists: ->(path) { File.file?(File.join(@dir, "media", path.delete_prefix("/media/"))) },
+      # A card names a site's post; a list names the site's pages unless its
+      # source is the docs.
+      site_names: ->(kind, source) { kind == :card || !source.to_s.strip.start_with?("documentation") }
     }
   end
 
+  # Every reference asked about is counted. site_names isn't a reference:
+  # it says where names can be checked.
   def counted(opts)
     opts.to_h do |key, callable|
+      next [ key, callable ] if key == :site_names
+
       [ key, ->(value) { key == :media_exists ? @media += 1 : @links += 1; callable.call(value) } ]
     end
   end

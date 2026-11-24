@@ -66,6 +66,17 @@ class RoeDocsLinksTest < ActiveSupport::TestCase
     assert_empty RoeDocsLinks.new(@dir).call.problems
   end
 
+  test "a card or menu naming the site's own post or page is listed, not failed" do
+    doc("a.md", "title: A\n", "```card\ntype: post-link\npost: welcome\n```\n")
+
+    check = RoeDocsLinks.new(@dir).call
+
+    assert_equal [ :site_name ], check.problems.map { |p| p[:type] }
+    refute check.broken?
+    assert_includes check.report_lines, "    welcome is a post on the site, not a doc, so this card only shows on a site that has it"
+    assert check.report_lines.any? { |l| l.start_with?("NEEDS THE SITE'S OWN POSTS OR PAGES (1,") }
+  end
+
   test "clean docs pass" do
     doc("a.md", "title: A\n", "[B](/documentation/roe/b)\n")
     doc("b.md", "title: B\n", "[A](/documentation/roe/a)\n")

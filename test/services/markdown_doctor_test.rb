@@ -396,8 +396,10 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     # Text after the notes can't be shown here: it needs the notes to be the
     # last thing before it, and the sample ends on an unclosed fence on
     # purpose. It has its own tests under "footnote placement". The link check
-    # needs a rendered page, which the sample isn't given.
-    expected = MarkdownDoctor::ISSUE_TYPES.keys - %i[content_after_footnotes broken_anchor_link]
+    # needs a rendered page, which the sample isn't given. A name that depends
+    # on the site only comes up for Roe's own docs (RoeDocsLinks), which pass
+    # site_names; it has its own tests.
+    expected = MarkdownDoctor::ISSUE_TYPES.keys - %i[content_after_footnotes broken_anchor_link site_name]
     assert_empty expected - issues.map { |i| i[:type] },
       "add a section to markdown_doctor_sample.md for the rules listed above"
     assert issues.any? { |i| i[:fixable] }, "and something for Fix All to do"
@@ -457,6 +459,29 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     issues = MarkdownDoctor.diagnose(content, name_matches: matches)
 
     assert_equal [ [ :broken_internal_link, 3, "gone" ] ], issues.map { |i| [ i[:type], i[:line], i[:target] ] }
+  end
+
+  test "in text for many sites, names of the site's own items are listed as depending on it" do
+    site_names = ->(kind, source) { kind == :card || !source.to_s.start_with?("documentation") }
+    content = <<~MD
+      ```card
+      post: welcome
+      ```
+
+      ```collection
+      template: menu
+      order: blog, about
+      ```
+
+      ```collection
+      order: real-doc, gone-doc
+      source: documentation/roe
+      ```
+    MD
+    issues = MarkdownDoctor.diagnose(content, name_matches: ->(n) { n == "real-doc" ? [ "the doc" ] : [] }, site_names: site_names)
+
+    assert_equal [ [ :site_name, "welcome" ], [ :site_name, "blog" ], [ :site_name, "about" ], [ :broken_internal_link, "gone-doc" ] ],
+                 issues.map { |i| [ i[:type], i[:target] ] }
   end
 
   test "the sort words match the collection's" do

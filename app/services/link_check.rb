@@ -100,7 +100,7 @@ class LinkCheck
         kind = p["item_type"] == "Documentation" ? "doc" : p["item_type"].downcase
         kind += ", draft" if p["draft"]
         where = p["field"] ? "#{p['field']}:" : "line #{p['line']}"
-        { section: p["section"], warning: p["warning"], where: "#{p['title']} (#{kind}) · #{where}", message: p["message"] }
+        { section: p["section"], type: p["type"], warning: p["warning"], where: "#{p['title']} (#{kind}) · #{where}", message: p["message"] }
       end
     end
 
