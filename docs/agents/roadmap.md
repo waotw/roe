@@ -105,10 +105,25 @@ macOS 26 (`RUBY_PLATFORM` `arm64-darwin25`), and its headers include
 `<stdckdint.h>`, which the Command Line Tools for macOS 14 (Apple clang 16)
 don't have. Ruby itself runs, but every gem with C code fails to build
 (`ed25519` first, reported as "You have to install development tools
-first"). On such a Mac, build Ruby from source instead:
-`mise uninstall ruby@4.0.10 && MISE_RUBY_COMPILE=true mise install ruby@4.0.10`
-(a few minutes; uses Homebrew's openssl, libyaml and gmp). Test for the
-problem with `echo '#include <stdckdint.h>' | cc -x c -fsyntax-only -`.
+first").
+
+Roe checks for this before installing a Ruby: on macOS, with a compiler that
+can't find the header (`echo '#include <stdckdint.h>' | cc -x c -fsyntax-only -`),
+it builds Ruby from source instead (`MISE_RUBY_COMPILE=true`, a few minutes,
+using Homebrew's openssl, libyaml and gmp when present). An installed
+ready-made Ruby whose `ruby/config.h` has `HAVE_STDCKDINT_H` counts as
+unusable on such a Mac and is rebuilt. Where:
+
+- the updater: `ruby_from_source?` and `ready_made_ruby_unusable?` in
+  `UpdateOrchestrator` (`ruby_available?` and `install_required_ruby`);
+- `roe.sh`: `ruby_needs_source_build`, `active_ruby_unusable` and
+  `mise_install_ruby`, used by `ensure_app_ruby_and_gems` (start, restart)
+  and by `./roe.sh check` (the installer).
+
+The updater that installs a release's Ruby is the *previous* release's, so a
+fix to how Ruby is installed only protects the Ruby change in the release
+after the one that ships it (the same reason the 4.0.5 preflight shipped a
+release ahead of 4.0.5).
 
 ---
 

@@ -1024,6 +1024,38 @@ check_ruby() {
     return 1
 }
 
+# mise's ready-made macOS Rubies are built on the newest macOS, and their
+# headers include <stdckdint.h>. Older Command Line Tools (macOS 14's Apple
+# clang 16) don't have it, so no gem with C code would build. There Ruby is
+# built from source instead (a few minutes). Not when there's no compiler at
+# all: then nothing builds either way, and the build-tools step says so.
+ruby_needs_source_build() {
+    is_macos || return 1
+    command_exists cc || return 1
+    ! echo '#include <stdckdint.h>' | cc -x c -fsyntax-only - >/dev/null 2>&1
+}
+
+# An installed Ruby (the one on the PATH now) whose headers need
+# <stdckdint.h> on a Mac whose compiler hasn't got it: it runs, but can't
+# build a single gem.
+active_ruby_unusable() {
+    ruby_needs_source_build || return 1
+    local hdr
+    hdr=$(cd "$APP_DIR" && ruby -e 'print RbConfig::CONFIG["rubyarchhdrdir"]' 2>/dev/null)
+    [ -n "$hdr" ] && grep -q '^#define HAVE_STDCKDINT_H 1' "$hdr/ruby/config.h" 2>/dev/null
+}
+
+# Install Ruby with mise, from source when this Mac needs it. Takes the mise
+# subcommand and its arguments: mise_install_ruby install ruby@4.0.10
+mise_install_ruby() {
+    if ruby_needs_source_build; then
+        log_info "This Mac's build tools can't use the ready-made Ruby, so it's built from source (a few minutes)."
+        MISE_RUBY_COMPILE=true mise "$@"
+    else
+        mise "$@"
+    fi
+}
+
 # A `git pull` can bring a .ruby-version or Gemfile.lock this install hasn't
 # caught up with. The in-app updater installs both before it switches
 # versions (UpdateOrchestrator: checking_ruby, installing_gems), so for an
@@ -1050,7 +1082,7 @@ ensure_app_ruby_and_gems() {
             return 1
         fi
         configure_mise_for_ruby
-        if ! mise install "ruby@${required}"; then
+        if ! mise_install_ruby install "ruby@${required}"; then
             log_error "Ruby ${required} didn't install — see the output above."
             return 1
         fi
@@ -1060,6 +1092,22 @@ ensure_app_ruby_and_gems() {
             return 1
         fi
         log_success "Ruby ${required} installed"
+    fi
+
+    if [ -n "$required" ] && command_exists mise && active_ruby_unusable; then
+        # COPY: a ready-made Ruby this Mac can't build gems for
+        log_warning "Ruby ${required} is installed, but this Mac's build tools can't build gems for it."
+        if ! _ask_yes "  Build Ruby ${required} from source now (a few minutes)? [Y/n]: "; then
+            echo -e "  RUN: ${CYAN}mise uninstall ruby@${required} && MISE_RUBY_COMPILE=true mise install ruby@${required}${NC}, then start again."
+            return 1
+        fi
+        mise uninstall "ruby@${required}" >/dev/null 2>&1
+        if ! mise_install_ruby install "ruby@${required}"; then
+            log_error "Ruby ${required} didn't build — see the output above."
+            return 1
+        fi
+        mise_pin_app_ruby
+        log_success "Ruby ${required} built"
     fi
 
     if ! (cd "$APP_DIR" && bundle check >/dev/null 2>&1); then
@@ -1630,7 +1678,7 @@ cmd_check() {
             #    the first build can take a few minutes.
             log_step "Installing Ruby ${required_ruby}"
             log_info "Downloading Ruby — the first build can take a few minutes…"
-            if ! mise use --global "ruby@${required_ruby}"; then
+            if ! mise_install_ruby use --global "ruby@${required_ruby}"; then
                 log_error "Ruby install failed — see the output above."
                 exit 1
             fi

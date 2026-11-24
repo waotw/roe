@@ -216,7 +216,14 @@ module RoeUpdater
 
         Bundler.with_original_env do
           if (mise = mise_bin)
-            return true if system("#{mise} where ruby@#{version} > /dev/null 2>&1")
+            if system("#{mise} where ruby@#{version} > /dev/null 2>&1")
+              # A ready-made Ruby this Mac can't build gems for counts as
+              # missing: installing it again builds it from source.
+              return true unless ready_made_ruby_unusable?(mise, version)
+
+              log("Ruby #{version} is installed, but this Mac's build tools can't build gems for it.")
+              return false
+            end
           end
           if command_available?("rbenv")
             installed = `rbenv versions --bare 2>/dev/null`.split("\n").map(&:strip)
@@ -243,14 +250,54 @@ module RoeUpdater
           current_step: "Installing Ruby #{version} (via mise)…",
           progress_percent: 40
         )
-        log("→ Installing Ruby #{version} via mise (usually ~30s)…")
+        from_source = ruby_from_source?
+        if from_source
+          @status.update!(current_step: "Building Ruby #{version} from source (a few minutes)…")
+          log("→ Building Ruby #{version} from source via mise: this Mac's build tools can't use " \
+              "the ready-made one (no <stdckdint.h>). This takes a few minutes…")
+        else
+          log("→ Installing Ruby #{version} via mise (usually ~30s)…")
+        end
 
         Bundler.with_original_env do
-          output = `#{mise} install "ruby@#{version}" 2>&1`
+          if from_source && ready_made_ruby_unusable?(mise, version)
+            `#{mise} uninstall "ruby@#{version}" 2>&1`
+          end
+          env = from_source ? "MISE_RUBY_COMPILE=true " : ""
+          output = `#{env}#{mise} install "ruby@#{version}" 2>&1`
           log(output.to_s.strip) if output.to_s.strip.present?
           raise "mise failed to install Ruby #{version}: #{output}" unless $?.success?
         end
         log("✓ Ruby #{version} installed")
+      end
+
+      # mise's ready-made macOS Rubies are built on the newest macOS, and
+      # their headers include <stdckdint.h>. Older Command Line Tools (macOS
+      # 14's Apple clang 16) don't have it, so no gem with C code would build
+      # and the update would fail at installing_gems, after the switch. On
+      # such a Mac, Ruby is built from source instead. False when there's no
+      # compiler at all: then nothing builds either way.
+      def ruby_from_source?
+        return false unless RUBY_PLATFORM.include?("darwin")
+
+        Bundler.with_original_env do
+          return false unless system("command -v cc > /dev/null 2>&1")
+
+          !system("echo '#include <stdckdint.h>' | cc -x c -fsyntax-only - > /dev/null 2>&1")
+        end
+      end
+
+      # An installed Ruby whose headers need <stdckdint.h> on a Mac whose
+      # compiler hasn't got it: it runs, but can't build a single gem.
+      def ready_made_ruby_unusable?(mise, version)
+        return false unless ruby_from_source?
+
+        dir = `#{mise} where ruby@#{version} 2>/dev/null`.strip
+        return false if dir.empty?
+
+        Dir.glob(File.join(dir, "include", "ruby-*", "*", "ruby", "config.h")).any? do |config|
+          File.read(config).match?(/^#define HAVE_STDCKDINT_H 1/)
+        end
       end
 
       # Install mise via its official one-line installer when it's missing.
