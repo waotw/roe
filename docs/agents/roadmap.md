@@ -107,23 +107,26 @@ don't have. Ruby itself runs, but every gem with C code fails to build
 (`ed25519` first, reported as "You have to install development tools
 first").
 
-Roe checks for this before installing a Ruby: on macOS, with a compiler that
-can't find the header (`echo '#include <stdckdint.h>' | cc -x c -fsyntax-only -`),
-it builds Ruby from source instead (`MISE_RUBY_COMPILE=true`, a few minutes,
-using Homebrew's openssl, libyaml and gmp when present). An installed
-ready-made Ruby whose `ruby/config.h` has `HAVE_STDCKDINT_H` counts as
-unusable on such a Mac and is rebuilt. Where:
+The fix is in the Gemfile, because the update to a new Ruby is run by the
+*previous* release's updater: the new release's Gemfile is the first code of
+the new release that runs (the old updater runs `bundle install` with it).
+On macOS, when the running Ruby's `ruby/config.h` has `HAVE_STDCKDINT_H` and
+the compiler can't find the header (`echo '#include <stdckdint.h>' | cc -x c
+-fsyntax-only -`), the Gemfile puts `lib/compat/` on `CPATH`. Its
+`stdckdint.h` maps `ckd_add`/`ckd_sub`/`ckd_mul` to clang's
+`__builtin_*_overflow`, which is all Ruby's headers use. Everywhere else the
+Gemfile does nothing.
 
-- the updater: `ruby_from_source?` and `ready_made_ruby_unusable?` in
-  `UpdateOrchestrator` (`ruby_available?` and `install_required_ruby`);
-- `roe.sh`: `ruby_needs_source_build`, `active_ruby_unusable` and
-  `mise_install_ruby`, used by `ensure_app_ruby_and_gems` (start, restart)
-  and by `./roe.sh check` (the installer).
+Tested by updating an untouched 0.4.5 install to a 4.0.10 release with its
+own (0.4.5) updater and an empty mise: the ready-made Ruby installed, every
+native gem built, and the site booted.
 
-The updater that installs a release's Ruby is the *previous* release's, so a
-fix to how Ruby is installed only protects the Ruby change in the release
-after the one that ships it (the same reason the 4.0.5 preflight shipped a
-release ahead of 4.0.5).
+Not done this way: building Ruby from source on such Macs. It works (a few
+minutes), but an old updater can't be taught to do it, so it only helps
+updates after the release that ships it, and it judged a ready-made Ruby
+unusable even when the stand-in made it fine, which stopped `roe start`.
+Report upstream: jdx/ruby builds macOS Rubies on `macos-26`; building with
+`ac_cv_header_stdckdint_h=no` would fix it for every mise user.
 
 ---
 
