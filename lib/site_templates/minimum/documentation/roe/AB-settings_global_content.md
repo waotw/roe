@@ -1,5 +1,5 @@
 ---
-title: "Settings → Content"
+title: "Settings: Content"
 status: published
 tags: settings
 ---

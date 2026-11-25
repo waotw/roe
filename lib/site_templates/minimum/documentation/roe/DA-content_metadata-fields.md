@@ -38,7 +38,7 @@ When editing in the admin, the Metadata panel reads and writes this YAML for you
 
 ![Metadata in Admin](/media/images/metadata-editor.png)(*The metadata editor writes directly to the YAML frontmatter in your markdown file*)
 
-Properties show up in the editor automatically based on `post_type`, whether members or newsletters are enabled, and other context. The `+ Add Property` button lets you add any field manually.
+Properties show up in the editor automatically based on `post_type`, whether members or newsletters are enabled, and other context. The `+ Add Field` button lets you add any field manually.
 
 ---
 
@@ -54,7 +54,12 @@ These properties work across posts, pages, and products.
 | `status` | `draft` `published` `unlisted` | Controls visibility. Defaults to `draft` if not set. |
 | `excerpt` | Any text | Short summary. Used in collections, SEO, and social sharing. |
 | `image` | `/media/images/...` | Featured image path. Used in collections, social sharing, and post headers. |
-| `tags` | `[tag-one, tag-two]` | Tags for filtering collections. Use a YAML list. |
+| `tags` | `[tag-one, tag-two]` | Tags for filtering collections. Managed from [Settings → Tags](/admin/tags/). |
+
+`subtitle`, `excerpt` and a product's `description` can…
+
+- use inline Markdown: inline Markdown: bold, italic, links and code.
+- A line break shows as a line break.
 
 ### Status Values
 

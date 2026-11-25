@@ -1,5 +1,6 @@
 class Product < ApplicationRecord
   include HasMetadata
+  include TracksTags
   include HasMarkdownExtensions
   include HasInlineFootnotes
   include TouchesMediaUsageIndex
@@ -41,11 +42,7 @@ class Product < ApplicationRecord
   scope :published, -> { where("json_extract(metadata, '$.status') = ?", "published") }
   scope :draft, -> { where("json_extract(metadata, '$.status') = ?", "draft") }
   scope :by_newest, -> { order(created_at: :desc) }
-  scope :with_tag, ->(tag) {
-    # Tags are stored as a JSON array, e.g. ["featured","sale"]. We match by
-    # looking for the quoted tag substring inside the serialized array.
-    where("json_extract(metadata, '$.tags') LIKE ?", "%\"#{tag}\"%")
-  }
+  scope :with_tag, ->(tag) { tagged_with(tag) }
 
   # Return all unique tags across all products
   def self.all_tags
@@ -242,7 +239,7 @@ class Product < ApplicationRecord
   # So: lead with this product's own variant, and fall back to the group's
   # description when the variant doesn't set its own.
   def snipcart_description
-    detail = description.presence || group_primary_description
+    detail = FieldText.plain(description.presence || group_primary_description)
     [ variant.presence, detail.presence ].compact.join(" — ").presence
   end
 

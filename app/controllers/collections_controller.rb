@@ -106,10 +106,7 @@ class CollectionsController < ApplicationController
 
     # Apply negative tag filters (exclude these tags)
     @exclude_tags.each do |exclude_tag|
-      @items = @items.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{exclude_tag}%"
-      )
+      @items = @items.not_tagged_with(exclude_tag)
     end
 
     # Apply paid content filter (before ordering!). Only include :show_paid when

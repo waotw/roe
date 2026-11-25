@@ -18,7 +18,7 @@ class Admin::PostsController < Admin::BaseController
   layout -> { action_name == "edit" ? "editor" : "admin" }
 
   def index
-    @posts = Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+    @posts = tagged(Post.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST")))
 
     # Get all post types that exist in the database
     @existing_types = Post.pluck(Arel.sql("json_extract(metadata, '$.post_type')"))
@@ -30,7 +30,7 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def drafts
-    @posts = Post.draft.order(created_at: :desc)
+    @posts = tagged(Post.draft.order(created_at: :desc))
 
     # Get distinct post types that exist (ADD THIS!)
     @existing_types = Post.distinct
@@ -42,7 +42,7 @@ class Admin::PostsController < Admin::BaseController
   end
 
   def unlisted
-    @posts = Post.unlisted.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST"))
+    @posts = tagged(Post.unlisted.order(Arel.sql("json_extract(metadata, '$.date') DESC NULLS LAST")))
     @title = "Unlisted Posts"
     @description = "Posts available at URL but not in feed."
     render :index
@@ -163,7 +163,7 @@ class Admin::PostsController < Admin::BaseController
       field: params[:field],
       value: params[:value],
       scopes: scopes,
-      exclude_url_name: params[:exclude]
+      exclude_id: params[:exclude]
     )
 
     render json: { taken: conflict.present?, conflict: conflict&.title }
@@ -337,6 +337,7 @@ class Admin::PostsController < Admin::BaseController
     was_published = @post.published?
     status_before = @post.status
     old_address = rename_redirect_source(@post)
+    link_source = internal_link_source(@post)
 
     # Use the formatted YAML (includes GUID if added/restored)
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
@@ -361,6 +362,7 @@ class Admin::PostsController < Admin::BaseController
     # "Save new URL & redirect" in the editor's slug-change modal: write the
     # 301 as part of this save (RenameRedirect).
     add_rename_redirect(Post, old_address, metadata, @post.file_path)
+    update_internal_links(link_source, @post, own_file: @post.file_path)
 
     finish_editor_save(record: @post, resource_type: "post", edit_path: edit_admin_post_path(@post),
                        file_path: @post.file_path, submitted: submitted, status_before: status_before)
@@ -425,11 +427,13 @@ class Admin::PostsController < Admin::BaseController
     end
 
     begin
+      link_source = internal_link_source(@post)
       File.rename(old_path, new_path)
       @post.update(file_path: new_path.to_s)
       ContentSync.sync_file(new_path)
 
       flash[:notice] = "Renamed to #{new_filename}.md"
+      update_internal_links(link_source, @post)
     rescue => e
       flash[:error] = "Failed to rename: #{e.message}"
     end
@@ -527,16 +531,25 @@ class Admin::PostsController < Admin::BaseController
                         .where("file_path NOT LIKE '%/roe/%'")
                         .limit(5)
 
-    results = posts.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/posts/#{r.url_name}", type: "Post" } } +
-              pages.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Page" } } +
-              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/store/#{r.url_name}", type: "Product" } } +
-              docs.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/documentation/#{r.url_name}", type: "Doc" } }
+    results = posts.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/posts/#{r.url_name}", type: "Post", ref: card_ref(r) } } +
+              pages.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Page", ref: card_ref(r) } } +
+              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/store/#{r.url_name}", type: "Product", ref: card_ref(r) } } +
+              docs.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/documentation/#{r.url_name}", type: "Doc", ref: card_ref(r) } }
 
     render json: results
   rescue => e
     Rails.logger.error "Post search error: #{e.message}"
     render json: { error: e.message }, status: :internal_server_error
   end
+
+  # How the card builder names what was picked: its file, as a Markdown
+  # link would (`/posts/lab-full.md`). It survives a retitle, and the
+  # rewrite follows a rename (ItemName, InternalLinkRewriter).
+  def card_ref(record)
+    ref = InternalLinks.ref_for(record)
+    ref.present? ? "/#{ref}.md" : record.url_name
+  end
+  private :card_ref
 
   # The values a post-link card would inherit from `params[:post]` (title,
   # excerpt, author, date, image, url, subtitle) — the card builder shows them

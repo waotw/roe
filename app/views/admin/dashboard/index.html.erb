@@ -73,6 +73,56 @@
     </div>
   <% end %>
 
+  <!-- ─── LINKS ─── -->
+  <%# COPY — The links check (LinkCheck): only the counts that matter here;
+      VIEW LINKS → has the rest. A row above 0 is amber and opens its section
+      of the Links page. Row labels and "Checked" are placeholder copy. %>
+  <div class="mb-8">
+    <div class="relative border-2 border-gray-800" data-test="dashboard-links">
+      <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">
+        ── Links ──
+      </div>
+
+      <table class="w-full bg-[#fffdf9]">
+        <tbody>
+          <% counts = @link_check&.dig("counts") || {} %>
+          <% [ [ "Missing media",   "media",  "media"  ],
+               [ "Broken links",    "broken", "links"  ],
+               [ "Links to drafts", "drafts", "drafts" ] ].each_with_index do |(row_label, key, anchor), i| %>
+            <% count = counts[key].to_i %>
+            <tr class="border-b border-dashed border-gray-200 <%= count.positive? ? 'bg-amber-50/60' : '' %>" data-test="dashboard-links-<%= key %>">
+              <td class="px-4 <%= i.zero? ? 'pt-4' : 'pt-1.5' %> pb-1.5">
+                <% if count.positive? %>
+                  <%= link_to row_label, admin_links_path(anchor: anchor), class: "text-amber-900 hover:underline" %>
+                <% else %>
+                  <%= row_label %>
+                <% end %>
+              </td>
+              <td class="px-4 <%= i.zero? ? 'pt-4' : 'pt-1.5' %> pb-1.5 text-right w-24 <%= count.positive? ? 'text-amber-700' : (@link_check ? 'text-green-700' : 'text-gray-400') %>">
+                <%= @link_check ? count : "—" %>
+              </td>
+            </tr>
+          <% end %>
+          <tr>
+            <td class="px-4 py-1.5 font-bold border-t border-gray-400">Total</td>
+            <td class="px-4 py-1.5 text-right font-bold border-t border-gray-400"><%= @link_check ? counts["total"].to_i : "—" %></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="px-4 pt-1 pb-3 bg-[#fffdf9] flex items-center gap-3 text-xs">
+        <span class="text-gray-500" data-test="dashboard-links-checked">
+          <%= @link_check ? "Checked #{link_check_time(@link_check)}" : "Not checked yet" %>
+        </span>
+        <span class="flex-1"></span>
+        <%= button_to "[ CHECK NOW ]", admin_check_links_path, method: :post,
+              form_class: "shrink-0",
+              class: "text-blue-700 hover:underline whitespace-nowrap cursor-pointer" %>
+        <%= link_to "View links →", admin_links_path,
+              class: "uppercase text-xs px-2 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs no-underline text-gray-900 whitespace-nowrap" %>
+      </div>
+    </div>
+  </div>
+
   <!-- ─── SYSTEM ─── -->
   <div class="relative border-2 border-gray-800 mb-8">
     <div class="absolute -top-2.5 left-4 bg-[#fffdf9] px-2 text-xs font-bold tracking-widest uppercase text-amber-700">

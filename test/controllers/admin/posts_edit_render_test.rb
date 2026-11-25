@@ -32,10 +32,26 @@ class Admin::PostsEditRenderTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'data-controller="unique-field"'
     assert_includes response.body, "Already used by"
     assert_includes response.body, "First", "the clashing post is named"
-    # Both scope fields and the post's own url_name ride along, so the live
-    # check stays scoped to show + season and the post can't flag itself.
+    # Both scope fields and the post's own id ride along, so the live check
+    # stays scoped to show + season and the post can't flag itself.
     assert_match(/data-unique-field-scope-fields-value="[^"]*podcast[^"]*season/, response.body)
-    assert_includes response.body, 'data-unique-field-exclude-value="uniq-b"'
+    assert_includes response.body, %(data-unique-field-exclude-value="#{record.id}")
+  end
+
+  # Excluding the post by its url_name hid every other post with that
+  # url_name too, so a clash that already existed never showed.
+  test "an existing url_name clash is shown on load" do
+    dir = File.join(RoeSitePaths::SITE_PATH, "posts")
+    %w[uniq-a uniq-b].each do |slug|
+      path = File.join(dir, "#{slug}.md")
+      File.write(path, "---\ntitle: \"#{slug == 'uniq-a' ? 'First' : 'Second'}\"\nurl_name: shared-slug\nstatus: published\n---\nx\n")
+      ContentSync.sync_file(path)
+    end
+    record = Post.find_by(file_path: RoeSitePaths.normalize(File.join(dir, "uniq-b.md")))
+
+    get edit_admin_post_path(record)
+
+    assert_includes response.body, "Already used by “First”"
   end
 
   test "a unique episode number shows no warning" do

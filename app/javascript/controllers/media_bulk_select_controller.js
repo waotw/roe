@@ -216,6 +216,36 @@ export default class extends Controller {
     );
   }
 
+  // Opened from a metadata field's CHOOSE…: the one file selected goes back
+  // into that field (the editor knows which). If several are ticked, the
+  // first is used.
+  submitToField() {
+    const selected = this.checkboxTargets.find((cb) => cb.checked);
+    if (!selected) return;
+
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:pick-for-field", {
+        bubbles: true,
+        detail: { path: selected.dataset.filePath },
+      }),
+    );
+  }
+
+  // REPLACE: the caret was in a media file's path in the text; the one file
+  // selected takes its place. The editor does the swap, as one undoable
+  // edit.
+  submitReplace() {
+    const selected = this.checkboxTargets.find((cb) => cb.checked);
+    if (!selected) return;
+
+    this.element.dispatchEvent(
+      new CustomEvent("media-picker:replace", {
+        bubbles: true,
+        detail: { path: selected.dataset.filePath },
+      }),
+    );
+  }
+
   // ADD PLAYER: the one audio or video file selected goes to the card
   // builder, which opens as a new player card with it in the Audio or Video
   // field. The picker closes first; the builder opens over the editor.

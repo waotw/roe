@@ -16,6 +16,27 @@ class Members::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @member.id, session[:member_id]
   end
 
+  test "signing in returns to the members-only page that asked for it, once" do
+    get "/account"
+    assert_redirected_to "/sign-in"
+
+    get "/signin/#{@member.access_token}"
+    assert_redirected_to "/account"
+
+    delete "/signout"
+    get "/signin/#{@member.access_token}"
+    assert_redirected_to root_path, "the stored page is used up"
+  end
+
+  test "password sign-in returns to the stored page too" do
+    SiteFeature.stubs(:member_passwords_enabled?).returns(true)
+    @member.update!(password: "a-password-11")
+
+    get "/account"
+    post "/signin", params: { member: { email: @member.email, password: "a-password-11" } }
+    assert_redirected_to "/account"
+  end
+
   test "should not sign in with invalid token" do
     get "/signin/invalid_token"
 

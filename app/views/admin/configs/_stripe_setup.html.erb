@@ -60,7 +60,6 @@
       <span class="rounded-xs text-xs bg-amber-200 px-1 py-0.5 font-mono">This is the Test setup: make sure you’re in test/sandbox mode on Stripe.</span>
     <% end %>
     <p class="text-sm text-gray-700 my-3">
-      <%# COPY %>
       There is one manual step: create a <strong>restricted key</strong> on your Stripe account following the instrucions below, then paste it in this form and save. Roe takes care of the rest.
     </p>
 
@@ -146,8 +145,7 @@
                  autocomplete="off"
                  class="w-full font-mono text-sm p-2 border border-gray-300">
           <p class="rounded-xs text-xs bg-amber-200 px-1 py-0.5 font-mono mt-2">
-            <%# COPY %>
-            Roe saves this secret for you when you add and save your key.
+            Roe saves this secret for you when you add and save your restricted key.
             Only paste a key here if you've customized it yourself on Stripe.
           </p>
         </div>
@@ -178,8 +176,7 @@
         <div class="mt-4 p-3 border border-red-300 bg-red-50 rounded-xs" data-test="stripe-key-unverified-<%= mode %>">
           <p class="text-sm font-semibold text-red-900 mb-1">✕ Stripe rejected this key</p>
           <p class="text-xs text-red-800">
-            <%# COPY %>
-            The key is saved but Stripe didn't accept it. Almost always this means the
+            The key is saved but Stripe didn't accept it. Usually this means the
             restricted key is missing a permission. Open your key on
             <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener" class="underline">Stripe → API keys ↗</a>,
             confirm every permission in the table above is set (in particular
@@ -190,7 +187,6 @@
       <% elsif !webhook_ready %>
         <div class="mt-4 p-3 border border-amber-300 bg-amber-50 rounded-xs" data-test="stripe-webhook-nourl-<%= mode %>">
           <p class="text-sm text-amber-900">
-            <%# COPY %>
             Your key works, but there's no public URL to receive webhooks yet. Set your
             <%= link_to "Site URL", admin_edit_deploy_config_path, class: "underline" rescue nil %>
             (or a dev tunnel host) so Stripe can reach <span class="font-mono">/webhooks/stripe</span>.
@@ -200,7 +196,6 @@
         <div class="mt-4 p-3 border border-amber-300 bg-amber-50 rounded-xs" data-test="stripe-webhook-missing-<%= mode %>">
           <p class="text-sm font-semibold text-amber-900 mb-1">Webhook not set up yet</p>
           <p class="text-xs text-amber-800 mb-3">
-            <%# COPY %>
             Your key works, but Roe couldn't find its webhook at
             <span class="font-mono"><%= resolved_webhook_url %></span>.
             This usually means the automatic setup on save failed — most often because the

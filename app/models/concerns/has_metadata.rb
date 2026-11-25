@@ -16,6 +16,18 @@ module HasMetadata
   # unlisted).
   DRAFT_SQL = "COALESCE(NULLIF(json_extract(metadata, '$.status'), ''), 'draft')".freeze
 
+  # True when an item has the tag (two binds, both the tag): whole tag, case
+  # ignored, from a JSON array or a comma-separated string. lower() folds
+  # ASCII letters only, so É and é stay different.
+  def self.tag_match_sql(table)
+    tags = "json_extract(#{table}.metadata, '$.tags')"
+    type = "COALESCE(json_type(#{table}.metadata, '$.tags'), '')"
+    "EXISTS (SELECT 1 FROM json_each(CASE #{type} WHEN 'array' THEN #{tags} ELSE '[]' END) AS t " \
+      "WHERE lower(trim(t.value)) = lower(?)) " \
+      "OR (#{type} = 'text' AND instr(',' || lower(replace(replace(#{tags}, ', ', ','), ' ,', ',')) || ',', " \
+      "',' || lower(?) || ',') > 0)"
+  end
+
   included do
     before_save :ensure_url_name_in_metadata
 
@@ -40,23 +52,23 @@ module HasMetadata
       where("json_extract(metadata, '$.status') IN (?, ?)", "published", "unlisted")
     }
 
-    # Tag scopes - optimized for JSON array searching
+    # Tag scopes. A tag matches whole and ignoring case: `lab` finds `lab`,
+    # `Lab` and `LAB`, never `labs` or `lab-image`. Tags are a JSON array, or
+    # a comma-separated string when written that way in the file.
     scope :tagged_with, ->(tags) {
-      tag_array = Array(tags)
+      tag_array = Array(tags).map { |t| t.to_s.strip }.reject(&:empty?)
       return none if tag_array.empty?
 
-      # For SQLite JSON arrays, we need to check if the tag exists in the array
-      # This uses LIKE but is more precise than before
-      conditions = tag_array.map {
-        # Match tag in array: ["tag"] or ["tag","other"] or ["other","tag"]
-        "(json_extract(metadata, '$.tags') LIKE ? OR json_extract(metadata, '$.tags') LIKE ? OR json_extract(metadata, '$.tags') LIKE ?)"
-      }
+      conditions = tag_array.map { "(#{HasMetadata.tag_match_sql(table_name)})" }
+      where(conditions.join(" OR "), *tag_array.flat_map { |tag| [ tag, tag ] })
+    }
 
-      params = tag_array.flat_map { |tag|
-        [ "%\"#{tag}\"%", "%[\"#{tag}\"]%", "%,\"#{tag}\"%" ]
-      }
+    # The opposite of tagged_with for one tag; untagged items are kept.
+    scope :not_tagged_with, ->(tag) {
+      tag = tag.to_s.strip
+      return all if tag.empty?
 
-      where(conditions.join(" OR "), *params)
+      where("NOT (#{HasMetadata.tag_match_sql(table_name)})", tag, tag)
     }
 
     scope :with_post_type, ->(type) {
@@ -100,18 +112,37 @@ module HasMetadata
         '""'
       when Array
         return "[]" if value.empty?
-        "[#{value.map { |item| format_yaml_scalar(item) }.join(', ')}]"
+        "[#{value.map { |item| item.is_a?(String) ? yaml_quoted(item) : format_yaml_scalar(item) }.join(', ')}]"
       when String
         if value.empty?
           '""'
         elsif value.match?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)
           "\"#{value}\""
+        elsif value.include?("\n")
+          yaml_block(value)
         else
-          "\"#{value.gsub('"', '\"')}\""
+          yaml_quoted(value)
         end
       else
         "\"#{value}\""
       end
+    end
+
+    # A value with lines, as a `|-` block. In double quotes YAML folds each
+    # line break into a space, so a subtitle written on two lines came back
+    # as one. `|2-` when the first line starts with a space, which YAML would
+    # otherwise take for the block's indentation.
+    def yaml_block(value)
+      lines = value.gsub(/\r\n?/, "\n").sub(/\n+\z/, "").split("\n", -1)
+      indicator = lines.first.to_s.match?(/\A\s/) ? "|2-" : "|-"
+      ([ indicator ] + lines.map { |line| line.empty? ? "" : "  #{line}" }).join("\n")
+    end
+
+    # Double-quoted, with the backslash escaped as well as the quote: `C:\new`
+    # written as-is reads back with a line break in it, or doesn't read.
+    def yaml_quoted(value)
+      escaped = value.gsub("\\") { "\\\\" }.gsub('"') { '\\"' }.gsub(/\r?\n/) { "\\n" }
+      "\"#{escaped}\""
     end
   end
 

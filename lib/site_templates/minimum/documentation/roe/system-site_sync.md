@@ -83,6 +83,8 @@ The first push may take several minutes depending on how much media you have. Su
 
 You might have edited the same post or page on the live site and the local site. If this happens, you will be asked to confirm which file should be kept. By default, Roe will prioritize the newest version of the file.
 
+In the case of `TAGS`, Roe tracks all tags across the site in `Settings → tags.yml` and this file is merged. Adding a tag on the live site and then adding a tag on the local site will result in both tags being saved.
+
 Click a file to compare the two versions before you choose: `LOCAL` and `LIVE` show each version, `DIFF` shows the difference between them. Click the file again to close it.
 
 Click `APPLY CHOICES & SYNC` (or `RESOLVE ALL BY MOST-RECENT & SYNC`). If that sync finds new conflicts, it stops and asks again. `CANCEL` stops the sync and changes nothing.

@@ -6,6 +6,7 @@ class Admin::DashboardController < Admin::BaseController
     # see SiteSync::BackupStats.
     @backup_stats  = SiteSync::BackupStats.current
     @database_size = database_bytes
+    @link_check    = LinkCheck.latest
 
     # Pages Roe installed that lost their status and now 404 for logged-out
     # visitors. Surfaced rather than repaired silently — see PageStatusRepair.

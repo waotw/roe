@@ -167,6 +167,19 @@ module Api
         render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
       end
 
+      # POST /api/site_sync/tags
+      #
+      # This side's tag list (tags.yml), for SiteSync::TagMerge on the writing
+      # computer. With `set`, replaces the list first — the combined list the
+      # writing computer worked out. Returns: { tags: [...] }
+      def tags
+        ::TagList.replace!(::TagList.clean(params[:set])) if params.key?(:set)
+        render json: { tags: ::TagList.names }
+      rescue => e
+        Rails.logger.error "[Api::SiteSync::ExchangeController] tags FAILED: #{e.class} #{e.message}"
+        render json: { ok: false, error: "#{e.class}: #{e.message}" }, status: :internal_server_error
+      end
+
       # GET /api/site_sync/manifest
       #
       # Returns the full file manifest for the site directory.

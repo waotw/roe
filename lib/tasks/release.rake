@@ -16,11 +16,11 @@
 #                                      which caused noise churn every
 #                                      rsync round-trip)
 #   4. app/themes/*.css               ("Bundled with: Roe v…" header
-#                                      line — always re-stamped so
-#                                      every release advertises being
-#                                      bundled with the current Roe,
-#                                      even when the theme's own
-#                                      version didn't move)
+#                                      line, on themes changed since
+#                                      the last tag — and on the same
+#                                      theme in site/theme/, which
+#                                      bin/sync-from-site copies back
+#                                      over app/themes/)
 #
 # Re-runnable: same VERSION twice is a no-op except release_date
 # advancing to today. Run from current/:
@@ -180,6 +180,7 @@ namespace :release do
     files = Dir.glob(pattern)
     changed = 0
     no_line = 0
+    unchanged_line = 0
     untouched = 0
 
     files.each do |path|
@@ -193,22 +194,21 @@ namespace :release do
 
       content = File.read(path)
 
-      # Replace `Bundled with: Roe vX.Y.Z` preserving the leading
-      # whitespace + comment indentation that's standard in theme
-      # headers. Case-insensitive on "Roe" defensively.
-      # \d+(\.\d+)* rather than [\d.]+, which also ate a sentence's full
-      # stop ("Roe v0.4.0." → "Roe v0.4.0"), so every bump and the next
-      # sync-from-site fought over it.
-      new_content = content.sub(/^(\s*Bundled with:\s*Roe\s+v)\d+(?:\.\d+)*/i) do
-        "#{Regexp.last_match(1)}#{version}"
-      end
-
-      if new_content == content
-        no_line += 1
-      else
-        File.write(path, new_content)
+      if stamp_bundled_with(path, version)
         changed += 1
         puts "  ✓ themes/#{File.basename(path)}"
+        # And the site/ copy the theme is developed in. bin/sync-from-site
+        # copies site/theme/ over app/themes/, so a line stamped only here
+        # went back to the old version on the next sync. Only this line is
+        # touched; it's in the header, outside the fingerprint.
+        site_copy = File.join(RoeSitePaths::SITE_PATH, "theme", File.basename(path))
+        if File.exist?(site_copy) && stamp_bundled_with(site_copy, version)
+          puts "  ✓ site/theme/#{File.basename(path)}"
+        end
+      elsif content.match?(bundled_with_pattern)
+        unchanged_line += 1
+      else
+        no_line += 1
       end
     end
 
@@ -216,7 +216,27 @@ namespace :release do
     puts "Themes:"
     puts "  ✓ #{changed} stamped at #{version}" if changed > 0
     puts "  · #{untouched} unchanged since last tag" if untouched > 0
+    puts "  · #{unchanged_line} already at #{version}" if unchanged_line > 0
     puts "  · #{no_line} touched but no `Bundled with:` line (skipped)" if no_line > 0
+  end
+
+  # Replace `Bundled with: Roe vX.Y.Z` preserving the leading whitespace +
+  # comment indentation that's standard in theme headers. Case-insensitive
+  # on "Roe" defensively. \d+(\.\d+)* rather than [\d.]+, which also ate a
+  # sentence's full stop ("Roe v0.4.0." → "Roe v0.4.0"), so every bump and
+  # the next sync-from-site fought over it.
+  def bundled_with_pattern
+    /^(\s*Bundled with:\s*Roe\s+v)\d+(?:\.\d+)*/i
+  end
+
+  # Writes the file only when the line changes. True when it did.
+  def stamp_bundled_with(path, version)
+    content = File.read(path)
+    new_content = content.sub(bundled_with_pattern) { "#{Regexp.last_match(1)}#{version}" }
+    return false if new_content == content
+
+    File.write(path, new_content)
+    true
   end
 
   # Regenerate the committed schema dumps so a release ships them in the exact

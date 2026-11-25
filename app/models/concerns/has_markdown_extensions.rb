@@ -8,7 +8,7 @@ module HasMarkdownExtensions
   PRODUCT_GRID_IMAGE_SIZES =
     "(min-width: 901px) 220px, (min-width: 769px) 30vw, (min-width: 401px) 45vw, 100vw".freeze
 
-  def to_html(preview: false, context: nil, static: false, feed: false)
+  def to_html(preview: false, context: nil, static: false, feed: false, email: false)
     # Store context for use by form renderers
     @render_context = context
 
@@ -30,6 +30,11 @@ module HasMarkdownExtensions
     # for FeedGenerator#preview_before_gate to split on.
     @rendering_feed = feed
 
+    # Whether this render is going into an email (a newsletter, or its test
+    # send). Like a feed it leaves the building, so it never carries a block
+    # warning, even when a signed-in admin's request renders it.
+    @rendering_email = email
+
     # In static-site mode, strip dynamic blocks that require a Rails
     # backend (forms, paywalls, product buttons). Done before any other
     # processing so downstream renderers never see them.
@@ -45,6 +50,12 @@ module HasMarkdownExtensions
     # strikethrough, highlights, blocks) touches code. See protect_fenced_code.
     code_blocks = {}
     processed_content = protect_fenced_code(source, code_blocks)
+
+    # Wikilinks ([[posts/x]], [[posts/x|text]]) become placeholders, so kramdown
+    # never sees the brackets, and the pipe can't split a table cell. Restored
+    # as links after kramdown. See InternalLinks.
+    wikilinks = {}
+    processed_content = InternalLinks.protect(processed_content, wikilinks)
 
     # Protect || split markers from Kramdown's table parsing. Every
     # marker restores to the same value, so a single shared placeholder
@@ -93,14 +104,24 @@ module HasMarkdownExtensions
     code_blocks.each do |token, html_code|
       html.gsub!(%r{<p>\s*#{Regexp.escape(token)}\s*</p>}) { html_code }
       # With soft line breaks, a fence right under a list item's text (no
-      # blank line) leaves a <br> before the block. The block starts its own
-      # line anyway, so the break goes.
-      html.gsub!(%r{<br\s*/?>\s*#{Regexp.escape(token)}}) { "\n#{html_code}" }
+      # blank line) leaves a <br> before the block, and text right under the
+      # closing fence leaves one after it. The block is on its own lines
+      # anyway, so neither break does anything but add an empty line.
+      # One pass for both: replacing the break before swaps the token out, so
+      # a second pass couldn't find the break after.
+      html.gsub!(%r{(<br\s*/?>\s*)?#{Regexp.escape(token)}(\s*<br\s*/?>)?}) do
+        "#{"\n" if Regexp.last_match(1)}#{html_code}#{"\n" if Regexp.last_match(2)}"
+      end
       html.gsub!(token) { html_code }
     end
 
     # Restore pullquote splits
     html.gsub!("PULLQUOTE_SPLIT_END", "||")
+
+    # Internal links: wikilinks back as links, and links to files
+    # ([text](/posts/x.md)) pointed at the item's address.
+    html = InternalLinks.restore(html, wikilinks)
+    html = InternalLinks.rewrite_file_hrefs(html)
 
     # Swap search-trigger icon placeholders for the inline SVG AFTER Kramdown
     # (Kramdown mangles inline SVG, so triggers carry a token instead).
@@ -133,12 +154,16 @@ module HasMarkdownExtensions
     # Keep content off ids that belong to injected third-party mount points.
     html = reserve_mount_ids(html)
 
+    # French spacing: no line break before ? ! : ; » or after «.
+    html = PunctuationSpaces.apply(html)
+
     html.html_safe
   ensure
     # Clear render context to prevent data leaking between requests
     @render_context = nil
     @rendering_static = nil
     @rendering_feed = nil
+    @rendering_email = nil
   end
 
   # IDs that belong to injected third-party mount points and must never be
@@ -1088,10 +1113,29 @@ module HasMarkdownExtensions
   end
 
   def render_collection(config)
+    @menu_missing = nil
     display_items, total_count, warning = resolve_collection_items(config)
     return warning if warning
 
-    render_resolved_collection(config, display_items, total_count)
+    html = render_resolved_collection(config, display_items, total_count)
+    "#{menu_missing_warning(config)}#{html}"
+  end
+
+  # A menu's order: names that match nothing are left out of the menu. Say
+  # which, above it, so a typo (or a page that's gone) is seen, not just
+  # missed. curate_menu collects them in @menu_missing.
+  def menu_missing_warning(config)
+    missing = @menu_missing
+    @menu_missing = nil
+    return "" if missing.blank?
+
+    noun = collection_source_noun(collection_source(config))
+    names = missing.map { |name| "`#{name}`" }.to_sentence
+    dev_warning(
+      "Menu #{'name'.pluralize(missing.size)} not found",
+      "#{names} #{missing.size == 1 ? "doesn't" : "don't"} match a #{noun}, so #{missing.size == 1 ? "it's" : "they're"} left out of this menu.",
+      "Check the url_name or file name. ADD NAVIGATION in the layout editor lists every page you can use."
+    )
   end
 
   # Default source for a collection, shared by resolve_collection_items and
@@ -1273,14 +1317,16 @@ module HasMarkdownExtensions
       my_related_slugs = Array(metadata["related"]).map(&:to_s).reject(&:empty?)
 
       items_array = items.to_a
-      by_slug     = items_array.index_by(&:url_name)
 
-      # Forward: items I declare as related, in my declared order.
-      forward = my_related_slugs.map { |slug| by_slug[slug] }.compact
+      # Forward: items I declare as related, in my declared order. A name is
+      # a url_name or a file name (ItemName).
+      forward = my_related_slugs.map { |slug| ItemName.pick(slug, items_array) }.compact
 
       # Backward: items that declare *me* as related.
       backward = items_array.select do |item|
-        Array(item.metadata["related"]).map(&:to_s).include?(my_url_name)
+        Array(item.metadata["related"]).map(&:to_s).any? do |slug|
+          slug == my_url_name || ItemName.pick(slug, [ self ]).present?
+        end
       end
 
       items = (forward + backward)
@@ -1517,7 +1563,6 @@ module HasMarkdownExtensions
 
     listed = []
     if has_list
-      by_slug  = all.index_by { |item| item.url_name.to_s.downcase }
       missing  = []
 
       # Each entry is a page's url_name or, in the same position, an inline
@@ -1526,13 +1571,14 @@ module HasMarkdownExtensions
         if (m = MENU_LINK_RE.match(entry))
           MenuLink.new(title: m[1].strip, path: m[2])
         else
-          by_slug[entry.downcase] || (missing << entry; nil)
+          ItemName.pick(entry, all) || (missing << entry; nil)
         end
       end
 
       if Rails.env.development? && missing.any?
         Rails.logger.warn("[Collection menu] order: url_names not found: #{missing.join(', ')}")
       end
+      @menu_missing = missing
     end
 
     tagged = []
@@ -1590,8 +1636,7 @@ module HasMarkdownExtensions
 
       # Subtitle
       if show_subtitle && item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "#{item.subtitle}"
-        output << "{: .item-subtitle}"
+        output << %(<p class="item-subtitle">#{FieldText.html(item.subtitle)}</p>)
         output << ""
       end
 
@@ -1652,14 +1697,12 @@ module HasMarkdownExtensions
       output << ""
 
       if show_subtitle && item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "#{item.subtitle}"
-        output << "{: .item-subtitle}"
+        output << %(<p class="item-subtitle">#{FieldText.html(item.subtitle)}</p>)
         output << ""
       end
 
       if show_excerpt && item.respond_to?(:excerpt) && item.excerpt.present?
-        output << item.excerpt.to_s
-        output << "{: .item-excerpt}"
+        output << %(<p class="item-excerpt">#{FieldText.html(item.excerpt)}</p>)
         output << ""
       end
 
@@ -1786,9 +1829,9 @@ module HasMarkdownExtensions
 
       # Subtitle: explicit config override > item's subtitle field
       subtitle_str = if config[:subtitle].present?
-        CGI.escapeHTML(config[:subtitle].to_s)
+        FieldText.html(config[:subtitle])
       elsif show_subtitle
-        item.respond_to?(:subtitle) ? CGI.escapeHTML(item.subtitle.to_s.strip) : nil
+        item.respond_to?(:subtitle) ? FieldText.html(item.subtitle) : nil
       end
 
       meta_html = ""
@@ -1833,8 +1876,8 @@ module HasMarkdownExtensions
 
       html = "<div class=\"glossary-entry\">\n"
       html << "  <dt id=\"#{term_id}\" class=\"item-title\">#{title_content}</dt>\n"
-      html << "  <dd class=\"item-subtitle\">#{CGI.escapeHTML(subtitle)}</dd>\n" if subtitle.present?
-      html << "  <dd class=\"item-excerpt\">#{CGI.escapeHTML(excerpt)}</dd>\n" if excerpt.present?
+      html << "  <dd class=\"item-subtitle\">#{FieldText.html(subtitle)}</dd>\n" if subtitle.present?
+      html << "  <dd class=\"item-excerpt\">#{FieldText.html(excerpt)}</dd>\n" if excerpt.present?
       html << "</div>"
       html
     end
@@ -1856,8 +1899,7 @@ module HasMarkdownExtensions
 
       # Subtitle
       if item.respond_to?(:subtitle) && item.subtitle.present?
-        output << "#{item.subtitle}"
-        output << "{: .item-subtitle}"
+        output << %(<p class="item-subtitle">#{FieldText.html(item.subtitle)}</p>)
         output << ""
       end
 
@@ -2415,8 +2457,8 @@ module HasMarkdownExtensions
       # Optional description
       if show_description && display_product.respond_to?(:description) && display_product.description.present?
         # Truncate to ~100 characters
-        desc = display_product.description.length > 100 ? display_product.description[0..97] + "..." : display_product.description
-        output << %Q(    <div class="grid-item-description">#{desc}</div>)
+        desc = FieldText.shortened(display_product.description, 100)
+        output << %Q(    <div class="grid-item-description">#{FieldText.html(desc)}</div>)
       end
 
       # Price and button
@@ -2553,6 +2595,8 @@ module HasMarkdownExtensions
       item.public_url
     elsif item.is_a?(Product)
       "/store/#{item.url_name}"
+    elsif item.is_a?(Page)
+      item.public_url
     else
       "/#{item.url_name}"
     end
@@ -2583,8 +2627,7 @@ module HasMarkdownExtensions
       "/collections/#{segments.join('/')}"
     else
       # No filters, no heading = general archive
-      archive_page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "archive")
-      archive_page ? "/archive" : "/posts"
+      SystemPages.path("archive", fallback: "/posts")
     end
 
     # Build query params (NEW)
@@ -3353,7 +3396,7 @@ module HasMarkdownExtensions
     text = explicit.to_s
     text = first_paragraph_of_post(referenced_post) if text.blank? && referenced_post.present?
     return "" if text.blank?
-    text.length > max_length ? text[0..max_length - 3] + "..." : text
+    FieldText.shortened(text, max_length)
   end
 
   # Walk a post's markdown content line by line, looking for the first
@@ -4061,22 +4104,12 @@ module HasMarkdownExtensions
   # (most common), then pages, products, and user documentation.
   # Roe's own docs (file_path contains /roe/) are excluded — those are
   # system docs and not intended as link targets in content.
+  # A card's `post:` / `product:`: a url_name, a file name, either with a
+  # folder (ItemName). An address prefix (`/posts/x`) that finds nothing in
+  # that folder still finds `x` anywhere, as it always did.
   def find_post_by_slug(slug_or_path)
     raw = slug_or_path.to_s.strip
-
-    # Strip known prefixes to get the bare slug
-    slug = raw
-      .sub(%r{^/posts/}, "")
-      .sub(%r{^/pages/}, "")
-      .sub(%r{^/store/}, "")
-      .sub(%r{^/documentation/}, "")
-      .sub(%r{^/}, "")
-
-    Post.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
-      Page.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
-      Product.where("json_extract(metadata, '$.url_name') = ?", slug).first ||
-      Documentation.where("json_extract(metadata, '$.url_name') = ?", slug)
-                   .where("file_path NOT LIKE '%/roe/%'").first
+    ItemName.find(raw) || (ItemName.find(ItemName.parse(raw).name) if ItemName.parse(raw).folder)
   end
 
   def render_error_card(message)
@@ -4311,12 +4344,11 @@ module HasMarkdownExtensions
   #
   #   dev_warning("Title", "What went wrong", "optional hint or context")
   #
-  # Shown while writing — in development, and in an editor preview whatever the
-  # environment. Silent everywhere else, which is the important half: a
-  # published URL never shows these, so a reader can't be handed a diagnostic
-  # and a self-hosted site can't leak one. Static builds are excluded outright
-  # rather than relying on the preview flag being false, because a generated
-  # file outlives the request that made it.
+  # Shown to whoever can fix it: anyone on a local install, a signed-in admin
+  # on live, and the editor preview. Silent for everyone else, which is the
+  # important half: a visitor is never handed a diagnostic. Static builds,
+  # feeds and emails are excluded outright, because they outlive the request
+  # that made them.
   #
   # Without the preview case these were invisible to anyone not running Roe
   # locally — the writer whose block silently rendered nothing got no
@@ -4332,11 +4364,15 @@ module HasMarkdownExtensions
   # alone isn't enough of a test: a feed rendered on a dev machine was shipping
   # the "Stripe isn't connected" notice into content:encoded, so it arrived in
   # a real reader as part of the article.
+  #
+  # Who sees them: anyone on a local (development) install, and a signed-in
+  # admin anywhere, live included. Nobody else ever does: a visitor on live,
+  # a static file, a feed or an email never carries one.
   def show_block_warnings?
-    return false if @rendering_static
-    return false if @rendering_feed
+    return false if @rendering_static || @rendering_feed || @rendering_email
+    return false if Current.static_generation
 
-    Rails.env.development? || @rendering_preview.present?
+    Rails.env.development? || @rendering_preview.present? || Current.user.present?
   end
 
   # The closest term in `vocabulary`, or nil if nothing is close. Ruby's own

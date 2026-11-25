@@ -338,7 +338,7 @@ class StaticGenerator
   end
 
   def home_changed?
-    home = Page.find_by("file_path LIKE ?", "%/home.md")
+    home = Page.home
     return true unless home
 
     manifest_entry = @manifest.dig("pages", home.id.to_s)
@@ -487,10 +487,10 @@ class StaticGenerator
 
   def generate_home
     puts "🏠 Generating home page..."
-    home_page = Page.find_by("file_path LIKE ?", "%/home.md")
+    home_page = Page.home
 
     unless home_page
-      puts "  ⚠ Home page (home.md) not found"
+      puts "  ⚠ Home page not found (page_type: home, pages/home.md or url_name home)"
       return
     end
 
@@ -818,11 +818,9 @@ class StaticGenerator
 
     collection = collection.tagged_with(positive_tags) if positive_tags.any?
 
+    # Whole tag, case ignored: -lab drops lab and LAB, not lab-image.
     negative_tags.each do |neg_tag|
-      collection = collection.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{neg_tag}%"
-      )
+      collection = collection.not_tagged_with(neg_tag)
     end
 
     collection
@@ -1180,7 +1178,7 @@ class StaticGenerator
     host = site_url_base
     urls = []
 
-    home = Page.find_by("file_path LIKE ?", "%/home.md")
+    home = Page.home
     urls << [ "#{host}/", home&.updated_at ] if home
 
     static_pages_scope.each do |page|

@@ -7,7 +7,7 @@
     <li>
       <span class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></span>
       <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
-        — <span class="item-subtitle"><%= item.subtitle %></span>
+        — <span class="item-subtitle"><%= FieldText.html(item.subtitle) %></span>
       <% end %>
       <% if item.respond_to?(:date) && item.date %>
         • <span class="item-date"><%= item.date.strftime('%B %d, %Y') %></span>

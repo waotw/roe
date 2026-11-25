@@ -21,7 +21,7 @@ class NewsletterRenderer
 
   # Convert post markdown to HTML
   def post_html
-    post.to_html
+    post.to_html(email: true)
   end
 
   def convert_action_text_attachments(html)

@@ -1,6 +1,7 @@
 ---
 title: "Donation - Success"
 url_name: "donation-success"
+page_type: donation-success
 status: published
 audience: "everyone"
 ---

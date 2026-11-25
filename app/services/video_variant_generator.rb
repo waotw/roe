@@ -58,6 +58,14 @@ class VideoVariantGenerator
   # dark on average (0–255) is taken to be black and another is tried.
   POSTER_MIN_BRIGHTNESS = 24
   POSTER_TRIES = 4
+
+  # The manifest keys that describe the poster (see "Choosing the poster").
+  POSTER_KEYS = %w[poster poster_at poster_from poster_image].freeze
+
+  # Images that can be chosen as a poster. At class level, not inside
+  # `class << self`, so other code can read it as
+  # VideoVariantGenerator::POSTER_IMAGE_EXTENSIONS.
+  POSTER_IMAGE_EXTENSIONS = %w[.jpg .jpeg .png .webp .gif .avif .heic .heif .tif .tiff].freeze
   MANIFEST_SUFFIX = "-video.json"
 
   # The manifest's key for its list of web versions (see upgrade_manifest).
@@ -147,6 +155,47 @@ class VideoVariantGenerator
     end
 
     def manifest_path(source) = variant_path_for(source, nil)
+
+    # Move a renamed video's web versions, poster and manifest to the new
+    # name, and point the manifest at the new paths. Without this the
+    # renamed original had no versions: Roe made them again and the poster
+    # you chose was lost. Returns how many files moved.
+    def rename_variants!(old_source, new_source)
+      old_source = normalize_path(old_source)
+      new_source = normalize_path(new_source)
+      moved = all_variant_paths(old_source).zip(all_variant_paths(new_source)).count do |from, to|
+        next false unless File.file?(from) && !File.exist?(to)
+
+        File.rename(from, to)
+        true
+      end
+
+      path = manifest_path(new_source)
+      return moved unless File.file?(path)
+
+      with_manifest_lock(path) do
+        manifest = JSON.parse(File.read(path))
+        from = web_path_for(old_source)
+        to = web_path_for(new_source)
+        renamed = ->(web) { web.is_a?(String) ? web.sub(variant_web_prefix(from), variant_web_prefix(to)) : web }
+        manifest["source"]["path"] = to if manifest["source"].is_a?(Hash)
+        manifest["poster"] = renamed.(manifest["poster"])
+        [ MANIFEST_LIST, LEGACY_MANIFEST_LIST ].each do |list|
+          Array(manifest[list]).each { |r| r["path"] = renamed.(r["path"]) if r.is_a?(Hash) }
+        end
+        File.write(path, JSON.pretty_generate(manifest) + "\n")
+      end
+      moved
+    rescue JSON::ParserError, SystemCallError => e
+      Rails.logger.warn("[VideoVariantGenerator] rename #{old_source} → #{new_source}: #{e.message}")
+      moved.to_i
+    end
+
+    # "/media/video/variants/clip-" for /media/video/clip.mov: what every
+    # variant's web path starts with.
+    def variant_web_prefix(web)
+      "#{File.dirname(web)}/variants/#{File.basename(web, '.*')}-"
+    end
 
     # Every file name this generator could make for a source, for cleanup
     # and for tracing a variant back to its (possibly paid) original.
@@ -316,7 +365,9 @@ class VideoVariantGenerator
       end
       if kept["poster"].present? && !File.file?(variant_path_for(source, POSTER))
         kept["poster"] = nil
-        kept.delete("poster_at")
+        # A chosen frame stays chosen: the poster is made again from the
+        # same moment (see make_poster).
+        kept.delete("poster_at") unless kept["poster_from"] == "frame"
       end
       kept
     end
@@ -710,6 +761,91 @@ class VideoVariantGenerator
       FileUtils.rm_f(partial) if partial
     end
 
+    # ── Choosing the poster ─────────────────────────────────────────────
+    #
+    # The Media Browser's video window (DETAILS) replaces the frame Roe
+    # picked with one chosen by hand: a moment in the video, or an image
+    # from the media library. Either way the result is the same
+    # <name>-poster.jpg, so the players, cards, Site Sync and the static
+    # site need nothing new. The manifest records the choice, and
+    # make_poster follows it when the web versions are made again:
+    #   poster_from: frame   poster_at: 140.0
+    #   poster_from: image   poster_image: /media/images/still.jpg
+    # No poster_from means Roe picked it.
+    #
+    # An image is copied into the poster, cut to the video's shape, so
+    # deleting or renaming the image later doesn't change the poster.
+
+    # The poster becomes the frame `at` seconds into the original (full
+    # quality, whatever the window played). Returns the updated manifest.
+    def choose_poster_frame!(web_path, at)
+      source = poster_source!(web_path)
+      probe = poster_probe!(source)
+      at = clamp_time(at, probe)
+      out = variant_path_for(source, POSTER)
+      grab_frame(source, probe, at, out)
+      update_manifest!(source, probe) do |manifest|
+        manifest["poster"] = web_path_for(out)
+        manifest["poster_from"] = "frame"
+        manifest["poster_at"] = at.round(2)
+        manifest.delete("poster_image")
+      end
+    end
+
+    # The poster becomes a copy of an image from the media library, cut to
+    # fill the video's shape. Returns the updated manifest.
+    def choose_poster_image!(web_path, image_web_path)
+      source = poster_source!(web_path)
+      image = poster_image_file(image_web_path) or
+        raise Error, "#{File.basename(image_web_path.to_s)} isn't an image in the media library."
+      probe = poster_probe!(source)
+      out = variant_path_for(source, POSTER)
+      cut_image(image, out, *poster_dimensions(probe))
+      update_manifest!(source, probe) do |manifest|
+        manifest["poster"] = web_path_for(out)
+        manifest["poster_from"] = "image"
+        manifest["poster_image"] = web_path_for(image)
+        manifest.delete("poster_at")
+      end
+    end
+
+    # A small still from `at` seconds in, for the window's JUMP TO strip.
+    # Made from the smallest web version when there is one (much quicker to
+    # read than a large original), kept in tmp/ (never in site/, which Site
+    # Sync carries), and reused while the video is unchanged.
+    def frame_preview(web_path, at, width: 160)
+      source = poster_source!(web_path)
+      from = available_renditions(source).first&.then { |r| variant_path_for(source, r["name"]) } || source
+      stat = File.stat(from)
+      at = at.to_f.clamp(0.0, 24 * 60 * 60).round(2)
+      dir = Rails.root.join("tmp", "video_variants", "frames")
+      FileUtils.mkdir_p(dir)
+      key = Digest::SHA1.hexdigest([ from, stat.size, stat.mtime.to_i, width ].join(":"))
+      out = dir.join("#{key}-#{format('%.2f', at)}.jpg").to_s
+      return out if File.file?(out)
+
+      _o, err, status = ManagedTools::Platform.run(
+        tool.ffmpeg_path, "-nostdin", "-v", "error", "-y", "-ss", format("%.2f", at), "-i", from,
+        "-frames:v", "1", "-vf", "scale=#{width.to_i}:-2", "-q:v", "5", "-f", "image2", out,
+        timeout: 30
+      )
+      raise Error, "Couldn't read a frame at #{at}s: #{err.to_s.lines.last.to_s.strip}" unless status&.success? && File.file?(out)
+
+      out
+    end
+
+    # How the current poster came to be, for the window: "frame", "image",
+    # or "roe" (picked by Roe), with the time or image it came from.
+    def poster_choice(manifest)
+      return nil unless manifest&.dig("poster").present?
+
+      case manifest["poster_from"]
+      when "frame" then { from: "frame", at: manifest["poster_at"] }
+      when "image" then { from: "image", image: manifest["poster_image"] }
+      else { from: "roe", at: manifest["poster_at"] }
+      end
+    end
+
     # ── Status ──────────────────────────────────────────────────────────
     #
     # A video's Medium#variants_status moves through:
@@ -847,7 +983,11 @@ class VideoVariantGenerator
         state: state,
         percent: percent,
         steps: steps,
-        poster: (manifest["poster"] if manifest&.dig("poster") && File.file?(variant_path_for(source, POSTER))),
+        # With its time as ?v=, so a page that showed the old poster shows
+        # a newly chosen one (the file keeps its name).
+        poster: (if manifest&.dig("poster") && File.file?(poster_file = variant_path_for(source, POSTER))
+                   "#{manifest['poster']}?v=#{File.mtime(poster_file).to_i}"
+                 end),
         source: manifest&.dig("source")&.slice("width", "height", "duration", "size") ||
                 { "size" => (File.size(source) if File.file?(source)) },
         outputs: manifest ? Array(manifest[MANIFEST_LIST]).map { |r| r.slice("name", "size", "width", "height") } : [],
@@ -899,7 +1039,12 @@ class VideoVariantGenerator
       existing = current_manifest(source)
       return existing if existing
 
-      all_variant_paths(source).each { |p| FileUtils.rm_f(p) } if read_manifest(source)
+      old = read_manifest(source)
+      all_variant_paths(source).each { |p| FileUtils.rm_f(p) } if old
+      # A chosen image doesn't depend on which original it was chosen for,
+      # so a replaced original keeps it; a chosen moment in the old
+      # original means nothing in the new one.
+      kept_choice = old&.dig("poster_from") == "image" ? old.slice("poster_from", "poster_image") : {}
       {
         "source" => {
           "path" => web_path_for(source), "size" => File.size(source),
@@ -909,7 +1054,7 @@ class VideoVariantGenerator
         MANIFEST_LIST => [],
         "poster" => nil,
         "complete" => false
-      }
+      }.merge(kept_choice)
     end
 
     def make_rendition(source, name, probe, manifest, force:)
@@ -951,19 +1096,150 @@ class VideoVariantGenerator
       out
     end
 
+    # Made again (a forced rebuild, or the file was deleted), a chosen
+    # poster stays what was chosen: the same moment, or the same image cut
+    # again. An image that's gone since leaves Roe to pick a frame.
     def make_poster(source, probe, manifest, force:)
       out = variant_path_for(source, POSTER)
       return nil if !force && File.file?(out) && manifest["poster"]
 
       write_progress(web_path_for(source), POSTER, 0)
-      at = poster_time(source, probe)
+      image = poster_image_file(manifest["poster_image"]) if manifest["poster_from"] == "image"
+      if image
+        cut_image(image, out, *poster_dimensions(probe))
+        manifest.delete("poster_at")
+      else
+        %w[poster_from poster_image].each { |k| manifest.delete(k) } if manifest["poster_from"] == "image"
+        at = manifest["poster_from"] == "frame" && manifest["poster_at"] ? clamp_time(manifest["poster_at"], probe) : poster_time(source, probe)
+        grab_frame(source, probe, at, out)
+        manifest["poster_at"] = at.round(2)
+      end
+      manifest["poster"] = web_path_for(out)
+      out
+    end
+
+    # The frame `at` seconds in, at the size of the largest web version.
+    def grab_frame(source, probe, at, out)
       short = [ probe.short_side.to_i, RENDITIONS.values.last[:short] ].min
       args = [ "-ss", format("%.2f", at), "-i", source, "-frames:v", "1",
                "-vf", video_filters(probe, short, frame_rate: nil), "-q:v", "3", "-map_metadata", "-1", "-f", "image2" ]
       run_ffmpeg(args, output: out, timeout: 120)
-      manifest["poster"] = web_path_for(out)
-      manifest["poster_at"] = at.round(2)
+    end
+
+    # The size a frame poster comes out at: the video as displayed, its
+    # shorter side brought down to the largest web version's (never up).
+    def poster_dimensions(probe)
+      w = probe.width.to_i
+      h = probe.height.to_i
+      return [ 1280, 720 ] unless w.positive? && h.positive?
+
+      short = [ [ w, h ].min, RENDITIONS.values.last[:short] ].min
+      short -= short % 2
+      long = ([ w, h ].max * short.to_f / [ w, h ].min).round
+      long -= long % 2
+      w >= h ? [ long, short ] : [ short, long ]
+    end
+
+    # An image cut to fill width × height (centred) and saved as the
+    # poster JPEG. libvips when it's here (it turns phone photos upright);
+    # ffmpeg otherwise. Written outside site/ first, like every variant.
+    def cut_image(image, out, width, height)
+      work_dir = Rails.root.join("tmp", "video_variants")
+      FileUtils.mkdir_p(work_dir)
+      FileUtils.mkdir_p(File.dirname(out))
+      partial = work_dir.join("#{SecureRandom.hex(6)}-#{File.basename(out)}").to_s
+      if ImageVariantGenerator.available?
+        require "image_processing/vips"
+        ImageProcessing::Vips.source(image)
+                             .resize_to_fill(width, height, crop: :centre)
+                             .custom { |img| img.has_alpha? ? img.flatten(background: [ 255, 255, 255 ]) : img }
+                             .convert("jpg").saver(quality: 85, strip: true)
+                             .call(destination: partial)
+      else
+        filters = "scale=#{width}:#{height}:force_original_aspect_ratio=increase,crop=#{width}:#{height},format=yuvj420p"
+        _o, err, status = ManagedTools::Platform.run(
+          tool.ffmpeg_path, "-nostdin", "-v", "error", "-y", "-i", image, "-frames:v", "1",
+          "-vf", filters, "-q:v", "3", "-map_metadata", "-1", "-f", "image2", partial, timeout: 60
+        )
+        raise Error, "Couldn't use #{File.basename(image)}: #{err.to_s.lines.last.to_s.strip}" unless status&.success?
+      end
+      raise Error, "Couldn't use #{File.basename(image)} as the poster." unless File.size?(partial)
+
+      FileUtils.mv(partial, out, force: true)
       out
+    rescue Error
+      raise
+    rescue => e
+      raise Error, "Couldn't use #{File.basename(image)} as the poster: #{e.message}"
+    ensure
+      FileUtils.rm_f(partial) if partial
+    end
+
+    # The file on disk for an image in the media library (/media/...), or
+    # nil: not under media/, a variant, not an image, or not there.
+    def poster_image_file(web_path)
+      web = web_path.to_s
+      return nil unless web.start_with?("/media/") && !web.include?("..") && !variant_path?(web)
+      return nil unless POSTER_IMAGE_EXTENSIONS.include?(File.extname(web).downcase)
+
+      path = normalize_path(web)
+      File.file?(path) ? path : nil
+    end
+
+    def poster_source!(web_path)
+      raise Error, "ffmpeg isn't installed." unless available?
+
+      web = web_path.to_s
+      raise Error, "Not a video in the media library." unless web.start_with?("/media/") && !web.include?("..")
+      raise Error, "Refusing to change a variant." if variant_path?(web)
+
+      source = normalize_path(web)
+      raise Error, "#{File.basename(source)} isn't there any more." unless video_file?(source) && File.file?(source)
+
+      source
+    end
+
+    def poster_probe!(source)
+      probe = MediaProbe.call(source) or raise Error, "ffprobe couldn't read #{File.basename(source)}."
+      raise Error, "#{File.basename(source)} has no video track." unless probe.video?
+
+      probe
+    end
+
+    # A time inside the video: a moment past the last frame gives ffmpeg
+    # nothing to take.
+    def clamp_time(at, probe)
+      at = at.to_f
+      duration = probe.duration.to_f
+      return [ at, 0.0 ].max unless duration.positive?
+
+      at.clamp(0.0, [ duration - 0.1, 0.0 ].max)
+    end
+
+    # Change the manifest under the same lock the transcode jobs write it
+    # with, so a job finishing at the same moment can't lose the change.
+    # A video with no manifest yet gets a fresh one.
+    def update_manifest!(source, probe)
+      path = manifest_path(source)
+      with_manifest_lock(path) do
+        manifest = on_disk(current_manifest(source), source) || fresh_manifest(source, probe)
+        yield manifest
+        File.write(path, JSON.pretty_generate(for_file(manifest)) + "\n")
+        manifest
+      end
+    end
+
+    # The lock file lives in tmp/, not next to the manifest: Site Sync
+    # lists every file under site/, and a stray .lock must never travel.
+    def with_manifest_lock(path)
+      FileUtils.mkdir_p(File.dirname(path))
+      lock_dir = Rails.root.join("tmp", "video_variants")
+      FileUtils.mkdir_p(lock_dir)
+      lock_path = lock_dir.join("#{Digest::SHA1.hexdigest(path)}.lock").to_s
+      File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock|
+        lock.flock(File::LOCK_EX)
+        yield
+      end
     end
 
     # Seconds into the video to take the poster from. A few random points
@@ -1119,16 +1395,7 @@ class VideoVariantGenerator
     # into the manifest as it is now on disk, under a lock.
     def finish(source, manifest, wanted, name)
       path = manifest_path(source)
-      FileUtils.mkdir_p(File.dirname(path))
-
-      # The lock file lives in tmp/, not next to the manifest: Site Sync
-      # lists every file under site/, and a stray .lock must never travel.
-      lock_dir = Rails.root.join("tmp", "video_variants")
-      FileUtils.mkdir_p(lock_dir)
-      lock_path = lock_dir.join("#{Digest::SHA1.hexdigest(path)}.lock").to_s
-
-      File.open(lock_path, File::RDWR | File::CREAT, 0o644) do |lock|
-        lock.flock(File::LOCK_EX)
+      with_manifest_lock(path) do
         # What's on disk, not just what was once recorded: a version deleted
         # since it was made is still to do, so the video isn't complete yet.
         merged = on_disk(merge_step(current_manifest(source), manifest, name), source)
@@ -1163,7 +1430,9 @@ class VideoVariantGenerator
 
       merged = on_disk.deep_dup
       if name == POSTER
-        %w[poster poster_at].each { |k| merged[k] = mine[k] if mine.key?(k) }
+        # Every poster key is the poster step's own, so one it dropped (a
+        # chosen image that's gone) is dropped here too.
+        POSTER_KEYS.each { |k| mine.key?(k) ? merged[k] = mine[k] : merged.delete(k) }
       else
         merged[MANIFEST_LIST] = Array(merged[MANIFEST_LIST]).reject { |r| r["name"] == name } +
                                Array(mine[MANIFEST_LIST]).select { |r| r["name"] == name }

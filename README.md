@@ -22,7 +22,7 @@ Full documentation, instructions and troubleshooting are at [go-roe.com/document
 
 Roe runs on **macOS**, **Linux**, and **Windows via WSL2**. To launch Roe you need:
 
-- **Ruby 4.0.5** — managed for you with [mise](https://mise.jdx.dev)
+- **Ruby 4.0.10** — managed for you with [mise](https://mise.jdx.dev)
 - **Git**
 - **A C compiler & build tools** (to install Ruby and gems)
   - macOS: Xcode Command Line Tools
@@ -144,6 +144,7 @@ roe open the-briefcase      # opens the home page and the admin
 roe admin the-briefcase     # just the admin
 roe folder                  # the cd command for each site's folder
 roe install libvips         # install an optional tool Roe can use
+roe links                   # broken links and missing media, site and Roe's docs
 roe start --all
 roe                         # help
 ```

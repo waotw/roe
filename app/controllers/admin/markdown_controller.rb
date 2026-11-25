@@ -12,7 +12,7 @@ class Admin::MarkdownController < Admin::BaseController
   # POST /admin/markdown/check
   # → { issues: [{ type:, line:, message:, fixable:, label: }], fixable_count: }
   def check
-    issues = MarkdownDoctor.diagnose(content_param, page_ids: page_ids, gfm: gfm?)
+    issues = MarkdownDoctor.diagnose(content_param, page_ids: page_ids, gfm: gfm?, **LinkTargets.doctor_options)
 
     render json: {
       issues: issues.map { |i| present(i) },
@@ -33,7 +33,7 @@ class Admin::MarkdownController < Admin::BaseController
     render json: {
       content: fixed,
       applied: applied.map { |i| present(i) },
-      remaining: MarkdownDoctor.diagnose(fixed, page_ids: page_ids(fixed), gfm: gfm?).map { |i| present(i) }
+      remaining: MarkdownDoctor.diagnose(fixed, page_ids: page_ids(fixed), gfm: gfm?, **LinkTargets.doctor_options).map { |i| present(i) }
     }
   end
 

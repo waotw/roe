@@ -135,4 +135,50 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     assert_equal "/", Page.public_url_for("home")
     assert_equal "/store/a", Product.public_url_for("a")
   end
+
+  # The site's own links follow the item, redirect or not: links written as
+  # addresses get the new address, links to the file get the new file name.
+  test "a new address or file name updates the site's own links to it" do
+    sign_in_as(@admin)
+    page = page_with("links-target")
+    linker = page_with("links-linker")
+    File.write(linker.file_path, "---\ntitle: Linker\nstatus: published\nurl_name: links-linker\n---\n" \
+                                 "[a](/links-target) [b](/pages/rename-redirect-links-target.md)\n")
+    ContentSync.sync_file(linker.file_path)
+
+    patch admin_page_path(page), params: {
+      metadata: "title: About Us\nstatus: published\nurl_name: links-moved\n", content: "Body."
+    }
+    assert_includes File.read(linker.file_path), "[a](/links-moved) [b](/pages/rename-redirect-links-target.md)"
+    assert_equal "Updated 1 link to it.", flash[:notice]
+
+    patch rename_admin_page_path(page), params: { new_filename: "rename-redirect-links-renamed" }
+    @files << File.join(RoeSitePaths::SITE_PATH, "pages", "rename-redirect-links-renamed.md")
+    assert_includes File.read(linker.file_path), "[b](/pages/rename-redirect-links-renamed.md)"
+  end
+
+  test "the editor is told when a page's url_name is another page's address" do
+    sign_in_as(@admin)
+    first = page_with("clash-one")
+    page_with("clash-two")
+
+    get check_unique_admin_pages_path, params: { field: "url_name", value: "clash-two", exclude: first.id }
+    assert_equal({ "taken" => true, "conflict" => "About Us" }, response.parsed_body)
+
+    get check_unique_admin_pages_path, params: { field: "url_name", value: "clash-one", exclude: first.id }
+    assert_equal false, response.parsed_body["taken"], "a page doesn't clash with itself"
+  end
+
+  test "a page Roe finds by its page_type says so in the editor" do
+    sign_in_as(@admin)
+    page = page_with("whatever-it-is-called")
+    File.write(page.file_path, File.read(page.file_path).sub("status:", "page_type: checkout-success\nstatus:"))
+    ContentSync.sync_file(page.file_path)
+
+    get edit_admin_page_path(page)
+    assert_includes response.body, "finds it by the page_type <code>checkout-success</code>"
+
+    get edit_admin_page_path(page_with("plain-page"))
+    assert_not_includes response.body, "finds it by the page_type"
+  end
 end

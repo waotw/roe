@@ -8,7 +8,7 @@
       <h3 class="item-title"><%= link_to item.title || 'Untitled', item_path(item) %></h3>
 
       <% if item.respond_to?(:subtitle) && item.subtitle.present? %>
-        <p class="item-subtitle"><%= item.subtitle %></p>
+        <p class="item-subtitle"><%= FieldText.html(item.subtitle) %></p>
       <% end %>
     </div>
   <% end %>

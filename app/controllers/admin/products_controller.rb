@@ -16,7 +16,7 @@ class Admin::ProductsController < Admin::BaseController
     # or a ProductGroup (2+ products sharing a `group:` value), most-recently-
     # edited first, groups kept together with their primary on top. Grouping is
     # derived from front-matter, not stored — see ProductGroup.
-    @rows = ProductGroup.rows_for(Product.all)
+    @rows = ProductGroup.rows_for(tagged(Product.all))
   end
 
   def new
@@ -141,6 +141,7 @@ class Admin::ProductsController < Admin::BaseController
     was_published = @product.status == "published"
     status_before = @product.status
     old_address = rename_redirect_source(@product)
+    link_source = internal_link_source(@product)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     SiteFile.write(File.join(RoeSitePaths::SITE_PATH, @product.file_path), full_content)
@@ -151,6 +152,7 @@ class Admin::ProductsController < Admin::BaseController
     # A plain save says nothing — the editor's dot shows "changes saved".
     flash[:notice] = "Product published" if !was_published && @product.status == "published"
     add_rename_redirect(Product, old_address, metadata, @product.file_path)
+    update_internal_links(link_source, @product, own_file: File.join(RoeSitePaths::SITE_PATH, @product.file_path))
     finish_editor_save(record: @product, resource_type: "product", edit_path: edit_admin_product_path(@product),
                        file_path: File.join(RoeSitePaths::SITE_PATH, @product.file_path), submitted: submitted, status_before: status_before)
   end
@@ -201,6 +203,7 @@ class Admin::ProductsController < Admin::BaseController
       id: product.id,
       title: product.title,
       url_name: product.url_name,
+      ref: (ref = InternalLinks.ref_for(product)).present? ? "/#{ref}.md" : product.url_name,
       price: product.price,
       variant: product.variant,
       primary: primary,
@@ -238,6 +241,13 @@ class Admin::ProductsController < Admin::BaseController
     end
   end
 
+  # Is this url_name already another product's address? Advisory only
+  # (UrlNameClash); the unique-field controller asks while it's typed.
+  def check_unique
+    conflict = UrlNameClash.find(Product, params[:value], except_id: params[:exclude])
+    render json: { taken: conflict.present?, conflict: conflict&.title }
+  end
+
   def rename
     @product = Product.find(params[:id])
     new_filename = sanitize_filename(params[:new_filename])
@@ -266,10 +276,12 @@ class Admin::ProductsController < Admin::BaseController
     end
 
     begin
+      link_source = internal_link_source(@product)
       File.rename(old_full, new_full)
       @product.update(file_path: new_rel)
       ContentSync.sync_file(new_full)
       flash[:notice] = "Renamed to #{new_filename}.md"
+      update_internal_links(link_source, @product)
     rescue => e
       flash[:error] = "Failed to rename: #{e.message}"
     end

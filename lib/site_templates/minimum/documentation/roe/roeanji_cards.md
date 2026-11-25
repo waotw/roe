@@ -133,7 +133,7 @@ Post links are a great way to link to other posts in your site with support for 
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 ````
 
@@ -142,7 +142,7 @@ post: collection-full
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 
 ### Options
@@ -152,7 +152,7 @@ post: collection-full
 | Option | Required | Description |
 |--------|----------|-------------|
 | `type` | Yes | Must be `post-link` |
-| `post` | Yes | Reference a post by its url_name — auto-populates all fields |
+| `post` | Yes | Reference a post by its url_name or filename with `.md` or without — auto-populates all fields |
 | `style` | No | `small` (default), `medium`, or `large` |
 | `title` | No | Override or provide custom title |
 | `subtitle` | No | Override subtitle (medium/large only) |
@@ -169,7 +169,7 @@ post: collection-full
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 ````
 
@@ -178,7 +178,7 @@ post: collection-full
 ```card
 type: post-link
 style: small
-post: collection-full
+post: welcome
 ```
 
 And you can change the size (small/medium/large)
@@ -187,7 +187,7 @@ And you can change the size (small/medium/large)
 ```card
 type: post-link
 style: medium
-post: collection-full
+post: welcome
 ```
 ````
 
@@ -196,7 +196,7 @@ post: collection-full
 ```card
 type: post-link
 style: medium
-post: collection-full
+post: welcome
 ```
 
 This simple syntax will pull all the information from the Post itself. You can also override this fully if you want. Just add the fields you'd like to replace ↓ :
@@ -204,7 +204,7 @@ This simple syntax will pull all the information from the Post itself. You can a
 ````markdown
 ```card
 type: post-link
-post: collection-full
+post: welcome
 style: large
 title: Collection Full
 author: Benjamin Welch, Esq.
@@ -218,7 +218,7 @@ link_text: Read more…
 
 ```card
 type: post-link
-post: collection-full
+post: welcome
 style: large
 title: Collection Full
 author: Benjamin Welch, Esq.
@@ -373,7 +373,7 @@ A Product Link works just like a [Post Link](#post-link), but points at a produc
 | Option | Required | Description |
 |--------|----------|-------------|
 | `type` | Yes | Must be `product-link` |
-| `product` | Yes | Reference a product by its url_name — auto-populates all fields |
+| `product` | Yes | Reference a product by its url_name or filename with `.md` or without — auto-populates all fields |
 | `style` | No | `small` (default), `medium`, or `large` |
 | `title` | No | Override the title pulled from the product |
 | `description` | No | Override the description pulled from the product |

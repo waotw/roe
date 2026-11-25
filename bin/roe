@@ -145,6 +145,7 @@ usage() {
     echo -e "  ${ROE_ORANGE}home${NC}        Open just the home page"
     echo -e "  ${ROE_ORANGE}admin${NC}       Open just the admin page"
     echo -e "  ${ROE_ORANGE}logs${NC}        Recent errors and failures, ready to copy and send"
+    echo -e "  ${ROE_ORANGE}links${NC}       Broken links and missing media in your site and Roe's docs"
     echo -e "  ${ROE_ORANGE}stripe${NC}      Forward Stripe test webhooks to a running site (local testing)"
     echo -e "  ${ROE_ORANGE}folder${NC}      Show the cd command for each site's folder"
     echo -e "  ${ROE_ORANGE}install${NC}     Install an optional tool Roe can use (libvips, …)"
@@ -166,6 +167,7 @@ usage() {
     echo -e "  $ ${ROE_ORANGE}roe install libvips${NC}"
     echo -e "  $ ${ROE_ORANGE}roe stripe${NC}"
     echo -e "  $ ${ROE_ORANGE}roe logs --day | pbcopy${NC}"
+    echo -e "  $ ${ROE_ORANGE}roe links${NC}"
     echo -e "  $ ${ROE_ORANGE}roe stop --all${NC}"
     echo ""
     echo -e "${ROE_RED}${BOLD}NOTES${NC}"
@@ -182,6 +184,10 @@ usage() {
     echo "  • 'roe logs' shows only what went wrong in the last hour: failed pages,"
     echo "    failed background jobs, and why the server didn't start, if it didn't."
     echo "    Email addresses and keys are blanked out, so it's safe to send on."
+    echo "  • 'roe links' checks links between your posts, pages, products and docs,"
+    echo "    and the media files they use, then Roe's own docs. It lists anything"
+    echo "    that points at nothing and exits 1 if something is broken. Links to"
+    echo "    other sites aren't checked."
     echo "  • Site names come from your folder name: \"The Briefcase\" is the-briefcase."
     echo "  • To register a site, run './roe.sh register' inside the Roe folder."
     echo "  • To unregister a site, run './roe.sh unregister' inside the Roe folder."
@@ -361,6 +367,13 @@ cmd_restart() {
     local f="$1" pid running_port=""
     if pid="$(server_pid_for "$(_conf_get "$f" ROOT)")"; then
         running_port="$(port_for_pid "$pid")"
+    fi
+    # After a `git pull`, the Ruby and gems it needs are asked about before
+    # the server is stopped, so saying no leaves it running. Only an
+    # install whose roe.sh knows how (older ones don't have ruby-ready).
+    local script
+    if script="$(roe_sh_for "$f")" && grep -q "ruby-ready)" "$script"; then
+        run_in "$f" ruby-ready || return 1
     fi
     cmd_stop "$1"
     sleep 1
@@ -723,7 +736,7 @@ default_name() {
         return 0
     fi
     case "$fn" in
-        cmd_stop|cmd_restart|cmd_status|cmd_open|cmd_home|cmd_admin|cmd_stripe)
+        cmd_stop|cmd_restart|cmd_status|cmd_open|cmd_home|cmd_admin|cmd_stripe|cmd_links)
             running="$(running_names)"
             if [ "$(printf '%s\n' "$running" | grep -c .)" -eq 1 ]; then
                 echo "$running"
@@ -1034,7 +1047,7 @@ install_with_method() {
 
 # The commands a bare `roe` accepts, one per line — the first word to complete.
 complete_commands() {
-    printf '%s\n' list start stop restart status open home admin logs stripe folder install completion help
+    printf '%s\n' list start stop restart status open home admin logs links stripe folder install completion help
 }
 
 # The candidates for the SECOND word, given the command being completed for.
@@ -1044,7 +1057,7 @@ complete_names() {
     case "$1" in
         start|stop|restart) echo "--all" ;;
         logs) echo "--2h --day" ;;
-        status|open|home|admin|stripe|folder) : ;;
+        status|open|home|admin|links|stripe|folder) : ;;
         install) complete_tools; return 0 ;;
         completion) echo "--zsh --bash"; return 0 ;;
         *) return 0 ;;   # list/help take no argument
@@ -1232,6 +1245,26 @@ cmd_logs() {
         with_install_ruby "$app" ruby "$app/bin/roe-logs" ${ROE_LOGS_WINDOW:+"$ROE_LOGS_WINDOW"}
 }
 
+# ── Links ─────────────────────────────────────────────────────────────────────
+#
+# The dashboard's links check, in the terminal: links between the site's own
+# posts, pages, products and docs, and the media files they use, that point
+# at nothing — then the same check of Roe's own docs. Checks now (through the
+# install's own Rails) and exits 1 when something is broken.
+
+cmd_links() {
+    local f="$1" name root app
+    name="$(basename "$f" .conf)"
+    root="$(_conf_get "$f" ROOT)"
+    app="$root/current"
+    [ -d "$app" ] || app="$root"
+    if [ ! -f "$app/app/services/link_check.rb" ]; then
+        log_error "$name is on a Roe without 'roe links'. Update it from Admin → Updates."
+        return 1
+    fi
+    run_rails "$app/bin/rails" runner 'exit LinkCheck.cli'
+}
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
@@ -1293,6 +1326,7 @@ case "${1:-}" in
         done
         for_target cmd_logs "$_logs_site"
         ;;
+    links|link)      for_target cmd_links "${2:-}" ;;
     install)         cmd_install "${2:-}" ;;
     completion)
         case "${2:-}" in

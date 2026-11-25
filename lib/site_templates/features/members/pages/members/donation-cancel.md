@@ -1,6 +1,7 @@
 ---
 title: "Donation Cancel"
 url_name: "donation-cancel"
+page_type: donation-cancel
 status: published
 audience: "everyone"
 ---

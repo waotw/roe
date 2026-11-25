@@ -40,7 +40,13 @@ class MarkdownDoctor
     unindented_footnote_line: "Footnote line not indented, so it leaves the note",
     content_after_footnotes: "Text below the footnotes shows above them",
     marker_across_lines: "Formatting that doesn't close on its own line",
-    broken_anchor_link: "Link to a heading that isn't on the page"
+    broken_anchor_link: "Link to a heading that isn't on the page",
+    broken_internal_link: "Link to a file that isn't there",
+    unclear_internal_link: "Link that matches more than one file",
+    unclear_name: "Name that matches more than one item",
+    draft_link: "Link to a draft",
+    missing_media: "Media file that isn't there",
+    site_name: "Names one of the site's own posts or pages"
   }.freeze
 
   # Which issues Fix All is allowed to touch.
@@ -101,13 +107,19 @@ class MarkdownDoctor
   # An in-page link: `[text](#anchor)` or `href="#anchor"`. The anchor is in
   # group 1 or 2.
   ANCHOR_LINK_RE = /\[[^\]]*\]\(#([^)\s]+)\)|href=["']#([^"']+)["']/
+  # Links to the site's own files: `[[posts/x]]`, `[[posts/x|text]]`, and
+  # `[text](/posts/x.md)`. The target is in group 1 or 2. Same shapes as
+  # InternalLinks, kept here so the CLI runs without Rails.
+  INTERNAL_LINK_RE = %r{\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]|\]\((?!(?:[a-z][a-z0-9+.-]*:)|//)([^)\s?#]+?\.md(?:#[^)\s]*)?)\)}i
 
   # gfm: whether the site renders with Kramdown's GFM parser, which Roe uses
   # when soft line breaks are on (HasMarkdownExtensions#to_html). The two
   # parsers nest lists differently, and a rule that's right for one is a
   # false alarm for the other.
-  def self.diagnose(content, page_ids: nil, gfm: false)
-    new(content, page_ids: page_ids, gfm: gfm).diagnose
+  def self.diagnose(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil,
+                    address_status: nil, media_exists: nil, site_names: nil)
+    new(content, page_ids: page_ids, gfm: gfm, link_status: link_status, name_matches: name_matches,
+                 address_status: address_status, media_exists: media_exists, site_names: site_names).diagnose
   end
 
   def self.diagnose_file(path, gfm: false)
@@ -121,10 +133,38 @@ class MarkdownDoctor
   # rather than from re-deriving heading ids here: collection items, glossary
   # terms and galleries make ids of their own, and a guess would call good
   # links broken.
-  def initialize(content, page_ids: nil, gfm: false)
+  #
+  # link_status: a callable taking a link target and returning what
+  # InternalLinks.status does ([:ok | :draft | :missing | :ambiguous, detail]),
+  # for checking links to the site's files. Optional, like page_ids.
+  #
+  # name_matches: a callable taking a card's `post:`/`product:` value and
+  # returning a description of every item it could mean, the one Roe uses
+  # first (ItemName.matches). Optional too. Also used for a collection's
+  # `order:` names.
+  #
+  # address_status: a callable taking a link written as an address
+  # (`/posts/x`, `/about`, `/documentation/roe/cards`) and returning
+  # [:ok | :draft | :missing, detail], like link_status. Optional.
+  #
+  # media_exists: a callable taking a `/media/...` path and returning whether
+  # the file is there. Optional.
+  #
+  # site_names: for text that ships to many sites (Roe's own docs), a callable
+  # taking where a name is (:card, or :order with the collection's source)
+  # and returning true when names there mean the site's own posts and pages.
+  # Those can't be checked here: the name works on a site that has that item
+  # and nowhere else. Optional; without it every name is checked.
+  def initialize(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil,
+                 address_status: nil, media_exists: nil, site_names: nil)
     @lines = content.to_s.lines
     @issues = []
     @page_ids = page_ids
+    @link_status = link_status
+    @name_matches = name_matches
+    @address_status = address_status
+    @media_exists = media_exists
+    @site_names = site_names
     @gfm = gfm
   end
 
@@ -139,6 +179,11 @@ class MarkdownDoctor
     check_indentation
     check_markers_across_lines
     check_anchor_links if @page_ids
+    check_internal_links if @link_status
+    check_address_links if @address_status
+    check_card_names if @name_matches
+    check_order_names if @name_matches
+    check_media if @media_exists
     @issues.each do |issue|
       issue[:fixable] = self.class.fixable?(issue[:type]) && !issue.delete(:unsafe)
     end
@@ -305,6 +350,226 @@ class MarkdownDoctor
           message: "Nothing on this page has the id \"#{anchor}\", so this link goes nowhere#{anchor_suggestion(anchor, known)}"
         }
       end
+    end
+  end
+
+  # `[[posts/x]]` and `[text](/posts/x.md)` that name no file, more than one,
+  # or a draft. The first two show as plain text on the site; a draft link
+  # does too, until the draft is published.
+  def check_internal_links
+    scan_blocks do |line, line_num, block|
+      next if block
+
+      line.gsub(INLINE_CODE_RE, "").scan(INTERNAL_LINK_RE).each do |wiki, file|
+        target = (wiki || file).strip
+        state, detail = @link_status.call(target)
+        issue = internal_link_issue(state, detail, wiki ? "[[#{wiki}]]" : target)
+        @issues << issue.merge(line: line_num, target: target) if issue
+      end
+    end
+  end
+
+  # A card names its post or product by url_name or file name. A short name
+  # can mean two things (a page and a post both called `about`); Roe uses the
+  # first, and this says which.
+  CARD_NAME_RE = /\A\s*(?:post|product):[ \t]*["']?([^"'\n]+?)["']?\s*\z/
+
+  def check_card_names
+    scan_blocks do |line, line_num, block|
+      next unless block == "card"
+
+      name = line[CARD_NAME_RE, 1]
+      next unless name
+
+      if @site_names&.call(:card, nil)
+        # COPY: card name in text that ships to many sites
+        site_name_issue(name, line_num, "a post on the site, not a doc, so this card only shows on a site that has it")
+      else
+        name_issue(name, line_num, missing: "so the card can't show it")
+      end
+    end
+  end
+
+  def site_name_issue(name, line_num, what)
+    @issues << { type: :site_name, line: line_num, target: name, message: "#{name} is #{what}" }
+  end
+
+  # A name that matches nothing, or more than one thing. Shared by cards and
+  # `order:`, which read names the same way (ItemName).
+  def name_issue(name, line_num, missing:)
+    found = Array(@name_matches.call(name))
+    # COPY: name check messages
+    if found.empty?
+      @issues << { type: :broken_internal_link, line: line_num, target: name,
+                   message: "#{name} doesn't match a post, page, product or doc, #{missing}" }
+    elsif found.size > 1
+      @issues << { type: :unclear_name, line: line_num, target: name,
+                   message: "#{name} could be #{found.join(' or ')}. Roe uses #{found.first}. Add the folder to clarify which #{name}" }
+    end
+  end
+
+  # A collection's `order:` lists names (url_names or file names) in the
+  # order to show them. One that matches nothing is skipped on the page. Sort
+  # words (`order: date`) and menu links (`[RSS](/feed.xml)`) aren't names.
+  # Same words as CollectionQuery.sort_keyword?, kept here so the CLI runs
+  # without Rails (a test checks the two agree).
+  SORT_KEYWORDS = %w[date date-asc title filename track_number episode_number chapter_number].freeze
+  ORDER_LINE_RE = /\A\s*order:[ \t]*(.+?)\s*\z/
+  MENU_ENTRY_LINK_RE = /\A\[[^\]]*\]\([^)\s]+\)\z/
+
+  def check_order_names
+    collection_blocks.each do |lines|
+      source = lines.map { |line, _| line[/\A\s*source:\s*(.+?)\s*\z/, 1] }.compact.first
+      lines.each do |line, line_num|
+        list = line[ORDER_LINE_RE, 1]
+        check_order_list(list, line_num, source) if list
+      end
+    end
+  end
+
+  # Each ```collection block as [[line, line_num], ...]. A block's lines come
+  # one after another; a gap means the next block.
+  def collection_blocks
+    blocks = []
+    scan_blocks do |line, line_num, block|
+      next unless block == "collection"
+
+      blocks << [] if blocks.empty? || blocks.last.last[1] != line_num - 1
+      blocks.last << [ line, line_num ]
+    end
+    blocks
+  end
+
+  def check_order_list(list, line_num, source)
+    site = @site_names&.call(:order, source)
+    list = list.delete_prefix("[").delete_suffix("]") if list.start_with?("[") && !list.match?(/\A\[[^\]]*\]\(/)
+    return if SORT_KEYWORDS.include?(list.strip.downcase)
+
+    split_order(list).each do |entry|
+      name = entry.strip.delete_prefix('"').delete_suffix('"').delete_prefix("'").delete_suffix("'").strip
+      next if name.empty? || name.match?(MENU_ENTRY_LINK_RE) || SORT_KEYWORDS.include?(name.downcase)
+
+      if site
+        # COPY: order name in text that ships to many sites
+        site_name_issue(name, line_num, "a page on the site, not a doc, so this list only shows it on a site that has it")
+      else
+        name_issue(name, line_num, missing: "so it's left out")
+      end
+    end
+  end
+
+  # Commas split entries, except inside a menu link's [ ] or ( ).
+  def split_order(list)
+    entries = []
+    buf = +""
+    depth = 0
+    list.each_char do |ch|
+      case ch
+      when "[", "(" then depth += 1
+      when "]", ")" then depth -= 1 if depth.positive?
+      end
+      if ch == "," && depth.zero?
+        entries << buf
+        buf = +""
+      else
+        buf << ch
+      end
+    end
+    entries << buf
+  end
+
+  # Links written as an address rather than a file: `[x](/posts/lab)`,
+  # `[x](/about)`, `href="/store/mug"`. Anything Roe can't tell is one of its
+  # own pages (a feed, a tag page, the admin) is left alone; the callable
+  # decides. `.md` links and /media/ files have checks of their own.
+  ADDRESS_LINK_RE = %r{\]\(<?(/(?!/)[^)\s>]*)>?(?:\s+"[^"]*")?\)|href=["'](/(?!/)[^"']*)["']}
+
+  def check_address_links
+    scan_blocks do |line, line_num, block|
+      next if block
+
+      line.gsub(INLINE_CODE_RE, "").scan(ADDRESS_LINK_RE).each do |md, html|
+        target = (md || html).strip
+        path = target.split(/[?#]/, 2).first.to_s
+        next if path.empty? || path == "/" || path.start_with?("/media/") || path.match?(/\.md\z/i)
+
+        state, = @address_status.call(path)
+        issue = internal_link_issue(state, nil, target)
+        @issues << issue.merge(line: line_num, target: target) if issue
+      end
+    end
+  end
+
+  # `/media/...` files the text uses that aren't there: images, audio and
+  # video in Markdown, src/href/poster in HTML, and `key: /media/...` lines
+  # inside cards and galleries. Code is skipped, since it shows paths as
+  # examples.
+  MEDIA_LINK_RE = %r{\]\(<?(/media/[^)>]+?)>?(?:\s+"[^"]*")?\)|(?:src|href|poster)\s*=\s*["'](/media/[^"']+)["']}i
+  MEDIA_VALUE_RE = %r{\A\s*[\w-]+:[ \t]*["']?(/media/[^"'\n]+?)["']?\s*\z}
+
+  def check_media
+    scan_blocks do |line, line_num, block|
+      next if block && !ROE_BLOCKS.include?(block)
+
+      text = block ? line : line.gsub(INLINE_CODE_RE, "")
+      paths = text.scan(MEDIA_LINK_RE).flatten.compact
+      paths << line[MEDIA_VALUE_RE, 1] if block && line.match?(MEDIA_VALUE_RE)
+      paths.compact.map(&:strip).uniq.each do |path|
+        next if @media_exists.call(media_path(path))
+
+        # COPY: missing media message
+        @issues << { type: :missing_media, line: line_num, target: path,
+                     message: "#{path} isn't in the media library" }
+      end
+    end
+  end
+
+  # `/media/my%20clip.mp4?v=2` → `/media/my clip.mp4`.
+  def media_path(path)
+    path.split(/[?#]/, 2).first.to_s.gsub(/%([0-9A-Fa-f]{2})/) { Regexp.last_match(1).hex.chr }
+        .force_encoding("UTF-8")
+  end
+
+  # Roe's own fenced blocks (HasMarkdownExtensions::ROE_BLOCK_FENCES): their
+  # lines are settings, not code.
+  ROE_BLOCKS = %w[collection card gallery form button search].freeze
+
+  # Each body line with the fenced block it sits in: nil outside one, else
+  # the fence's first word (`card`, `ruby`, "" for a bare fence). Fence lines
+  # themselves aren't yielded.
+  #
+  # A fence may be indented any amount: inside a list item it's indented to
+  # the item's text, and Roe's renderer (protect_fenced_code) still reads it
+  # as code. Counting only fences at column 0–3 took the examples in a list
+  # for real links and images.
+  def scan_blocks
+    fence = nil
+    info = nil
+    effective_lines.each_with_index do |line, idx|
+      if (open = line.match(/\A[ \t]*(`{3,}|~{3,})(.*?)\s*\z/))
+        if fence.nil?
+          fence = open[1]
+          info = open[2].strip.split(/\s+/).first.to_s.downcase
+          next
+        elsif open[1][0] == fence[0] && open[1].length >= fence.length && open[2].strip.empty?
+          fence = nil
+          info = nil
+          next
+        end
+      end
+      yield line, effective_line_number(idx), (fence ? info : nil)
+    end
+  end
+
+  def internal_link_issue(state, detail, shown)
+    # COPY: link check messages
+    case state
+    when :missing
+      { type: :broken_internal_link, message: "#{shown} doesn't match a post, page, product or doc, so it shows as plain text" }
+    when :ambiguous
+      { type: :unclear_internal_link, message: "#{shown} could be #{detail.join(' or ')}. Add the folder to clarify which #{shown}" }
+    when :draft
+      { type: :draft_link, message: "#{shown} is a draft, so it shows as plain text until it's published" }
     end
   end
 

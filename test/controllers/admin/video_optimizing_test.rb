@@ -54,7 +54,7 @@ class Admin::VideoOptimizingTest < ActionDispatch::IntegrationTest
     data = JSON.parse(response.body)
 
     assert data["pending"]
-    assert_includes data["card_html"], %(src="/media/video/variants/card-poster.jpg")
+    assert_match %r{src="/media/video/variants/card-poster\.jpg\?v=\d+"}, data["card_html"], "the poster, with its time so a new one shows"
     assert_includes data["card_html"], "optimizing 30%"
     assert_includes data["card_html"], 'data-variants-pending="true"'
     assert_not_includes data["card_html"], "🎬"
@@ -145,9 +145,9 @@ class Admin::VideoOptimizingTest < ActionDispatch::IntegrationTest
     get picker_admin_medium_index_path(media_type: "video")
     assert_response :success
     assert_select "[data-media-picker-target=optimizing][data-media-id='#{medium.id}']", 1
-    assert_select "[data-media-picker-target=optimizing] img[src='/media/video/variants/picked-poster.jpg']"
+    assert_select "[data-media-picker-target=optimizing] img[src^='/media/video/variants/picked-poster.jpg']"
     assert_select "[data-media-picker-target=optimizing]", text: /optimizing 55%/
-    assert_select "img[src='/media/video/variants/finished-poster.jpg']", 1
+    assert_select "img[src^='/media/video/variants/finished-poster.jpg']", 1
     assert_no_match(/🎬/, response.body.scan(/<img[^>]*finished-poster[^>]*>/).join)
 
     get video_status_admin_medium_path(medium, thumbnail: 1, height: "h-24"), headers: { "Accept" => "application/json" }

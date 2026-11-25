@@ -151,7 +151,7 @@ module Members
 
     def load_signup_page
       # Load the signup page so sidebar and other page-specific features work
-      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "sign-up")
+      @page = SystemPages.find("signup")
     end
   end
 end

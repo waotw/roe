@@ -109,7 +109,6 @@ export default class extends Controller {
     resourceType: String,
     resourceId: String,
     previewPath: String,
-    collectionTemplate: String,
     asideTemplate: String,
     postLinkTemplate: String,
     pullquoteTemplate: String,
@@ -118,12 +117,18 @@ export default class extends Controller {
     knownFields: Array,
     defaultAuthor: String,
     highlightMedia: String,
+    // From the Links page: the line the reference is on, or the metadata
+    // field holding it, and whether it's a link (open the link list there).
+    highlightLine: Number,
+    highlightField: String,
+    highlightLink: Boolean,
     originalUrlName: String,
     filenameSlug: String,
     published: Boolean,
     // Where this kind of content lives: "/posts/", "/" for pages, "/store/"
     // for products. Used only by the slug-change redirect modal.
     publicPathPrefix: { type: String, default: "/posts/" },
+    homePage: Boolean,
   };
 
   connect() {
@@ -266,6 +271,19 @@ export default class extends Controller {
       "card-builder:pick-media",
       this.cardPickHandler,
     );
+
+    // A metadata media field's CHOOSE… asks for one file for that field.
+    // The editor opens the picker; the file comes back as
+    // media-picker:pick-for-field and goes into the field.
+    this.fieldPickHandler = (event) => this.chooseForField(event);
+    this.element.addEventListener("media-field:choose", this.fieldPickHandler);
+    this.fieldPickedHandler = (event) => this.pickForField(event);
+    this.element.addEventListener("media-picker:pick-for-field", this.fieldPickedHandler);
+
+    // REPLACE in the picker: the file chosen takes the place of the media
+    // path the caret was in.
+    this.mediaReplaceHandler = (event) => this.replaceMediaPath(event);
+    this.element.addEventListener("media-picker:replace", this.mediaReplaceHandler);
 
     // Listen for media picker close events (e.g. Cancel button)
     this.mediaPickerCloseHandler = this.closeMediaPicker.bind(this);
@@ -785,6 +803,12 @@ export default class extends Controller {
         "card-builder:pick-media",
         this.cardPickHandler,
       );
+    }
+
+    if (this.fieldPickHandler) {
+      this.element.removeEventListener("media-field:choose", this.fieldPickHandler);
+      this.element.removeEventListener("media-picker:pick-for-field", this.fieldPickedHandler);
+      this.element.removeEventListener("media-picker:replace", this.mediaReplaceHandler);
     }
 
     // Remove media picker close handler
@@ -2029,6 +2053,12 @@ export default class extends Controller {
 
     const params = new URLSearchParams({ media_type: mediaType });
     if (openedFor) params.set("for", openedFor);
+    // Inserting into the text with the caret in a media file's path: the
+    // picker also offers REPLACE.
+    this.replaceRange = openedFor
+      ? null
+      : this._mediaPathAt(this.textareaTarget.value, this.savedMediaPosition);
+    if (this.replaceRange) params.set("replace", "1");
 
     fetch(`/admin/medium/picker?${params}`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
@@ -2049,6 +2079,73 @@ export default class extends Controller {
     this.mediaPickerModalTarget.style.display = "none";
     document.body.style.overflow = "";
     this.savedMediaPosition = null;
+    this.replaceRange = null;
+    this.pickingField = null;
+  }
+
+  // The `/media/...` path the caret is in, as { from, to }, or null: in a
+  // Markdown link or image, an HTML src/href/poster, or a `key: /media/...`
+  // line in a card or gallery.
+  _mediaPathAt(text, position) {
+    if (position == null) return null;
+    const lineFrom = text.lastIndexOf("\n", position - 1) + 1;
+    const lineEnd = text.indexOf("\n", position);
+    const line = text.slice(lineFrom, lineEnd === -1 ? text.length : lineEnd);
+    const caret = position - lineFrom;
+    const patterns = [
+      /\]\(<?(\/media\/[^)>]+?)>?(?:\s+"[^"]*")?\)/g,
+      /(?:src|href|poster)\s*=\s*["'](\/media\/[^"']+)["']/gi,
+      /^\s*[\w-]+:[ \t]*["']?(\/media\/[^"'\n]+?)["']?\s*$/g,
+    ];
+    for (const pattern of patterns) {
+      for (const match of line.matchAll(pattern)) {
+        const start = match.index + match[0].indexOf(match[1]);
+        const end = start + match[1].length;
+        if (caret >= start && caret <= end) {
+          return { from: lineFrom + start, to: lineFrom + end };
+        }
+      }
+    }
+    return null;
+  }
+
+  // REPLACE: swap the path the caret was in for the file chosen, as one
+  // edit, so undo (Cmd+Z) puts the old path back.
+  replaceMediaPath(event) {
+    const range = this.replaceRange;
+    const path = event.detail?.path;
+    this.closeMediaPicker();
+    if (!range || !path) return;
+
+    this.textareaTarget.focus({ preventScroll: true });
+    this.textareaTarget.setSelectionRange(range.from, range.to);
+    document.execCommand("insertText", false, path);
+  }
+
+  // CHOOSE… beside a metadata media field: open the picker for that kind of
+  // file, remembering the field.
+  chooseForField(event) {
+    const { kind, input } = event.detail || {};
+    const mediaType = { image: "images", audio: "audio", video: "video" }[kind];
+    if (!mediaType || !input) return;
+
+    this.openMediaPickerFor(mediaType, "field");
+    this.pickingField = input;
+  }
+
+  // The file chosen replaces the field's value. input and change go out as
+  // if it were typed, so the field's own checks (file found, duration) and
+  // the unsaved-changes tracking all see it.
+  pickForField(event) {
+    const input = this.pickingField;
+    const path = event.detail?.path;
+    this.closeMediaPicker();
+    if (!input || !path) return;
+
+    input.value = path;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.focus({ preventScroll: true });
   }
 
   closeMediaPickerOnBackdrop(event) {
@@ -2838,10 +2935,11 @@ export default class extends Controller {
   }
 
   // The public address for a slug, mirroring each model's public_url_for
-  // (a page called "home" is the site's front page).
+  // (a page called "home" is the site's front page). The home page itself is
+  // at "/" whatever its url_name (Page#home?).
   _publicPath(slug) {
     const prefix = this.publicPathPrefixValue;
-    if (prefix === "/" && slug === "home") return "/";
+    if (prefix === "/" && (slug === "home" || this.homePageValue)) return "/";
     return `${prefix}${slug}`;
   }
 
@@ -2867,6 +2965,16 @@ export default class extends Controller {
     if (event && event.preventDefault) event.preventDefault();
     if (this.hasRedirectFromFieldTarget)
       this.redirectFromFieldTarget.value = this._publicPath(this.originalUrlNameValue);
+    this._redirectDecisionMade = true;
+    this._closeRedirectDecision();
+    this.formTarget.requestSubmit();
+  }
+
+  // "Save new URL" — save the rename with no redirect. The site's own links
+  // still follow it (the server rewrites them on every save).
+  saveNewUrl(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    if (this.hasRedirectFromFieldTarget) this.redirectFromFieldTarget.value = "";
     this._redirectDecisionMade = true;
     this._closeRedirectDecision();
     this.formTarget.requestSubmit();
@@ -3047,9 +3155,21 @@ export default class extends Controller {
   // where this file is used. In the text, the path is selected and scrolled
   // to; in the metadata, the panel is opened and the field holding it is
   // selected.
+  //
+  // The Links page adds where the reference is: its line (searched from
+  // there, so a second copy further down isn't the one picked) or its
+  // metadata field, and for a link, opens the link list on it.
   async highlightMediaReference() {
     const mediaPath = this.highlightMediaValue;
-    const position = this.textareaTarget.value.indexOf(mediaPath);
+    if (this.highlightFieldValue) {
+      this._highlightInMetadata(mediaPath, this.highlightFieldValue);
+      return;
+    }
+
+    const text = this.textareaTarget.value;
+    const lineStart = this._offsetOfLine(text, this.highlightLineValue);
+    let position = lineStart == null ? -1 : text.indexOf(mediaPath, lineStart);
+    if (position === -1) position = text.indexOf(mediaPath);
 
     if (position === -1) {
       this._highlightInMetadata(mediaPath);
@@ -3063,11 +3183,24 @@ export default class extends Controller {
     if (liveEditor) {
       liveEditor.goTo(position, position + mediaPath.length);
       this._settleAgainWhileLoading(liveEditor, position);
+      if (this.highlightLinkValue) liveEditor.openLinkList?.();
       return;
     }
 
     this.textareaTarget.setSelectionRange(position, position + mediaPath.length);
     this.textareaTarget.focus();
+  }
+
+  // Where a 1-based line starts in the text, or null for no line.
+  _offsetOfLine(text, line) {
+    if (!line || line < 1) return null;
+    let offset = 0;
+    for (let n = 1; n < line; n++) {
+      const next = text.indexOf("\n", offset);
+      if (next === -1) return null;
+      offset = next + 1;
+    }
+    return offset;
   }
 
   // The page keeps changing height after the first jump: images further up
@@ -3114,7 +3247,7 @@ export default class extends Controller {
 
   // The path is in the metadata, not the text: open the panel if it's
   // closed, then select the field (or the RAW YAML) that holds it.
-  _highlightInMetadata(mediaPath) {
+  _highlightInMetadata(mediaPath, fieldName = null) {
     const panel = document.querySelector('[data-controller~="metadata-editor"]');
     if (!panel) return;
 
@@ -3127,11 +3260,13 @@ export default class extends Controller {
 
     const yamlView = panel.querySelector('[data-metadata-editor-target="yamlView"]');
     const yamlOpen = yamlView && !yamlView.classList.contains("hidden");
+    const fields = [...panel.querySelectorAll("[data-metadata-field]")];
+    const named = fieldName
+      ? fields.find((el) => el.dataset.metadataField === fieldName && (el.value || "").includes(mediaPath))
+      : null;
     const field = yamlOpen
       ? panel.querySelector('[data-metadata-editor-target="yamlTextarea"]')
-      : [...panel.querySelectorAll("[data-metadata-field]")].find((el) =>
-          (el.value || "").includes(mediaPath),
-        );
+      : named || fields.find((el) => (el.value || "").includes(mediaPath));
     if (!field) return;
 
     const at = (field.value || "").indexOf(mediaPath);

@@ -13,8 +13,8 @@
 # :select / :boolean), label, hint, and (for :select) options. Booleans are
 # tri-state (unset / true / false) so "use the engine default" stays distinct
 # from an explicit false. Only fields the author sets get written. A :text
-# field with `pick: "audio"` / `"video"` gets a Choose… button that opens the
-# media picker for that kind.
+# field with `pick: "audio"` / `"video"` / `"images"` gets a Choose… button
+# that opens the media picker for that kind.
 module CardBuilderSchema
   # Ordered for the type selector at the top of the modal.
   TYPES = [
@@ -39,7 +39,7 @@ module CardBuilderSchema
     "aside" => [
       { key: "text", type: :textarea, label: "Text",
         hint: "Body text. Leave blank for an image-only aside." },
-      { key: "image", type: :text, label: "Image",
+      { key: "image", type: :text, label: "Image", pick: "images",
         hint: "Image URL/path to show in the aside." },
       { key: "link_url", type: :text, label: "Link URL",
         hint: "Makes the whole aside a link — image and all. Put links inside the text instead if you only want part of it to be clickable." }
@@ -69,7 +69,7 @@ module CardBuilderSchema
         hint: "Override the author (posts only)." },
       { key: "date", type: :text, label: "Date",
         hint: "Override the date (posts only)." },
-      { key: "image", type: :text, label: "Image",
+      { key: "image", type: :text, label: "Image", pick: "images",
         hint: "Override the featured image. Use “none” to suppress it." }
     ],
 
@@ -91,7 +91,7 @@ module CardBuilderSchema
         hint: "Override the link target (defaults to the product's page)." },
       { key: "link_text", type: :text, label: "Link text",
         hint: "Label for the link. Defaults to “View product →”." },
-      { key: "image", type: :text, label: "Image",
+      { key: "image", type: :text, label: "Image", pick: "images",
         hint: "Override the product image. Use “none” to suppress it." }
     ],
 
@@ -102,7 +102,7 @@ module CardBuilderSchema
         hint: "A video file or YouTube link. Leave blank to play the post's own video. If both are set, audio plays." },
       { key: "title", type: :text, label: "Title",
         hint: "Defaults to the post's title." },
-      { key: "image", type: :text, label: "Artwork",
+      { key: "image", type: :text, label: "Artwork", pick: "images",
         hint: "Audio only. Defaults to the post's image, then the release/podcast cover." },
       { key: "show_artwork", type: :boolean, label: "Show artwork",
         hint: "Audio only. Show the artwork. On by default." },

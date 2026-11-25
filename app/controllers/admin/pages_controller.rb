@@ -13,7 +13,7 @@ class Admin::PagesController < Admin::BaseController
     # Default order: follow layout/navigation.md when it exists (pages listed in
     # the nav come first, in nav order); otherwise alphabetical by title. Pages
     # not in the nav fall to the end, alphabetically.
-    @member_pages, @content_pages = ordered_pages.partition { |page| member_page?(page) }
+    @member_pages, @content_pages = tagged(ordered_pages).partition { |page| member_page?(page) }
 
     # Empty on a healthy site. Non-empty means Members is on and a page it needs
     # can't be found by declaration, by the form it renders, or by filename —
@@ -179,6 +179,7 @@ class Admin::PagesController < Admin::BaseController
     was_published = @page.published?
     status_before = @page.status
     old_address = rename_redirect_source(@page)
+    link_source = internal_link_source(@page)
 
     full_content = "---\n#{yaml_content}\n---\n#{params[:content]}"
     normalize_and_write(@page.file_path, full_content)
@@ -189,6 +190,7 @@ class Admin::PagesController < Admin::BaseController
     # A plain save says nothing — the editor's dot shows "changes saved".
     flash[:notice] = "Page published" if !was_published && @page.published?
     add_rename_redirect(Page, old_address, metadata, @page.file_path)
+    update_internal_links(link_source, @page, own_file: @page.file_path)
 
     finish_editor_save(record: @page, resource_type: "page", edit_path: edit_admin_page_path(@page),
                        file_path: @page.file_path, submitted: submitted, status_before: status_before)
@@ -223,6 +225,13 @@ class Admin::PagesController < Admin::BaseController
     end
   end
 
+  # Is this url_name already another page's address? Advisory only
+  # (UrlNameClash); the unique-field controller asks while it's typed.
+  def check_unique
+    conflict = UrlNameClash.find(Page, params[:value], except_id: params[:exclude])
+    render json: { taken: conflict.present?, conflict: conflict&.title }
+  end
+
   def rename
     @page = Page.find(params[:id])
     new_filename = sanitize_filename(params[:new_filename])
@@ -249,11 +258,13 @@ class Admin::PagesController < Admin::BaseController
     end
 
     begin
+      link_source = internal_link_source(@page)
       File.rename(old_path, new_path)
       @page.update(file_path: new_path.to_s)
       ContentSync.sync_file(new_path)
 
       flash[:notice] = "Renamed to #{new_filename}.md"
+      update_internal_links(link_source, @page)
     rescue => e
       flash[:error] = "Failed to rename: #{e.message}"
     end

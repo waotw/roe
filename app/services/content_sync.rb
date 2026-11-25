@@ -4,13 +4,57 @@ class ContentSync
   end
 
   def sync_all
+    link_sources = link_snapshot
     sync_configs
     sync_posts
     sync_pages
     sync_documentation
     sync_media
     sync_products
+    follow_links(link_sources)
+    reconcile_tags
     prune_variant_cache
+  end
+
+  # Files renamed, or given a new url_name or title, while Roe wasn't
+  # running: the links to them follow, as they do when Roe sees the change
+  # happen (ContentWatcher) or makes it (the admin). Where each item's links
+  # pointed before the sync, by record.
+  CONTENT_MODELS = [ Post, Page, Documentation, Product ].freeze
+
+  def link_snapshot
+    CONTENT_MODELS.each_with_object({}) do |model, out|
+      model.select(:id, :metadata, :file_path).find_each do |record|
+        out[[ model.name, record.id ]] = InternalLinkRewriter.source_for(record)
+      end
+    end
+  rescue => e
+    Rails.logger.warn "[ContentSync] links not checked: #{e.class} #{e.message}"
+    nil
+  end
+
+  def follow_links(sources)
+    return unless sources
+
+    sources.each do |(name, id), source|
+      record = name.constantize.select(:id, :metadata, :file_path).find_by(id: id)
+      next unless record
+      next if InternalLinkRewriter.source_for(record) == source
+
+      count = InternalLinkRewriter.follow(source, record)
+      puts "🔗 #{File.basename(record.file_path.to_s)}: updated #{count} #{'link'.pluralize(count)} to it" if count.positive?
+    end
+  rescue => e
+    Rails.logger.warn "[ContentSync] links not updated: #{e.class} #{e.message}"
+  end
+
+  # Every save already updates content.yml's tags: list (TracksTags). This
+  # catches what a save can't: a site from before the list existed, or a
+  # content.yml replaced by hand. Only adds; see TagList.reconcile!.
+  def reconcile_tags
+    TagList.reconcile!
+  rescue => e
+    Rails.logger.warn "[ContentSync] tag list not updated: #{e.class} #{e.message}"
   end
 
   # Reconcile the image-variant cache against reality after content +
@@ -372,11 +416,19 @@ class ContentSync
   def handle_orphaned_products(markdown_files)
     real_site_path = File.realpath(RoeSitePaths::SITE_PATH.to_s)
     relative_paths = markdown_files.map { |path| File.realpath(path).sub(real_site_path + "/", "") }
-    orphaned_products = Product.where.not(file_path: relative_paths)
+    orphaned_products = Product.where.not(file_path: relative_paths).to_a
+    return if orphaned_products.empty?
 
-    if orphaned_products.any?
-      puts "\n🗑️  Found #{orphaned_products.count} orphaned products (deleted from filesystem)"
-      orphaned_products.each do |product|
+    puts "\n🗑️  Found #{orphaned_products.count} orphaned products (deleted from filesystem)"
+    added = relative_paths.reject { |rel| Product.exists?(file_path: rel) }
+    renames = follow_renames(orphaned_products.index_by(&:file_path), added.map { |rel| File.join(real_site_path, rel) })
+
+    orphaned_products.each do |product|
+      if (new_file = renames[product.file_path])
+        new_rel = new_file.sub(real_site_path + "/", "")
+        puts "  - Renamed: #{product.file_path} → #{new_rel}"
+        product.update(file_path: new_rel)
+      else
         puts "  - Deleting: #{product.file_path}"
         product.destroy
       end
@@ -385,84 +437,65 @@ class ContentSync
 
   private
 
-  def handle_orphaned_posts(current_files)
-    orphans = Post.where.not(file_path: current_files)
+  # Which removed records were renamed rather than deleted (RenameMatch),
+  # saying so for any it isn't sure about.
+  def follow_renames(orphans_by_path, added)
+    renames, unsure = RenameMatch.pairs(orphans_by_path, added)
+    unsure.each do |old_path|
+      puts "⚠️  #{File.basename(old_path)} may have been renamed, but more than one file matches it; treating it as removed"
+    end
+    renames
+  end
 
-    return unless orphans.any?
+  def handle_orphaned_posts(current_files)
+    orphans = Post.where.not(file_path: current_files).to_a
+    return if orphans.empty?
+
+    added = current_files.reject { |file_path| Post.exists?(file_path: file_path) }
+    renames = follow_renames(orphans.index_by(&:file_path), added)
 
     orphans.each do |orphan|
-      old_path = orphan.file_path
-      old_basename = File.basename(old_path, ".md")
-
-      # Try to find a renamed file by matching content or metadata
-      possible_rename = current_files.find do |file_path|
-        # Skip if this file already has a database record
-        next if Post.exists?(file_path: file_path)
-
-        # Check if the new filename is similar (could be just adding a number prefix)
-        new_basename = File.basename(file_path, ".md")
-
-        # Match if the old name is contained in the new name (handles 01-old-name.md)
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
-      end
-
-      if possible_rename
-        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
-        orphan.update(file_path: possible_rename)
+      if (new_file = renames[orphan.file_path])
+        puts "🔄 Detected rename: #{File.basename(orphan.file_path)} → #{File.basename(new_file)}"
+        orphan.update(file_path: new_file)
       else
-        puts "🧹 Removing orphaned post: #{File.basename(old_path)}"
+        puts "🧹 Removing orphaned post: #{File.basename(orphan.file_path)}"
         orphan.destroy
       end
     end
   end
 
   def handle_orphaned_pages(current_files)
-    orphans = Page.where.not(file_path: current_files)
+    orphans = Page.where.not(file_path: current_files).to_a
+    return if orphans.empty?
 
-    return unless orphans.any?
+    added = current_files.reject { |file_path| Page.exists?(file_path: file_path) }
+    renames = follow_renames(orphans.index_by(&:file_path), added)
 
     orphans.each do |orphan|
-      old_path = orphan.file_path
-      old_basename = File.basename(old_path, ".md")
-
-      possible_rename = current_files.find do |file_path|
-        next if Page.exists?(file_path: file_path)
-
-        new_basename = File.basename(file_path, ".md")
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
-      end
-
-      if possible_rename
-        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
-        orphan.update(file_path: possible_rename)
+      if (new_file = renames[orphan.file_path])
+        puts "🔄 Detected rename: #{File.basename(orphan.file_path)} → #{File.basename(new_file)}"
+        orphan.update(file_path: new_file)
       else
-        puts "🧹 Removing orphaned page: #{File.basename(old_path)}"
+        puts "🧹 Removing orphaned page: #{File.basename(orphan.file_path)}"
         orphan.destroy
       end
     end
   end
 
   def handle_orphaned_documentation(current_files)
-    orphans = Documentation.where.not(file_path: current_files)
+    orphans = Documentation.where.not(file_path: current_files).to_a
+    return if orphans.empty?
 
-    return unless orphans.any?
+    added = current_files.reject { |file_path| Documentation.exists?(file_path: file_path) }
+    renames = follow_renames(orphans.index_by(&:file_path), added)
 
     orphans.each do |orphan|
-      old_path = orphan.file_path
-      old_basename = File.basename(old_path, ".md")
-
-      possible_rename = current_files.find do |file_path|
-        next if Documentation.exists?(file_path: file_path)
-
-        new_basename = File.basename(file_path, ".md")
-        new_basename.include?(old_basename) || old_basename.include?(new_basename.sub(/^\d+-/, ""))
-      end
-
-      if possible_rename
-        puts "🔄 Detected rename: #{File.basename(old_path)} → #{File.basename(possible_rename)}"
-        orphan.update(file_path: possible_rename)
+      if (new_file = renames[orphan.file_path])
+        puts "🔄 Detected rename: #{File.basename(orphan.file_path)} → #{File.basename(new_file)}"
+        orphan.update(file_path: new_file)
       else
-        puts "🧹 Removing orphaned documentation: #{File.basename(old_path)}"
+        puts "🧹 Removing orphaned documentation: #{File.basename(orphan.file_path)}"
         orphan.destroy
       end
     end

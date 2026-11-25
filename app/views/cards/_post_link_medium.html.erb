@@ -16,7 +16,7 @@
       <h4 class="card-title"><%= title %></h4>
     <% end %>
     <% if show_subtitle && subtitle.present? %>
-      <p class="card-subtitle"><%= subtitle %></p>
+      <p class="card-subtitle"><%= FieldText.html(subtitle) %></p>
     <% end %>
     <% if author.present? || date.present? %>
       <p class="card-metadata">
@@ -26,7 +26,7 @@
       </p>
     <% end %>
     <% if show_excerpt && excerpt.present? %>
-      <p class="card-excerpt"><%= excerpt %></p>
+      <p class="card-excerpt"><%= FieldText.html(excerpt) %></p>
     <% end %>
     <a href="<%= url %>" class="card-link"><%= link_text %></a>
   </div>

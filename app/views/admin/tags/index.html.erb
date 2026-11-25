@@ -1,0 +1,121 @@
+<%#
+  The tag manager: Settings → tags.yml. Every change re-renders the
+  tag_manager frame, so the page doesn't reload.
+%>
+<%
+  columns = [ [ :posts, "Posts", ->(tag) { admin_posts_path(tag: tag) } ],
+              [ :pages, "Pages", ->(tag) { admin_pages_path(tag: tag) } ] ]
+  columns << [ :products, "Products", ->(tag) { admin_products_path(tag: tag) } ] if @show_products
+  # Docs have no list in the admin to link to.
+  columns << [ :docs, "Docs", nil ] if @show_docs
+  grid = "grid-template-columns: minmax(0, 1fr) repeat(#{columns.size}, 4.5rem) 9.5rem;"
+  button = "uppercase text-xs px-1.5 py-1 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs cursor-pointer"
+  primary = "uppercase text-xs px-1.5 py-1 border border-gray-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs cursor-pointer"
+  input = "font-mono text-xs px-2 py-1.5 border border-gray-400 bg-white rounded-xs"
+%>
+<% content_for :title, "Tags" %>
+
+<div class="flex justify-between items-center mb-5 pb-2.5 border-b border-gray-300">
+  <h1 class="text-3xl font-bold font-sans">Tags</h1>
+  <%= link_to "← Back to Settings", admin_configs_path,
+        class: "inline-flex items-center uppercase text-sm px-2 py-1.5 border border-gray-800 bg-white hover:bg-gray-300 font-mono rounded-xs text-nowrap" %>
+</div>
+
+<p class="text-sm text-gray-700 mb-5">
+  The tags used across the site, kept in <code>tags.yml</code>. A tag is added here the first time it's used and removed when nothing uses it.
+</p>
+
+<%= turbo_frame_tag "tag_manager", class: "block max-w-3xl" do %>
+  <div class="font-mono text-sm" data-controller="tag-manager">
+    <p class="mb-3 text-xs text-gray-500"><%= pluralize(@usage.size, "tag") %></p>
+
+    <% if @notice.present? %>
+      <p class="mb-3 px-3 py-2 text-xs bg-green-50 border border-green-300 text-green-800"><%= @notice %></p>
+    <% end %>
+    <% if @alert.present? %>
+      <p class="mb-3 px-3 py-2 text-xs bg-red-50 border border-red-300 text-red-800"><%= @alert %></p>
+    <% end %>
+
+    <% if @merge %>
+      <% to_count = @usage[@merge[:to]].values.sum %>
+      <div class="mb-4 p-3 border border-amber-400 bg-amber-50 text-xs font-sans text-amber-900">
+        <p class="mb-2">
+          <code class="font-mono"><%= @merge[:to] %></code> is already a tag<%= to_count.positive? ? ", used #{pluralize(to_count, 'time')}" : "" %>.
+          Renaming <code class="font-mono"><%= @merge[:from] %></code> to it merges the two: everything tagged
+          <code class="font-mono"><%= @merge[:from] %></code> is tagged <code class="font-mono"><%= @merge[:to] %></code> instead.
+        </p>
+        <div class="flex gap-2">
+          <%= button_to "MERGE INTO #{@merge[:to].upcase}", admin_rename_tag_path, method: :patch,
+                params: { from: @merge[:from], to: @merge[:to], merge: "1" }, class: primary %>
+          <%= link_to "CANCEL", admin_tags_path, class: button %>
+        </div>
+      </div>
+    <% end %>
+
+    <%= form_with url: admin_tags_path, method: :post, class: "flex gap-2 mb-3" do |f| %>
+      <%= f.text_field :name, placeholder: "New tag…", autocomplete: "off", class: "#{input} grow", required: true %>
+      <%= f.submit "ADD TAG", class: button %>
+    <% end %>
+
+    <% if @usage.any? %>
+      <input type="search" placeholder="Search tags…" autocomplete="off"
+             data-action="input->tag-manager#search" data-tag-manager-target="search"
+             class="<%= input %> w-full mb-3">
+
+      <div class="border border-gray-300 bg-white">
+        <div class="grid items-center gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-[11px] font-bold uppercase text-gray-500" style="<%= grid %>">
+          <span>Tag</span>
+          <% columns.each do |_, label, _| %><span class="text-right"><%= label %></span><% end %>
+          <span></span>
+        </div>
+
+        <% @usage.each do |name, counts| %>
+          <% total = counts.values.sum %>
+          <div class="border-b border-gray-200 last:border-b-0" data-tag-manager-target="row" data-tag="<%= name.downcase %>">
+            <div class="grid items-center gap-2 px-3 py-1.5" style="<%= grid %>" data-tag-manager-target="view">
+              <span class="truncate font-medium text-gray-900" title="<%= name %>"><%= name %></span>
+              <% columns.each do |kind, _, path| %>
+                <span class="text-right">
+                  <% if counts[kind].positive? && path %>
+                    <%= link_to counts[kind], path.call(name), class: "text-blue-700 underline hover:text-blue-900", data: { turbo_frame: "_top" } %>
+                  <% else %>
+                    <span class="<%= counts[kind].zero? ? 'text-gray-400' : 'text-gray-900' %>"><%= counts[kind] %></span>
+                  <% end %>
+                </span>
+              <% end %>
+              <span class="flex justify-end gap-1.5">
+                <button type="button" class="<%= button %>" data-action="tag-manager#rename">RENAME</button>
+                <%= button_to "DELETE", admin_destroy_tag_path, method: :delete, params: { name: name },
+                      class: button.sub("bg-white hover:bg-gray-300", "bg-red-100 hover:bg-red-200 text-red-800 border-red-400"),
+                      form: { data: { turbo_confirm: total.zero? ? "Delete #{name}?" : "Delete #{name}? It will be removed from #{pluralize(total, 'item')}." } } %>
+              </span>
+            </div>
+
+            <%= form_with url: admin_rename_tag_path, method: :patch,
+                  class: "hidden items-center gap-2 px-3 py-1.5 bg-blue-50",
+                  data: { tag_manager_target: "renameForm" } do |f| %>
+              <%= hidden_field_tag :from, name, id: nil %>
+              <%= text_field_tag :to, name, id: nil, autocomplete: "off", required: true,
+                    class: "#{input} grow", data: { action: "keydown.esc->tag-manager#cancel" } %>
+              <%= submit_tag "SAVE", name: nil, class: primary %>
+              <button type="button" class="<%= button %>" data-action="tag-manager#cancel">CANCEL</button>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if @unused.any? %>
+          <% codes = @unused.map { |t| content_tag(:code, t, class: "font-mono text-gray-700") } %>
+          <p class="px-3 py-2 bg-gray-50 border-t border-gray-200 text-xs font-sans text-gray-500">
+            <% if codes.size == 1 %>
+              <%= codes.first %> is unused.
+            <% else %>
+              <%= safe_join(codes[0..-2], ", ") %> and <%= codes.last %> are unused.
+            <% end %>
+          </p>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-xs font-sans text-gray-500">No tags yet. Tags added to posts, pages<%= ", products" if @show_products %><%= " or docs" if @show_docs %> show here.</p>
+    <% end %>
+  </div>
+<% end %>

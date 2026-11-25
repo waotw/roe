@@ -27,6 +27,21 @@ export default class extends Controller {
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
   }
 
+  // CHOOSE… beside the field: ask the editor, which owns the media picker,
+  // to open it for this kind of file. The file chosen comes back into this
+  // input (editor#pickForField).
+  choose(event) {
+    event?.preventDefault();
+    if (!this.hasInputTarget) return;
+
+    this.element.dispatchEvent(
+      new CustomEvent("media-field:choose", {
+        bubbles: true,
+        detail: { kind: this.kindValue, input: this.inputTarget },
+      }),
+    );
+  }
+
   // Called on input as the user types. Debounces the existence check so
   // we don't hammer the server on every keystroke. Duration extraction
   // is skipped here — it only runs on blur/change (see check()).

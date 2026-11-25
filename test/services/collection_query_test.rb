@@ -136,6 +136,21 @@ class CollectionQueryTest < ActiveSupport::TestCase
     assert_includes negative, "cq-untagged", "but keeps the untagged one"
   end
 
+  test "tags match whole and ignore case, both ways" do
+    write_post("cq-lower", "tags" => [ "cqlab" ])
+    write_post("cq-upper", "tags" => [ "CQLAB", "other" ])
+    write_post("cq-string", "tags" => "other, CqLab")
+    write_post("cq-longer", "tags" => [ "cqlabs", "cqlab-noimage" ])
+    query = ->(tags) { CollectionQuery.new(source: "posts", tags: tags).records.to_a.map(&:url_name) }
+
+    positive = query.call("cqlab")
+    assert_equal %w[cq-lower cq-string cq-upper], (positive & %w[cq-lower cq-upper cq-string cq-longer]).sort
+
+    negative = query.call("-cqlab")
+    assert_includes negative, "cq-longer", "-cqlab keeps cqlabs and cqlab-noimage"
+    %w[cq-lower cq-upper cq-string].each { |name| assert_not_includes negative, name }
+  end
+
   # --- ordering ----------------------------------------------------------
 
   test "order_items sorts by a keyword and by an explicit url_name list" do
@@ -182,6 +197,23 @@ class CollectionQueryTest < ActiveSupport::TestCase
     with = CollectionQuery.new(source: "posts", show_unlisted: "true").records.to_a.map(&:url_name)
     assert_includes with, "cq-pub"
     assert_includes with, "cq-unl", "shown with show_unlisted: true"
+  end
+
+  test "show_unlisted widens a pages collection the same way" do
+    %w[published unlisted draft].each do |status|
+      meta = { "title" => "cq page #{status}", "url_name" => "cq-page-#{status}", "status" => status }
+      slug = ContentWriter.new.write(kind: :page, filename: "cq-page-#{status}", metadata: meta, body: "x")
+      @created << File.join(RoeSitePaths::SITE_PAGES_PATH, "#{slug}.md")
+    end
+
+    without = CollectionQuery.new(source: "pages").records.to_a.map(&:url_name)
+    assert_includes without, "cq-page-published"
+    assert_not_includes without, "cq-page-unlisted", "unlisted hidden by default"
+
+    with = CollectionQuery.new(source: "pages", show_unlisted: "true").records.to_a.map(&:url_name)
+    assert_includes with, "cq-page-published"
+    assert_includes with, "cq-page-unlisted", "shown with show_unlisted: true"
+    assert_not_includes with, "cq-page-draft", "drafts never show"
   end
 
   # --- records: collection membership -----------------------------------

@@ -17,10 +17,13 @@ import { Controller } from "@hotwired/stimulus";
 // Values:
 //   field       — which field this is (episode_number, url_name, …)
 //   scopeFields — the metadata fields that scope it (podcast + season, release)
-//   exclude     — this post's url_name, so it doesn't flag itself
+//   exclude     — this post's (page's, product's) id, so it doesn't flag
+//                 itself
+//   url         — where to ask; posts by default, pages and products have
+//                 their own (UrlNameClash)
 export default class extends Controller {
   static targets = ["input", "warning"];
-  static values = { field: String, scopeFields: Array, exclude: String };
+  static values = { field: String, scopeFields: Array, exclude: String, url: String };
 
   connect() {
     this._timer = null;
@@ -52,7 +55,7 @@ export default class extends Controller {
       params.append(`scopes[${name}]`, val);
     });
 
-    fetch(`/admin/posts/check_unique?${params}`, {
+    fetch(`${this.urlValue || "/admin/posts/check_unique"}?${params}`, {
       headers: { "X-Requested-With": "XMLHttpRequest" },
     })
       .then((r) => (r.ok ? r.json() : null))

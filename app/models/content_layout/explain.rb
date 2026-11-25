@@ -108,7 +108,7 @@ class ContentLayout
         when "music-page"   then [ [ "Release", RELEASE_PAGE_PARTS ], [ "Page", PAGE_PARTS ] ]
         else [ [ nil, PAGE_PARTS ] ]
         end
-      when "product"       then [ [ nil, %w[image title price buy_button tags body] ] ]
+      when "product"       then [ [ nil, %w[image title subtitle price buy_button description tags body] ] ]
       when "documentation" then [ [ nil, %w[title body] ] ]
       end
     end
@@ -225,8 +225,8 @@ class ContentLayout
       when "tags"          then %(<ul class="#{k}-tags"><li class="#{k}-tag"><a class="#{k}-tag-link">tag</a></li></ul>)
       when "body"
         case k
-        when "post"    then %(<div class="post-content">…the post's writing…</div>)
-        when "product" then "…the product's writing…"
+        when "post"    then %(<div class="post-content">…the post markdown content…</div>)
+        when "product" then "…the product markdown content…"
         else %(<div class="#{k}-content">…the #{noun}'s writing…</div>)
         end
       else %(<p class="#{k}-field #{k}-field-#{part.dasherize}">#{part}</p>)
@@ -369,7 +369,12 @@ class ContentLayout
       when "cover"         then "The release's cover art, from Music settings."
       when "artwork"       then "The podcast's artwork, from Podcast settings."
       when "synopsis"      then "The release's synopsis, from Music settings. Styled like [excerpt]."
-      when "description"   then "The podcast's description, from Podcast settings. Styled like [excerpt]."
+      when "description"
+        if @kind == "product"
+          "The product's description, from `description:`. A variant without one shows its group's. Styled like [excerpt]."
+        else
+          "The podcast's description, from Podcast settings. Styled like [excerpt]."
+        end
       when "genre", "label" then "The release's #{part}, from Music settings."
       when "category"      then "The podcast's category, from Podcast settings."
       when "podcast_link"  then "A link to the podcast's website, from Podcast settings."

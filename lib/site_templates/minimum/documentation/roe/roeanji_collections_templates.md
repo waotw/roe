@@ -82,7 +82,7 @@ The `menu` template is a clean list of links — no subtitle, date, or author, j
 order: home, blog, shop, about, contact
 ```
 
-When a `menu` lives in a sidebar, `style` sets its orientation on a full-size screen. On a narrow screen the sidebar can move under the header or below your content, and the links change orientation to fit. See [the sidebar options](/documentation/roe/admin_layouts#the-sidebar-on-narrow-screens) for `mobile` and `mobile_style`.
+When a `menu` lives in a sidebar, `style` sets its orientation on a full-size screen. On a narrow screen the sidebar can move under the header or below your content, and the links change orientation to fit. See [the sidebar options](/documentation/roe/layouts#the-sidebar-on-narrow-screens) for `mobile` and `mobile_style`.
 
 #### Why give the `collection` a name?
 

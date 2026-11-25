@@ -48,7 +48,7 @@ class FeedGenerator
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
 
           item.description = if post.excerpt.present?
-            post.excerpt
+            FieldText.plain(post.excerpt)
           else
             feed_description(post)
           end
@@ -85,7 +85,7 @@ class FeedGenerator
           item.link = "#{site_config[:url]}/posts/#{post.url_name}"
 
           item.description = if post.excerpt.present?
-            post.excerpt
+            FieldText.plain(post.excerpt)
           else
             feed_description(post)
           end
@@ -286,7 +286,25 @@ class FeedGenerator
         preview_before_gate(html)
       end
 
-    ContentLayout::Text.new(post, mode: :feed, body_html: body).html
+    absolute_urls(ContentLayout::Text.new(post, mode: :feed, body_html: body).html)
+  end
+
+  # A feed reader shows an item away from the site, with nothing to resolve
+  # `/posts/x` against (no page address, and these feeds set no xml:base), so
+  # many readers left every internal link and image broken. Each href, src,
+  # poster and srcset entry starting with a single `/` gets the site's
+  # address. Full URLs, `//cdn…`, `#notes` and `mailto:` are left alone.
+  def absolute_urls(html)
+    base = site_config[:url].to_s.chomp("/")
+    return html if base.empty? || html.blank?
+
+    html.to_s
+        .gsub(%r{\b(href|src|poster)=(["'])/(?!/)}) { "#{Regexp.last_match(1)}=#{Regexp.last_match(2)}#{base}/" }
+        .gsub(/\bsrcset=(["'])([^"']*)\1/) do
+          quote = Regexp.last_match(1)
+          entries = Regexp.last_match(2).split(",").map { |entry| entry.strip.sub(%r{\A/(?!/)}, "#{base}/") }
+          "srcset=#{quote}#{entries.join(', ')}#{quote}"
+        end
   end
 
   # A free post can still carry a paywall block — the author may have written
@@ -316,8 +334,8 @@ class FeedGenerator
 
   def feed_description(post)
     # Priority: subtitle > excerpt > first paragraph
-    return post.subtitle if post.subtitle.present?
-    return post.excerpt if post.excerpt.present?
+    return FieldText.plain(post.subtitle) if post.subtitle.present?
+    return FieldText.plain(post.excerpt) if post.excerpt.present?
 
     # Extract first paragraph from content
     clean_content = post.content
@@ -387,8 +405,8 @@ class FeedGenerator
 
   def episode_description(post)
     # Priority: excerpt > subtitle > content snippet
-    return post.excerpt if post.excerpt.present?
-    return post.subtitle if post.subtitle.present?
+    return FieldText.plain(post.excerpt) if post.excerpt.present?
+    return FieldText.plain(post.subtitle) if post.subtitle.present?
 
     # Fallback: first paragraph or truncated content
     feed_description(post)
@@ -520,8 +538,12 @@ class FeedGenerator
 
     # Convert markdown to HTML, then place it in the episode's layout, as on
     # its page, less the player (the audio is the enclosure).
-    body = Kramdown::Document.new(clean_content, input: "GFM").to_html
-    ContentLayout::Text.new(post, mode: :podcast_feed, body_html: body).html
+    # Links to the site's files ([[posts/x]], [x](/posts/x.md)) become the
+    # items' addresses, as they do on the page (InternalLinks).
+    links = {}
+    body = Kramdown::Document.new(InternalLinks.protect(clean_content, links), input: "GFM").to_html
+    body = InternalLinks.rewrite_file_hrefs(InternalLinks.restore(body, links))
+    absolute_urls(ContentLayout::Text.new(post, mode: :podcast_feed, body_html: body).html)
   end
 
   def extract_first_sentence(content)

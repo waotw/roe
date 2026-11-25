@@ -1,6 +1,7 @@
 ---
 title: "Checkout - Cancel"
 url_name: "checkout-cancel"
+page_type: checkout-cancel
 status: published
 audience: "everyone"
 ---

@@ -1,0 +1,178 @@
+<%# The video window: DETAILS on a video card in the Media Browser
+    (MediumController#details, shown by the video-details controller).
+    Left: two ways to choose the poster (a frame from the video, or an
+    image from the media library). Right: the poster now and what the video
+    is. Locals: medium, manifest, status, probe, play_path, choice, usages,
+    images, can_choose. %>
+<% name = File.basename(medium.file_path) %>
+<% source = manifest&.dig("source") || {} %>
+<% width = (probe&.width || source["width"]).to_i %>
+<% height = (probe&.height || source["height"]).to_i %>
+<% aspect = width.positive? && height.positive? ? "#{width} / #{height}" : "16 / 9" %>
+<% duration = (probe&.duration || source["duration"]).to_f %>
+<% fps = probe&.frame_rate.to_f.positive? ? probe.frame_rate.to_f : 30 %>
+<% poster_file = VideoVariantGenerator.variant_path_for(VideoVariantGenerator.normalize_path(medium.file_path), VideoVariantGenerator::POSTER) %>
+<% poster_url = status[:poster] %>
+<% human = ->(bytes) { bytes ? number_to_human_size(bytes, precision: 3) : "?" } %>
+<% btn = "uppercase text-nowrap text-xs px-3 py-1 border border-gray-800 font-mono rounded-xs disabled:opacity-40 disabled:cursor-not-allowed" %>
+<div data-video-details-target="panel"
+     data-id="<%= medium.id %>"
+     data-poster-url="<%= poster_admin_medium_path(medium) %>"
+     data-fps="<%= fps %>"
+     data-duration="<%= duration %>"
+     data-start="<%= choice&.dig(:at) %>"
+     class="bg-white border border-gray-300 rounded-xs shadow-2xl text-sm">
+
+  <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-300">
+    <span class="font-mono text-xs text-gray-500 shrink-0">VIDEO</span>
+    <span class="font-mono text-xs text-gray-900 truncate"><%= name %></span>
+    <button type="button" data-action="video-details#close" class="ml-auto text-gray-500 hover:text-gray-900 text-lg leading-none px-1" aria-label="Close">×</button>
+  </div>
+
+  <div class="flex px-4 border-b border-gray-200 font-mono text-xs">
+    <button type="button" data-video-details-target="tab" data-tab="frame" data-action="video-details#tab"
+            class="px-5 pt-2.5 pb-2 border-b-2 border-gray-900 font-bold text-gray-900">FRAME FROM VIDEO</button>
+    <button type="button" data-video-details-target="tab" data-tab="image" data-action="video-details#tab"
+            class="px-5 pt-2.5 pb-2 border-b-2 border-transparent text-gray-500 hover:text-gray-800">IMAGE FROM MEDIA</button>
+  </div>
+
+  <div class="flex flex-col md:flex-row gap-5 p-4">
+    <div class="flex-1 min-w-0">
+      <% unless can_choose %>
+        <p class="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-xs">
+          Choosing a poster needs ffmpeg on this computer. Install it with <code>roe install ffmpeg</code> in any terminal window.
+        </p>
+      <% end %>
+
+      <%# ── Frame from the video ── %>
+      <div data-video-details-target="pane" data-tab="frame" class="flex flex-col gap-2.5">
+        <video data-video-details-target="video" src="<%= play_path %>" preload="metadata" playsinline
+               data-action="timeupdate->video-details#tick loadedmetadata->video-details#ready seeked->video-details#tick play->video-details#tick pause->video-details#tick"
+               class="w-full bg-black" style="aspect-ratio: <%= aspect %>"></video>
+
+        <div class="flex items-center gap-2.5 font-mono text-xs">
+          <span data-video-details-target="time" class="tabular-nums text-gray-800">0:00.00</span>
+          <input type="range" min="0" max="<%= duration %>" step="any" value="0"
+                 data-video-details-target="scrub" data-action="input->video-details#seek"
+                 class="flex-1 accent-gray-800" aria-label="Position in the video">
+          <span class="tabular-nums text-gray-500"><%= video_time(duration) %></span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <%# The two symbols are drawn the same size, so the button never
+              changes width. COPY: player buttons (aria-label) %>
+          <button type="button" data-video-details-target="play" data-action="video-details#togglePlay" aria-label="Play"
+                  class="<%= btn %> bg-gray-200 hover:bg-gray-300 inline-flex items-center justify-center w-10 self-stretch">
+            <svg data-icon="play" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true"><path d="M2 1 L11 6 L2 11 Z" fill="currentColor" /></svg>
+            <svg data-icon="pause" viewBox="0 0 12 12" class="w-3 h-3" aria-hidden="true" hidden><rect x="2" y="1" width="3" height="10" fill="currentColor" /><rect x="7" y="1" width="3" height="10" fill="currentColor" /></svg>
+          </button>
+          <button type="button" data-action="video-details#stepBack" class="<%= btn %> bg-gray-200 hover:bg-gray-300">‹ FRAME</button>
+          <button type="button" data-action="video-details#stepForward" class="<%= btn %> bg-gray-200 hover:bg-gray-300">FRAME ›</button>
+          <span class="text-xs text-gray-500">← → step one frame</span>
+        </div>
+
+        <% points = video_jump_points(duration) %>
+        <% if points.any? %>
+          <div class="font-mono text-[11px] text-gray-500 mt-1">JUMP TO</div>
+          <div class="grid grid-cols-8 gap-1">
+            <% points.each do |at| %>
+              <button type="button" data-video-details-target="jump" data-at="<%= at %>" data-action="video-details#jump"
+                      class="group flex flex-col items-center gap-0.5" title="<%= video_time(at) %>">
+                <span class="block w-full bg-gray-800 border-2 border-transparent group-[.is-current]:border-blue-600 overflow-hidden" style="aspect-ratio: <%= aspect %>">
+                  <% if can_choose %>
+                    <img src="<%= frame_admin_medium_path(medium, at: at) %>" alt="" loading="lazy" class="w-full h-full object-cover">
+                  <% end %>
+                </span>
+                <span class="font-mono text-[10px] text-gray-500 group-[.is-current]:text-gray-900"><%= video_time(at) %></span>
+              </button>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+
+      <%# ── Image from media ── %>
+      <div data-video-details-target="pane" data-tab="image" class="flex flex-col gap-2.5" hidden>
+        <input type="search" data-video-details-target="search" data-action="input->video-details#filter"
+               placeholder="Search images…" class="w-full border border-gray-300 px-2.5 py-1.5 text-sm rounded-xs">
+        <p class="text-xs text-gray-500">For best results, choose an image that is landscape and close to 16:9.</p>
+        <% if images.empty? %>
+          <p class="text-xs text-gray-500">No images in the media library yet. Upload one in the Media Browser first.</p>
+        <% else %>
+          <div class="grid grid-cols-3 gap-2 max-h-[22rem] overflow-y-auto pr-1">
+            <% images.each do |image| %>
+              <% preview = media_grid_preview(image.file_path) %>
+              <% image_name = File.basename(image.file_path) %>
+              <button type="button" data-video-details-target="image" data-path="<%= image.file_path %>" data-name="<%= image_name.downcase %>"
+                      data-action="video-details#pickImage"
+                      class="group text-left p-1 border border-gray-300 hover:border-gray-500 bg-white [&.is-picked]:border-blue-600 [&.is-picked]:bg-blue-50 [&.is-picked]:outline [&.is-picked]:outline-1 [&.is-picked]:outline-blue-600">
+                <span class="block w-full bg-gray-100 overflow-hidden" style="aspect-ratio: <%= aspect %>">
+                  <% if preview.first == :placeholder %>
+                    <span class="flex w-full h-full items-center justify-center font-mono text-[10px] text-gray-400">preview…</span>
+                  <% else %>
+                    <img src="<%= preview.last %>" alt="" loading="lazy" class="w-full h-full object-cover">
+                  <% end %>
+                </span>
+                <span class="block mt-1 font-mono text-[10px] text-gray-600 truncate"><%= image_name %></span>
+              </button>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ── Poster now, and the video ── %>
+    <div class="md:w-60 shrink-0 flex flex-col gap-2">
+      <div class="font-mono text-[11px] text-gray-500">POSTER NOW</div>
+      <div class="w-full bg-gray-900 overflow-hidden" style="aspect-ratio: <%= aspect %>">
+        <% if poster_url %>
+          <img data-video-details-target="posterNow" data-video-poster="<%= medium.id %>" src="<%= poster_url %>" alt="" class="w-full h-full object-cover">
+        <% else %>
+          <img data-video-details-target="posterNow" data-video-poster="<%= medium.id %>" alt="" class="w-full h-full object-cover" hidden>
+        <% end %>
+      </div>
+      <div data-video-details-target="caption" class="text-xs text-gray-600"><%= video_poster_caption(choice) %></div>
+
+      <div class="font-mono text-[11px] text-gray-500 mt-3">ABOUT THIS VIDEO</div>
+      <% rows = [] %>
+      <% rows << [ "LENGTH", video_time(duration) ] if duration.positive? %>
+      <% rows << [ "SIZE", "#{width} × #{height}" ] if width.positive? %>
+      <% rows << [ "ORIGINAL", [ human.(source["size"] || File.size?(VideoVariantGenerator.normalize_path(medium.file_path))), (probe&.video_codec || source["codec"]) ].compact.join(" · ") ] %>
+      <% versions = Array(manifest&.dig(VideoVariantGenerator::MANIFEST_LIST)) %>
+      <% rows << [ "VERSIONS", versions.any? ? versions.map { |v| "#{v['name']} · #{human.(v['size'])}" }.join(", ") : (status[:served_as_original] ? "the original is served" : "not made yet") ] %>
+      <dl class="text-xs">
+        <% rows.each do |key, value| %>
+          <div class="flex gap-2 py-1 border-b border-gray-200">
+            <dt class="font-mono text-[11px] text-gray-500 w-20 shrink-0"><%= key %></dt>
+            <dd class="text-gray-900 min-w-0"><%= value %></dd>
+          </div>
+        <% end %>
+        <div class="flex gap-2 py-1 border-b border-gray-200">
+          <dt class="font-mono text-[11px] text-gray-500 w-20 shrink-0">USED IN</dt>
+          <dd class="text-gray-900 min-w-0">
+            <% if usages.empty? %>
+              <span class="text-gray-500">nothing yet</span>
+            <% else %>
+              <% usages.each_with_index do |usage, i| %><%= ", " if i.positive? %><%= link_to usage[:label], usage[:url], class: "text-blue-600 hover:underline" %><% end %>
+            <% end %>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-300">
+    <span data-video-details-target="footnote" data-tab="frame" class="text-xs text-gray-500 min-w-0">
+      Saves as <span class="font-mono"><%= File.basename(poster_file) %></span>.
+    </span>
+    <span data-video-details-target="footnote" data-tab="image" class="text-xs text-gray-500 min-w-0" hidden>
+      <span data-video-details-target="pickedNote">Choose an image.</span>
+    </span>
+    <span data-video-details-target="error" class="text-xs text-red-700 min-w-0" hidden></span>
+    <span class="ml-auto"></span>
+    <button type="button" data-video-details-target="closeButton" data-action="video-details#close" class="<%= btn %> bg-gray-200 hover:bg-gray-300">CANCEL</button>
+    <button type="button" data-video-details-target="useFrame" data-action="video-details#useFrame"
+            class="<%= btn %> bg-blue-100 hover:bg-blue-300" <%= "disabled" unless can_choose %>>USE THIS FRAME</button>
+    <button type="button" data-video-details-target="useImage" data-action="video-details#useImage"
+            class="<%= btn %> bg-blue-100 hover:bg-blue-300" disabled hidden>USE THIS IMAGE</button>
+  </div>
+</div>

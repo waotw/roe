@@ -1,0 +1,9 @@
+<%# The video window's frame (video-details Stimulus controller, on the
+    Media Browser's outer element). Its contents come from
+    MediumController#details each time it opens. Clicking outside, ×,
+    CLOSE/CANCEL and Escape all close it. %>
+<dialog data-video-details-target="dialog"
+        data-action="click->video-details#backdrop close->video-details#closed keydown->video-details#key"
+        class="p-0 bg-transparent outline-none backdrop:bg-black/50 max-w-[60rem] w-[calc(100%-2rem)] m-auto">
+  <div data-video-details-target="body"></div>
+</dialog>

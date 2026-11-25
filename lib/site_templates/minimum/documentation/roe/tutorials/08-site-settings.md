@@ -28,7 +28,7 @@ Your Site Settings hold the basics about your site — its name, its address, an
     - **Author Email** — a contact address for your site.
 4. Click `SAVE`.
 
-See [Site Settings](/documentation/roe/global-site) for a description of all the Site Settings and what they do.
+See [Site Settings](/documentation/roe/global-settings) for a description of all the Site Settings and what they do.
 
 ## Next
 

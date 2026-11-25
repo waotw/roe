@@ -379,15 +379,27 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
   # a rule missing from it is a rule nobody looks at. Cheaper to fail here than
   # to notice months later that a check has never been seen working.
   test "the sample post exercises every rule" do
+    # Links to files are judged against stand-in content: what each target
+    # in the sample is, without needing those files to exist.
+    link_status = lambda do |target|
+      { "posts/no-such-post" => [ :missing, nil ], "posts/sample-draft" => [ :draft, nil ],
+        "/sample-shared.md" => [ :ambiguous, %w[posts/sample-shared pages/sample-shared] ] }
+        .fetch(target, [ :ok, nil ])
+    end
     issues = MarkdownDoctor.diagnose(
       File.read(Rails.root.join("test/fixtures/files/markdown_doctor_sample.md")),
+      link_status: link_status,
+      name_matches: ->(name) { name == "about" ? [ "the page “About”", "the post “About”" ] : [] },
+      media_exists: ->(path) { path != "/media/images/no-such-image.jpg" },
     )
 
     # Text after the notes can't be shown here: it needs the notes to be the
     # last thing before it, and the sample ends on an unclosed fence on
     # purpose. It has its own tests under "footnote placement". The link check
-    # needs a rendered page, which the sample isn't given.
-    expected = MarkdownDoctor::ISSUE_TYPES.keys - %i[content_after_footnotes broken_anchor_link]
+    # needs a rendered page, which the sample isn't given. A name that depends
+    # on the site only comes up for Roe's own docs (RoeDocsLinks), which pass
+    # site_names; it has its own tests.
+    expected = MarkdownDoctor::ISSUE_TYPES.keys - %i[content_after_footnotes broken_anchor_link site_name]
     assert_empty expected - issues.map { |i| i[:type] },
       "add a section to markdown_doctor_sample.md for the rules listed above"
     assert issues.any? { |i| i[:fixable] }, "and something for Fix All to do"
@@ -402,6 +414,125 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
     assert_predicate applied.size, :positive?
     assert_empty MarkdownDoctor.diagnose(fixed).select { |i| i[:fixable] }
     assert_equal fixed, MarkdownDoctor.new(fixed).fix.first, "and running it again changes nothing"
+  end
+
+  test "a card's name that could be two items says which Roe uses, and examples don't count" do
+    matches = ->(name) { name == "about" ? [ "the page “About”", "the post “About”" ] : [ "the post “X”" ] }
+    content = "```card\ntype: post-link\npost: about\n```\n\n````markdown\n```card\npost: about\n```\n````\n\n```card\npost: x\n```\n"
+    issues = MarkdownDoctor.diagnose(content, name_matches: matches)
+
+    assert_equal 1, issues.size
+    assert_equal :unclear_name, issues.first[:type]
+    assert_equal 3, issues.first[:line]
+    assert_includes issues.first[:message], "Roe uses the page “About”"
+  end
+
+  # --- names, addresses and media (the links check) ------------------------
+
+  test "a card's name that matches nothing is broken" do
+    issues = MarkdownDoctor.diagnose("```card\ntype: post-link\npost: gone\n```\n", name_matches: ->(_) { [] })
+
+    assert_equal [ :broken_internal_link ], issues.map { |i| i[:type] }
+    assert_equal 3, issues.first[:line]
+    assert_equal "gone", issues.first[:target]
+  end
+
+  test "order: names are checked; sort words, menu links and code aren't" do
+    known = %w[home about]
+    matches = ->(name) { known.include?(name) ? [ "the page “#{name}”" ] : [] }
+    content = <<~MD
+      ```collection
+      template: menu
+      order: home, gone, [RSS](/feed.xml), [Hi, there](/x), about
+      ```
+
+      ```collection
+      order: date
+      ```
+
+      ````markdown
+      ```collection
+      order: also-gone
+      ```
+      ````
+    MD
+    issues = MarkdownDoctor.diagnose(content, name_matches: matches)
+
+    assert_equal [ [ :broken_internal_link, 3, "gone" ] ], issues.map { |i| [ i[:type], i[:line], i[:target] ] }
+  end
+
+  test "in text for many sites, names of the site's own items are listed as depending on it" do
+    site_names = ->(kind, source) { kind == :card || !source.to_s.start_with?("documentation") }
+    content = <<~MD
+      ```card
+      post: welcome
+      ```
+
+      ```collection
+      template: menu
+      order: blog, about
+      ```
+
+      ```collection
+      order: real-doc, gone-doc
+      source: documentation/roe
+      ```
+    MD
+    issues = MarkdownDoctor.diagnose(content, name_matches: ->(n) { n == "real-doc" ? [ "the doc" ] : [] }, site_names: site_names)
+
+    assert_equal [ [ :site_name, "welcome" ], [ :site_name, "blog" ], [ :site_name, "about" ], [ :broken_internal_link, "gone-doc" ] ],
+                 issues.map { |i| [ i[:type], i[:target] ] }
+  end
+
+  test "the sort words match the collection's" do
+    MarkdownDoctor::SORT_KEYWORDS.each { |word| assert CollectionQuery.sort_keyword?(word), word }
+    CollectionQuery::NUMBERED_SORTS.each_key { |word| assert_includes MarkdownDoctor::SORT_KEYWORDS, word }
+  end
+
+  test "links written as addresses are checked by the callable; files, media and code aren't" do
+    status = { "/posts/gone" => [ :missing, nil ], "/posts/later" => [ :draft, nil ] }
+    asked = []
+    address = ->(path) { asked << path; status.fetch(path, [ :ok, nil ]) }
+    content = <<~MD
+      [a](/posts/gone) and [b](/posts/later#notes "title") and <a href="/about">c</a>.
+      [file](/posts/x.md), ![img](/media/images/x.jpg), `[code](/posts/gone)`, [out](https://x.com/y).
+    MD
+    issues = MarkdownDoctor.diagnose(content, address_status: address)
+
+    assert_equal [ [ :broken_internal_link, "/posts/gone" ], [ :draft_link, "/posts/later#notes" ] ],
+                 issues.map { |i| [ i[:type], i[:target] ] }
+    assert_equal %w[/posts/gone /posts/later /about], asked
+  end
+
+  test "media in the text, in HTML and in Roe blocks is checked; code isn't" do
+    present = %w[/media/images/here.jpg]
+    content = <<~MD
+      ![a](/media/images/here.jpg) ![b](/media/images/My%20Photo.jpg?v=2)
+      <video src="/media/video/clip.mp4" poster="/media/images/poster.jpg"></video>
+
+      ```card
+      type: aside
+      image: /media/images/card.jpg
+      ```
+
+      ```gallery
+      ![g](/media/images/gallery.jpg)
+      ```
+
+      ```markdown
+      ![example](/media/images/example.jpg)
+      ```
+
+      `![inline](/media/images/inline.jpg)`
+    MD
+    asked = []
+    issues = MarkdownDoctor.diagnose(content, media_exists: ->(path) { asked << path; present.include?(path) })
+
+    assert_equal %w[/media/images/here.jpg /media/images/My\ Photo.jpg /media/video/clip.mp4 /media/images/poster.jpg
+                    /media/images/card.jpg /media/images/gallery.jpg], asked
+    assert_equal [ 1, 2, 2, 6, 10 ], issues.map { |i| i[:line] }
+    assert(issues.all? { |i| i[:type] == :missing_media })
+    assert_includes issues.first[:message], "/media/images/My%20Photo.jpg?v=2"
   end
 
   test "indentation inside a code block is content" do

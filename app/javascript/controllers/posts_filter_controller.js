@@ -216,6 +216,9 @@ export default class extends Controller {
 
   updateURL() {
     const params = new URLSearchParams();
+    // ?tag= is applied by the server; keep it so a reload stays filtered.
+    const tag = new URLSearchParams(window.location.search).get("tag");
+    if (tag) params.set("tag", tag);
 
     if (this.currentType !== "all") params.set("type", this.currentType);
     if (this.currentStatus !== "all") params.set("status", this.currentStatus);

@@ -1,8 +1,11 @@
 <%# media-upload wraps BOTH the upload input (in the header below) and the grid
     (in the content div). Stimulus only wires actions/targets inside the
     controller's element, so the input and grid must share one scope — hence
-    this outer wrapper rather than putting media-upload on the content div. %>
-<div data-controller="media-upload">
+    this outer wrapper rather than putting media-upload on the content div.
+    video-details sits here too, so DETAILS on any card (and CHANGE in the
+    progress window) reaches it. %>
+<div data-controller="media-upload video-details"
+     data-action="video-progress:change-poster->video-details#openFromEvent">
 <div class="mb-0 pb-2 border-b border-gray-300">
   <div class="flex items-start justify-between">
     <div class="flex gap-4">
@@ -304,5 +307,6 @@
   }
 </script>
 <%= render 'video_progress_modal' %>
+<%= render 'video_details_modal' %>
 </div>
 <%# /media-upload wrapper %>

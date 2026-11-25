@@ -29,7 +29,7 @@ You created a simple gallery in the last tutorial by adding this:
 
 1. In the editor, select the 3 images you added and click the `GALLERY` button.
 2. Select `Display as carousel?`
-3. Click `INSERT`
+3. Click `INSERT` this
 4. This will wrap the simple gallery in a code block like this:
     ````markdown
     ```gallery
@@ -38,8 +38,8 @@ You created a simple gallery in the last tutorial by adding this:
     ![Old barn](/media/images/old-barn.jpg)
     slideshow: true
     ```
-    The above is an example, you'll upload your own images.
     ````
+    The above is an example, you'll upload your own images.
 5. Check the preview and you'll see your gallery is now a carousel/slideshow.
 
 You now know how to create galleries. Galleries also allow you to change sizing and layout, as well as add captions. Learn all about Galleries here: [Galleries](/documentation/roe/galleries)

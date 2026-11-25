@@ -1,0 +1,10 @@
+<%#
+  Shown on a content list opened from a count in the tag manager (?tag=lab).
+  locals: path — the same list without the filter
+%>
+<% if @tag_filter %>
+  <div class="mt-4 flex items-center gap-3 px-3 py-2 bg-amber-100 border border-amber-300 text-xs font-sans text-amber-900">
+    <span>Showing items with the tag <code class="font-mono font-semibold bg-white border border-amber-300 px-1"><%= @tag_filter %></code>.</span>
+    <%= link_to "SHOW ALL", path, class: "uppercase font-mono text-xs px-1.5 py-0.5 border border-gray-800 bg-white hover:bg-gray-300 rounded-xs text-gray-900" %>
+  </div>
+<% end %>

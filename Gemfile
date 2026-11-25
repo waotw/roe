@@ -1,5 +1,19 @@
 source "https://rubygems.org"
 
+# mise's ready-made macOS Rubies are built on the newest macOS, and their
+# headers include <stdckdint.h>, which macOS 14's build tools don't have, so
+# no gem with C code would build. When that's the case, point the compiler at
+# a stand-in (lib/compat/stdckdint.h). This lives here, not in the updater,
+# because the update to a new Ruby is run by the previous release's updater:
+# the new release's Gemfile is the first code of ours that runs.
+if RUBY_PLATFORM.include?("darwin")
+  ruby_config_h = File.join(RbConfig::CONFIG["rubyarchhdrdir"].to_s, "ruby", "config.h")
+  if File.exist?(ruby_config_h) && File.read(ruby_config_h).include?("#define HAVE_STDCKDINT_H 1") &&
+     !system("echo '#include <stdckdint.h>' | cc -x c -fsyntax-only - > /dev/null 2>&1")
+    ENV["CPATH"] = [ File.expand_path("lib/compat", __dir__), ENV["CPATH"] ].compact.reject(&:empty?).join(":")
+  end
+end
+
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.4", ">= 8.1.4.1"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]

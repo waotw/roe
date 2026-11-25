@@ -136,6 +136,39 @@ class HasMarkdownExtensionsTest < ActiveSupport::TestCase
       "no placeholder token should survive into the output"
   end
 
+  # With soft line breaks, text right above or below a fence inside a list
+  # item gets a hard break next to the placeholder. The block is on its own
+  # lines anyway, so both breaks go (the one below showed as a blank line).
+  test "a code block in a list item has no break before or after it" do
+    post = Post.new(file_path: "x.md", content: "1. Like this:\n    ```markdown\n    x\n    ```\n    The above is an example.\n2. Next\n")
+    post.stubs(:soft_line_breaks?).returns(true)
+    html = post.to_html.to_s
+
+    assert_no_match %r{<br\s*/?>\s*<pre}, html
+    assert_no_match %r{</pre>\s*<br}, html
+    assert_includes html, "The above is an example."
+  end
+
+  test "a menu says which order: names it left out" do
+    page = Page.new(file_path: "x.md", content: "```collection\ntemplate: menu\norder: zz-nope-one, zz-nope-two\n```\n")
+    page.stubs(:show_block_warnings?).returns(true)
+    html = page.to_html.to_s
+
+    assert_includes html, "Menu names not found"
+    assert_includes html, "<code"
+    assert_match(/zz-nope-one.*zz-nope-two/m, html)
+    assert_includes html, "collection-menu", "the menu itself still renders"
+  end
+
+  test "a menu with every name found has no warning" do
+    Page.create!(file_path: File.join(RoeSitePaths::SITE_PATH, "pages/zz-menu-real.md"), content: "x",
+                 metadata: { "title" => "Real", "url_name" => "zz-menu-real", "status" => "published" })
+    page = Page.new(file_path: "x.md", content: "```collection\ntemplate: menu\norder: zz-menu-real\n```\n")
+    page.stubs(:show_block_warnings?).returns(true)
+
+    assert_not_includes page.to_html.to_s, "not found"
+  end
+
   test "several code blocks all restore, with no leftovers" do
     html = render("```ruby\na = 1\n```\n\nMiddle.\n\n```js\nlet b = 2;\n```\n")
     doc = Nokogiri::HTML::DocumentFragment.parse(html)

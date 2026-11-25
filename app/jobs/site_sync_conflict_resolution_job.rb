@@ -80,6 +80,7 @@ class SiteSyncConflictResolutionJob < ApplicationJob
     update_step(:reconciling_content)
     ContentSync.sync_all if pulled
     SiteSync::Exchange.reconcile_peer_content! if pushed
+    SiteSync::TagMerge.run! unless then_sync # the sync that follows does it
     update_step(:notifying_peer)
     SiteSync::Exchange.refresh_peer_ledger!
 

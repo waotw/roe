@@ -55,8 +55,9 @@ class SearchIndexGenerator
   # The paywall is a ```form block with `for: paid_content` — either on the
   # fence line (```form for: paid_content) or inside the block. Everything
   # above it is public on the page. Matches the whole fenced block so the
-  # split point is the start of the fence.
-  PAYWALL_BLOCK = /^```form\b(?:[^\n]*for:\s*paid_content[^\n]*\n|[^\n]*\n(?:(?!```)[^\n]*\n)*?[^\n]*for:\s*paid_content[^\n]*\n).*?^```[ \t]*$/m
+  # split point is the start of the fence. `\r?` before the closing `$` is for
+  # files written with Windows line endings.
+  PAYWALL_BLOCK = /^```form\b(?:[^\n]*for:\s*paid_content[^\n]*\n|[^\n]*\n(?:(?!```)[^\n]*\n)*?[^\n]*for:\s*paid_content[^\n]*\n).*?^```[ \t]*\r?$/m
 
   def self.build(audience: :public)
     new(audience: audience).build
@@ -195,7 +196,7 @@ class SearchIndexGenerator
   end
 
   def excerpt_for(record)
-    record.respond_to?(:excerpt) ? record.excerpt.to_s : ""
+    record.respond_to?(:excerpt) ? FieldText.plain(record.excerpt) : ""
   end
 
   # What a non-member may search in a paid post: the excerpt plus whatever
@@ -266,7 +267,8 @@ class SearchIndexGenerator
   end
 
   def plain_text(markdown)
-    markdown.gsub(/```.*?```/m, " ")        # fenced blocks (code/cards/etc.)
+    InternalLinks.plain(markdown)                  # [[posts/x|text]] → text
+            .gsub(/```.*?```/m, " ")        # fenced blocks (code/cards/etc.)
             .gsub(/!\[[^\]]*\]\([^)]*\)/, " ") # images
             .gsub(/[#>*_`~\-|]/, " ")        # common markdown punctuation
             .gsub(/\s+/, " ")

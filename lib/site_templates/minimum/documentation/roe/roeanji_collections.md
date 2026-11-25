@@ -42,16 +42,17 @@ You won't need most of these. Start with a bare block and add options only as yo
 | `podcast`                                       | No       | Filter posts by podcast key/name                                                  |
 | `post_type`                                     | No       | Filter posts by type: `article`, `podcast`, `music`,`audio`, `video` or `all`     |
 | [`related`](#show-related-content)              | No       | `true` shows items linked via frontmatter `related:`                              |
+| `show_unlisted`                                 | No       | `true` includes unlisted posts or pages                                           |
 
 ### Ordering
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `order` | No | `date` (newest first, default), `date-asc` (oldest first), `title` (alphabetical), `filename` (numeric prefix aware, a file that starts with `0-` will be at the top), or a comma-separated list of `url_name`s for a hand-picked order (see [Pick the order by hand](#pick-the-order-by-hand)) |
+| Option  | Required | Description                                                                                                                                                                                                                                                                                                   |
+| ------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `order` | No       | `date` (newest first, default), `date-asc` (oldest first), `title` (alphabetical), `filename` (numeric prefix aware, a file that starts with `0-` will be at the top), or a comma-separated list of `url_name` or `filename`s for a hand-picked order (see [Pick the order by hand](#pick-the-order-by-hand)) |
 
 #### Pick the order by hand
 
-Instead of a sort mode, give `order:` a comma-separated list of `url_name`s. The items appear in exactly that order:
+Instead of a sort mode, give `order:` a comma-separated list of `url_name`s or `filename`s (with `.md` or without). The items appear in exactly that order:
 
 ````
 ```collection
@@ -62,32 +63,32 @@ order: blog, about, store
 
 Items you don't name fall to the end, alphabetically — so nothing disappears if you forget one. The whole order lives in the block, so each collection can arrange things its own way, and you never edit the individual pages.
 
-The [`menu`](#build-a-menu-footer-or-sidebar) template is the one exception: there the list *is* the menu, so anything you don't name is left out rather than appended.
+The [`menu`](#build-a-menu-footer-or-sidebar) template is the one exception: there the list _is_ the menu, so anything you don't name is left out rather than appended.
 
 ### Display
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `template` | No | `list` (default), `grid` (products default), `compact`, `links`, `menu`, `full`, or `glossary` |
-| `style` | No | For the `menu` template only: `vertical` (default) or `horizontal` |
-| `limit` | No | Number or `all` — defaults to [collection config](/admin/configs/collections/edit) or 10 |
-| `offset` | No | Skip first `N` items, e.g., `offset: 10` |
-| `heading` | No | Section heading above collection |
-| `show_author` | No | `true` = show author name |
-| `show_date` | No | `true` = show date |
-| `show_subtitle` | No | `true` = show subtitle |
-| `show_excerpt` | No | `true` = show excerpt |
-| `show_more` | No | `true` = Add "View all" link to full [collection pagination](/documentation/roe/collections_pagination) (posts only) |
-| `show_more_text` | No | Custom text for `show_more link` (default "View all") |
+| Option           | Required | Description                                                                                                          |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------- |
+| `template`       | No       | `list` (default), `grid` (products default), `compact`, `links`, `menu`, `full`, or `glossary`                       |
+| `style`          | No       | For the `menu` template only: `vertical` (default) or `horizontal`                                                   |
+| `limit`          | No       | Number or `all` — defaults to [collection config](/admin/configs/collections/edit) or 10                             |
+| `offset`         | No       | Skip first `N` items, e.g., `offset: 10`                                                                             |
+| `heading`        | No       | Section heading above collection                                                                                     |
+| `show_author`    | No       | `true` = show author name                                                                                            |
+| `show_date`      | No       | `true` = show date                                                                                                   |
+| `show_subtitle`  | No       | `true` = show subtitle                                                                                               |
+| `show_excerpt`   | No       | `true` = show excerpt                                                                                                |
+| `show_more`      | No       | `true` = Add "View all" link to full [collection pagination](/documentation/roe/collections_pagination) (posts only) |
+| `show_more_text` | No       | Custom text for `show_more link` (default "View all")                                                                |
 
 ### Products
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `category` | No | Filter products by category |
-| `groups` | No | `true` to group variants together (e.g., Paperback/Hardback/Ebook of same book) |
-| `aspect_ratio` | No | Product image ratio: `original` (default), `square`, `portrait`, `tv`, `wide`, or `cinema` (`auto`, `landscape`, and `film` are accepted aliases) |
-| `show_description` | No | Show truncated product description (~100 chars) below the title |
+| Option             | Required | Description                                                                                                                                       |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `category`         | No       | Filter products by category                                                                                                                       |
+| `groups`           | No       | `true` to group variants together (e.g., Paperback/Hardback/Ebook of same book)                                                                   |
+| `aspect_ratio`     | No       | Product image ratio: `original` (default), `square`, `portrait`, `tv`, `wide`, or `cinema` (`auto`, `landscape`, and `film` are accepted aliases) |
+| `show_description` | No       | Show truncated product description (~100 chars) below the title                                                                                   |
 
 #### [Grouped products](/documentation/roe/products#product-variants-groups)
 
@@ -137,6 +138,7 @@ post_type: article
 ↑ Add this to a Page you're editing and click `PREVIEW`.
 
 ## Add a `heading`
+
 ↓ Give the Collection a `heading`:
 
 ````markdown
@@ -179,7 +181,7 @@ style: horizontal
 - `template: menu` outputs a bare list of links — no headings, no dates, no excerpts.
 - The source defaults to `pages` (the usual case). Use `source: posts` or `products` to build the menu from those instead.
 - `style: horizontal` lays the links out in a row; the default, `vertical`, stacks them.
-- A `url_name` the list can't find is skipped (but will show up on the local site as a typo so you'll notice it).
+- A `url_name` that Roe can't find is skipped but you'll see an error when signed in as the admin.
 - A `menu` shows every link you give it — no `limit` for this Collection.
 - In the `header` file, the current page's link gets an `active` class automatically, so you can highlight it in CSS.
 - You can add `show_active: true` or `show_active: false` to turn this on/off for any `menu` Collection.
@@ -235,7 +237,7 @@ Add a `related` entry to any Post, Product, or Page, and the two pieces of conte
 
 ![Related field in metadata for Yellow T-shirt Product](/media/images/related_product_metadata.png)
 
-The link is `bi-directional` — you set it on one side, and both sides see it. I added `blue-tshirt` to **Yellow T-shirt**, and it shows up in the `related: true` Collection on **Blue T-shirt's** page just the same.
+You can also use the `filename` instead of `url_name`. The link is `bi-directional` — you set it on one side, and both sides see it. I added `blue-tshirt` to **Yellow T-shirt**, and it shows up in the `related: true` Collection on **Blue T-shirt's** page just the same.
 
 ## Pagination with a "View all" link
 
@@ -290,7 +292,7 @@ order: date
 
 ````markdown
 ```collection
-heading: Music 
+heading: Music
 limit: 5
 tags: music-criticism
 order: title

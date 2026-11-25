@@ -264,7 +264,24 @@ class ConfigGenerator
     if Dir.exist?(posts_dir) && Dir.glob(File.join(posts_dir, "*.md")).any?
       paths << "posts/welcome.md"
     end
+    paths << "pages/home.md" if home_page_elsewhere?
     paths
+  end
+
+  # The home page can be renamed: another page file that says `page_type:
+  # home`, or still has `url_name: home`, is the home page, and a fresh
+  # home.md beside it would be a second one.
+  def home_page_elsewhere?
+    pages_dir = File.join(RoeSitePaths::SITE_PATH, "pages")
+    own = File.join(pages_dir, "home.md")
+    Dir.glob(File.join(pages_dir, "**", "*.md")).any? do |path|
+      next false if path == own
+
+      head = File.read(path, 4096)[/\A---\s*\n(.*?)\n---/m, 1].to_s
+      head.match?(/^page_type:\s*["']?home["']?\s*$/) || head.match?(/^url_name:\s*["']?home["']?\s*$/)
+    rescue StandardError
+      false
+    end
   end
 
   private

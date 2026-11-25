@@ -288,6 +288,7 @@ STEPS = [
   Step.new("sync",          "Bring docs, themes and site JS over from site/",    %w[stable pre], :prep),
   Step.new("leftovers",     "No TODO, FIXME or /bw left in what ships",           %w[stable pre], :prep),
   Step.new("doctor",        "Markdown Doctor on the docs",                       %w[stable pre], :prep),
+  Step.new("links",         "No broken links or missing media in the docs",      %w[stable pre], :prep),
   Step.new("secrets",       "No keys or secrets committed",                      %w[stable pre], :prep),
   Step.new("migrations",    "The last release's database migrates cleanly",     %w[stable pre], :prep),
   Step.new("ci",            "bin/ci passes (RuboCop, audits, Brakeman, tests)",   %w[stable pre], :prep),
@@ -595,6 +596,25 @@ def step_doctor
   soft_stop("doctor", report)
 end
 
+# Links and media in Roe's docs that point at nothing (bin/roe-docs-links,
+# the check `roe links` and the dashboard share). Fix the doc in site/ and
+# check again: the run starts over, so the sync step copies the fix into
+# current/ and offers to commit it.
+def step_links
+  out, clean = capture(File.join(CURRENT, "bin/roe-docs-links"), File.join(SITE, "documentation/roe"))
+  if clean
+    ok("No broken links or missing media in the docs")
+    return mark_done("links")
+  end
+
+  report = out.lines.map(&:rstrip).reject(&:empty?)
+  # COPY: links step
+  bad("Broken links or missing media in the docs:")
+  list(report, 40)
+  say "Fix them in site/documentation/roe/, then check again."
+  soft_stop("links", report)
+end
+
 SECRET_PATTERN = [
   "sk_live_[0-9A-Za-z]{20,}", "rk_live_[0-9A-Za-z]{20,}", "whsec_[0-9A-Za-z]{24,}",
   "-----BEGIN [A-Z ]*PRIVATE KEY-----", "ghp_[0-9A-Za-z]{30,}", "github_pat_[0-9A-Za-z_]{30,}",
@@ -705,6 +725,11 @@ end
 def ci_hints(output)
   plain = output.gsub(/\e\[[\d;]*m/, "")
   hints = []
+  # Which steps failed, by name: a failure early on (Brakeman) prints its
+  # report thousands of lines above the end, under all the test output.
+  failed = plain.scan(/^❌ (.+?) failed in /).flatten.uniq - [ "Continuous Integration" ]
+  hints << "Failed: #{failed.join(', ')}." unless failed.empty?
+  brakeman_warnings(plain).each { |w| hints << "  #{w}" }
   if plain.include?("is not the latest version")
     hints << "Brakeman fails until it's the newest release (bin/brakeman adds --ensure-latest):"
     hints << "  #{orange("bundle update brakeman --conservative")}, then commit Gemfile.lock."
@@ -718,6 +743,19 @@ def ci_hints(output)
     failing.first(10).each { |t| hints << "  #{orange("bin/rails test #{t}")}" }
   end
   hints
+end
+
+# Brakeman's warnings, one line each ("Message — file:line"), from its report
+# in the CI output.
+def brakeman_warnings(plain)
+  report = plain[/^== Warnings ==\n(.*?)(?:^❌|^✅|\z)/m, 1].to_s
+  report.split(/\n\s*\n/).filter_map do |block|
+    message = block[/^Message: (.+)$/, 1] or next
+    file = block[/^File: (.+)$/, 1]
+    line = block[/^Line: (\d+)$/, 1]
+    where = [ file, line ].compact.join(":")
+    where.empty? ? message : "#{message} — #{where}"
+  end
 end
 
 # ── Release notes ───────────────────────────────────────────────────────────

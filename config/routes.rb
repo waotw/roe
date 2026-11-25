@@ -16,6 +16,7 @@ Rails.application.routes.draw do
       post "refresh_ledger",            to: "exchange#refresh_ledger"
       post "rewind_ledger",             to: "exchange#rewind_ledger"
       post "reconcile_content",         to: "exchange#reconcile_content"
+      post "tags",                      to: "exchange#tags"
       post "file_states",               to: "exchange#file_states"
       post "file_hashes",               to: "exchange#file_hashes"
       get "manifest",                   to: "exchange#manifest"
@@ -76,6 +77,8 @@ Rails.application.routes.draw do
     # The live editor's block cards: which Roe-anji blocks would render a
     # warning instead of themselves.
     post "markdown/blocks", to: "markdown#blocks", as: "markdown_blocks"
+    # What the editor's link list offers (InternalLinks).
+    get "internal_links", to: "internal_links#index", as: "internal_links"
 
     # Site Sync
     get "site_sync", to: "site_sync#index", as: "site_sync"
@@ -159,6 +162,7 @@ Rails.application.routes.draw do
         get :check_unique
         post :bulk_destroy
         post :bulk_publish
+        post :bulk_tags
       end
       member do
         post :publish_modal
@@ -177,7 +181,9 @@ Rails.application.routes.draw do
       collection do
         post :bulk_destroy
         post :bulk_publish
+        post :bulk_tags
         post :restore_member_pages
+        get :check_unique
       end
       member do
         post :publish_modal
@@ -209,6 +215,9 @@ Rails.application.routes.draw do
         post :regenerate_variants
         get :card
         get :video_status
+        get :details
+        get :frame
+        post :poster
       end
     end
 
@@ -217,12 +226,14 @@ Rails.application.routes.draw do
     resources :products do
       collection do
         get :check_sku
+        get :check_unique
         get :suggest_sku
         get :search
         get :next_sku_number
         get :duplicate_skus
         post :bulk_destroy
         post :bulk_publish
+        post :bulk_tags
       end
       member do
         post :publish_modal
@@ -336,6 +347,11 @@ Rails.application.routes.draw do
     # linked from the dashboard — but a real top-level page.
     resources :orders, only: [ :index, :show ]
 
+    # The site-wide links check (LinkCheck). Linked from the dashboard's
+    # LINKS box. CHECK NOW runs it again.
+    get "links", to: "links#index", as: :links
+    post "links/check", to: "links#check", as: :check_links
+
     resources :imports, only: [ :index, :new, :create, :show, :destroy ] do
       member do
         get :phase_2
@@ -403,6 +419,12 @@ Rails.application.routes.draw do
 
     get "configs/content/edit", to: "configs#edit_content", as: "edit_content_config"
     patch "configs/content", to: "configs#update_content", as: "content_config"
+
+    # Tags: the list in content.yml, opened from Settings → Content.
+    get    "tags",        to: "tags#index",   as: "tags"
+    post   "tags",        to: "tags#create"
+    patch  "tags/rename", to: "tags#rename",  as: "rename_tag"
+    delete "tags",        to: "tags#destroy", as: "destroy_tag"
 
     get   "configs/custom_code/edit", to: "configs#edit_custom_code", as: "edit_custom_code_config"
     patch "configs/custom_code",      to: "configs#update_custom_code", as: "custom_code_config"
@@ -522,9 +544,9 @@ Rails.application.routes.draw do
   get "donate/cancel", to: "donations#cancel", as: :donation_cancel
 
   # Public site
-  # Root renders home.md as a regular page through PagesController#show.
-  # Same code path as any other public page — no special-case template.
-  root to: "pages#show", defaults: { url_name: "home" }
+  # Root renders the home page (Page.home: page_type home, else home.md,
+  # else url_name home) with the same template as any other page.
+  root to: "pages#home"
 
   # Redirect post ID to slug (preserves anchor in browser)
   get "p/:id", to: "posts#show_by_id", constraints: { id: /\d+/ }, as: :post_by_id

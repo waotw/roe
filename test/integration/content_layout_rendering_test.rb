@@ -368,6 +368,35 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     assert_select ".product-top .product-price", 0, "the body's button stands in for the layout's"
   end
 
+  test "a button block in a file with Windows line endings still replaces the layout's" do
+    product = a_product(content: "About it.\r\n\r\n```button\r\nsku: THING-X\r\n```\r\n\r\nMore.\r\n")
+    get product_path(product.url_name)
+    assert_select ".product-top .product-price", 0
+  end
+
+  test "[subtitle] and [description] show the product's own" do
+    site_layout("product", "product-top: [title] [subtitle] [description]\n[body]\n")
+    product = a_product(subtitle: "A guide to the world", description: "A radical guide.")
+    get product_path(product.url_name)
+    assert_select ".product-top p.product-subtitle", "A guide to the world"
+    assert_select ".product-top p.product-excerpt.product-description", "A radical guide."
+  end
+
+  test "a variant without a description shows its group's, from the primary" do
+    site_layout("product", "[title] [description]\n[body]\n")
+    a_product(group: "book", primary: true, description: "The group copy.")
+    epub = a_product(group: "book", variant: "Epub")
+    get product_path(epub.url_name)
+    assert_select "p.product-description", "The group copy."
+  end
+
+  test "[subtitle] and [description] draw nothing on a product without them" do
+    site_layout("product", "[title] [subtitle] [description]\n[body]\n")
+    product = a_product
+    get product_path(product.url_name)
+    assert_select ".product-subtitle, .product-description", 0
+  end
+
   test "an example button inside a four-backtick fence doesn't count" do
     product = a_product(content: "````\n```button\nsku: X\n```\n````\n")
     get product_path(product.url_name)

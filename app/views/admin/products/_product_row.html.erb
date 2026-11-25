@@ -11,6 +11,17 @@
 <% dimmed = local_assigns.fetch(:dimmed, false) %>
 <% rowpad = dimmed ? "py-1.5" : "py-4" %>
 <tr>
+  <td data-bulk-select-target="selectColumn" class="hidden pl-6 md:pl-4 pr-2 w-8 align-middle">
+    <input type="checkbox"
+           data-bulk-select-target="checkbox"
+           data-action="change->bulk-select#update"
+           data-id="<%= product.id %>"
+           data-status="<%= product.status %>"
+           data-warnings="<%= product.publish_warnings? %>"
+           data-newsletter="false"
+           data-paid="false"
+           data-tags="<%= TagList.clean(product.tags).to_json %>">
+  </td>
   <td class="whitespace-nowrap <%= rowpad %> pr-4 text-sm font-medium <%= dimmed ? 'text-gray-400' : 'text-gray-900' %> <%= dimmed ? 'pl-10 md:pl-8' : 'pl-6 md:pl-4' %>">
     <div class="flex items-center">
     <%= link_to product.title || "Untitled", edit_admin_product_path(product),

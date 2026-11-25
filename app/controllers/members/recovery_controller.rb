@@ -80,7 +80,7 @@ module Members
     end
 
     def load_recover_page
-      @page = Page.find_by("json_extract(metadata, '$.url_name') = ?", "recover-account")
+      @page = SystemPages.find("recovery")
     end
   end
 end

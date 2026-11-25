@@ -56,8 +56,9 @@ class ContentWatcher
     # settled; anything still wrong is recorded again when it changes.
     write_errors({})
     # Anything the listen gem catches itself goes to the Rails log too, not
-    # only to the background log.
-    Listen.logger = Rails.logger
+    # only to the background log: its warnings and errors, not its chatter
+    # (ListenLog).
+    Listen.logger = ListenLog.new
 
     listener = Listen.to(*paths, ignore: /\/variants\//) do |modified, added, removed|
       handle_changes(modified, added, removed)
@@ -95,6 +96,15 @@ class ContentWatcher
     puts "  Added: #{added.inspect}"
     puts "  Modified: #{modified.inspect}"
     puts "  Removed: #{removed.inspect}"
+    # A file both removed and added in one batch is still there: an editor
+    # that saves by replacing the file. It changed; nothing moved.
+    replaced = removed & added
+    if replaced.any?
+      removed -= replaced
+      added -= replaced
+      modified |= replaced
+    end
+
     # Check for renames (removed + added happening together)
     potential_renames = detect_renames(added, removed)
 
@@ -149,6 +159,19 @@ class ContentWatcher
     # peer ping so the other side learns within seconds (instead
     # of waiting up to an hour for the recurring exchange).
     notify_site_sync if (modified + added + removed).any?
+
+    # Links and media files may have changed: check the site's links again
+    # (in the background, once the batch settles).
+    LinkCheck.request("change") if (modified + added + removed).any? { |file| link_check_file?(file) }
+  end
+
+  # Content, a layout, or an original media file. Variants come and go with
+  # their originals, and config and theme files hold no links the check reads.
+  def self.link_check_file?(file)
+    path = relative_site_path(file).to_s
+    return false if path.include?("/variants/")
+
+    path.match?(%r{\A(posts|pages|products|documentation|media|layout)/})
   end
 
   def self.notify_site_sync
@@ -238,7 +261,7 @@ class ContentWatcher
       puts "\n   ✓ #{type.capitalize} integration config reloaded\n"
 
     elsif absolute_file.include?("site/posts")
-      result = Post.create_or_update_from_file(absolute_file)
+      result = following_links(Post, absolute_file) { Post.create_or_update_from_file(absolute_file) }
 
       case result
       when :warning
@@ -250,21 +273,21 @@ class ContentWatcher
       end
 
     elsif absolute_file.include?("site/pages")
-      result = Page.create_or_update_from_file(absolute_file)
+      result = following_links(Page, absolute_file) { Page.create_or_update_from_file(absolute_file) }
 
       if result
         puts "\n   ✓ Page saved: #{result.title || File.basename(file)}\n"
       end
 
     elsif absolute_file.include?("site/documentation")
-      result = Documentation.create_or_update_from_file(absolute_file)
+      result = following_links(Documentation, absolute_file) { Documentation.create_or_update_from_file(absolute_file) }
 
       if result
         puts "\n   ✓ Documentation saved: #{result.title || File.basename(file)}\n"
       end
 
     elsif absolute_file.include?("site/products")
-      result = Product.create_or_update_from_file(absolute_file)
+      result = following_links(Product, absolute_file) { Product.create_or_update_from_file(absolute_file) }
 
       if result
         puts "\n   ✓ Product saved: #{result.title || File.basename(file)}\n"
@@ -305,28 +328,31 @@ class ContentWatcher
     end
   end
 
+  # The listen gem's warnings and errors, passed to the Rails log. Its debug
+  # and info lines are dropped: at debug level (every local install) it
+  # writes "(silenced): <path>" for each ignored file, and Roe writes image
+  # variants by the thousand on a first start or an import.
+  class ListenLog < ::Logger
+    def initialize
+      super(nil, level: ::Logger::WARN)
+    end
+
+    def add(severity, message = nil, progname = nil)
+      return true if severity.to_i < level
+
+      message ||= block_given? ? yield : progname
+      Rails.logger.add(severity, "[listen] #{message}")
+    end
+  end
+
   def self.detect_renames(added, removed)
-    renames = {}
+    renames = content_renames(added, removed)
 
     removed.each do |old_file|
-      # Handle markdown files
-      if old_file.end_with?(".md")
-        old_basename = File.basename(old_file, ".md")
-
-        new_file = added.find do |file|
-          next unless file.end_with?(".md")
-          new_basename = File.basename(file, ".md")
-
-          new_basename.include?(old_basename) ||
-            old_basename.include?(new_basename.sub(/^\d+-/, ""))
-        end
-
-        renames[old_file] = new_file if new_file
-
-      # Handle media files. Third copy of the same list until now — a type
-      # missing here isn't seen as a rename, so it reads as a delete plus an
-      # add and the record is destroyed and recreated instead of moved.
-      elsif old_file.match?(MEDIA_PATTERN)
+      # Media files. Third copy of the same list until now — a type missing
+      # here isn't seen as a rename, so it reads as a delete plus an add and
+      # the record is destroyed and recreated instead of moved.
+      if old_file.match?(MEDIA_PATTERN)
         old_basename = File.basename(old_file, File.extname(old_file))
         old_ext = File.extname(old_file)
 
@@ -342,6 +368,23 @@ class ContentWatcher
       end
     end
 
+    renames
+  end
+
+  # Removed content files that were renamed, by their records (RenameMatch).
+  # Content files that share a name aren't matched by name: `music.md` →
+  # `music-2.md` could as well be a new post.
+  def self.content_renames(added, removed)
+    records = removed.select { |file| file.end_with?(".md") }.filter_map do |old_file|
+      record = [ Post, Page, Documentation, Product ].lazy.map { |model| content_record(model, old_file) }.find(&:itself)
+      [ old_file, record ] if record
+    end.to_h
+    return {} if records.empty?
+
+    renames, unsure = RenameMatch.pairs(records, added.select { |file| file.end_with?(".md") })
+    unsure.each do |old_file|
+      puts "   ⚠️  #{File.basename(old_file)} may have been renamed, but more than one file matches it; treating it as removed"
+    end
     renames
   end
 
@@ -420,23 +463,40 @@ class ContentWatcher
     if absolute_old.include?("site/posts")
       post = Post.find_by(file_path: absolute_old)
       if post
-        post.update(file_path: absolute_new)
-        Post.create_or_update_from_file(absolute_new)
+        following_links(Post, absolute_new, old_file: absolute_old) do
+          post.update(file_path: absolute_new)
+          Post.create_or_update_from_file(absolute_new)
+        end
         puts "   ✓ Post renamed in database"
       end
     elsif absolute_old.include?("site/pages")
       page = Page.find_by(file_path: absolute_old)
       if page
-        page.update(file_path: absolute_new)
-        Page.create_or_update_from_file(absolute_new)
+        following_links(Page, absolute_new, old_file: absolute_old) do
+          page.update(file_path: absolute_new)
+          Page.create_or_update_from_file(absolute_new)
+        end
         puts "   ✓ Page renamed in database"
       end
     elsif absolute_old.include?("site/documentation")
       doc = Documentation.find_by(file_path: absolute_old)
       if doc
-        doc.update(file_path: absolute_new)
-        Documentation.create_or_update_from_file(absolute_new)
+        following_links(Documentation, absolute_new, old_file: absolute_old) do
+          doc.update(file_path: absolute_new)
+          Documentation.create_or_update_from_file(absolute_new)
+        end
         puts "   ✓ Documentation renamed in database"
+      end
+    elsif absolute_old.include?("site/products")
+      # Products keep their path relative to site/. Without this branch a
+      # product renamed outside Roe was never picked up at its new name.
+      product = Product.find_by(file_path: relative_site_path(absolute_old))
+      if product
+        following_links(Product, absolute_new, old_file: absolute_old) do
+          product.update(file_path: relative_site_path(absolute_new))
+          Product.create_or_update_from_file(absolute_new)
+        end
+        puts "   ✓ Product renamed in database"
       end
     elsif absolute_old.include?("site/media")
       # Media files are stored with web paths like "/media/images/file.jpg"
@@ -452,6 +512,31 @@ class ContentWatcher
         puts "   New: #{new_web_path}"
       end
     end
+  end
+
+  # A file changed or renamed outside Roe: once its record is updated, the
+  # site's own links to it follow its new file name and address
+  # (InternalLinkRewriter), as they do after a save or rename in the admin.
+  # The file itself is left alone. A failure here never stops the load.
+  def self.following_links(model, absolute_file, old_file: nil)
+    before = content_record(model, old_file || absolute_file)
+    source = before && InternalLinkRewriter.source_for(before)
+    result = yield
+    after = source && content_record(model, absolute_file)
+    if after
+      begin
+        count = InternalLinkRewriter.follow(source, after, except: absolute_file)
+        puts "   🔗 Updated #{count} #{'link'.pluralize(count)} to it" if count.positive?
+      rescue StandardError => e
+        Rails.logger.error("[ContentWatcher] links to #{absolute_file}: #{e.class}: #{e.message}")
+      end
+    end
+    result
+  end
+
+  def self.content_record(model, absolute_file)
+    path = model == Product ? relative_site_path(absolute_file) : RoeSitePaths.normalize(absolute_file)
+    model.find_by(file_path: path)
   end
 
   def self.remove_file(file)

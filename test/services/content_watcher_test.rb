@@ -125,26 +125,13 @@ class ContentWatcherTest < ActiveSupport::TestCase
     assert_includes paths, File.join(RoeSitePaths::SITE_PATH, "media")
   end
 
-  # Detect renames functionality
-  test "detect_renames identifies markdown file renames" do
-    # Names must have overlapping substrings to match
+  # Detect renames functionality. Content files are matched by their text
+  # and title (RenameMatch), never by a similar name.
+  test "detect_renames doesn't treat a similar name as a rename" do
     added = [ "site/posts/updated-article-slug.md" ]
     removed = [ "site/posts/article-slug.md" ]
 
-    renames = ContentWatcher.send(:detect_renames, added, removed)
-
-    assert_equal({ "site/posts/article-slug.md" => "site/posts/updated-article-slug.md" }, renames)
-  end
-
-  test "detect_renames handles similar basenames" do
-    # When old basename is contained in new basename
-    added = [ "site/posts/updated-article-name.md" ]
-    removed = [ "site/posts/article-name.md" ]
-
-    renames = ContentWatcher.send(:detect_renames, added, removed)
-
-    assert renames.key?("site/posts/article-name.md")
-    assert_equal "site/posts/updated-article-name.md", renames["site/posts/article-name.md"]
+    assert_empty ContentWatcher.send(:detect_renames, added, removed)
   end
 
   test "detect_renames identifies media file renames" do
@@ -179,23 +166,19 @@ class ContentWatcherTest < ActiveSupport::TestCase
   test "detect_renames handles multiple file changes" do
     # Names must have overlapping substrings to match
     added = [
-      "site/posts/updated-post.md",
-      "site/pages/updated-page.md",
-      "site/media/images/updated-photo.jpg"
+      "site/media/images/updated-photo.jpg",
+      "site/media/audio/updated-song.mp3"
     ]
     removed = [
-      "site/posts/post.md",
-      "site/pages/page.md",
-      "site/media/images/photo.jpg"
+      "site/media/images/photo.jpg",
+      "site/media/audio/song.mp3"
     ]
 
     renames = ContentWatcher.send(:detect_renames, added, removed)
 
-    # Should detect all 3 renames since basenames overlap
-    assert_equal 3, renames.keys.count
-    assert_equal "site/posts/updated-post.md", renames["site/posts/post.md"]
-    assert_equal "site/pages/updated-page.md", renames["site/pages/page.md"]
+    assert_equal 2, renames.keys.count
     assert_equal "site/media/images/updated-photo.jpg", renames["site/media/images/photo.jpg"]
+    assert_equal "site/media/audio/updated-song.mp3", renames["site/media/audio/song.mp3"]
   end
 
   # Static generation check
@@ -364,18 +347,18 @@ class ContentWatcherTest < ActiveSupport::TestCase
   end
 
   # Handle changes orchestration
-  test "handle_changes detects renames before processing additions" do
-    # This test verifies the orchestration logic
-    added = [ "site/posts/old-name.md" ]  # Same basename so it matches
-    modified = []
-    removed = [ "site/posts/old-name.md" ]
+  # Some editors save by replacing the file, which reports it removed and
+  # added at once. That's a change to the file, not a removal.
+  test "handle_changes treats a file removed and added at once as changed" do
+    file = write_test_file("posts/replaced.md", "---\ntitle: Replaced\nstatus: published\n---\n\nFirst")
+    ContentWatcher.send(:handle_changes, [], [ file ], [])
+    post = Post.find_by(file_path: RoeSitePaths.normalize(file))
+    File.write(file, "---\ntitle: Replaced\nstatus: published\n---\n\nSecond")
 
-    # Verify detect_renames identifies matching files
-    renames = ContentWatcher.send(:detect_renames, added, removed)
+    ContentWatcher.send(:handle_changes, [], [ file ], [ file ])
 
-    # Since names are identical, it should match
-    assert renames.key?("site/posts/old-name.md"), "Expected rename detection to find matching file"
-    assert_equal "site/posts/old-name.md", renames["site/posts/old-name.md"]
+    assert_equal post.id, Post.find_by(file_path: RoeSitePaths.normalize(file))&.id
+    assert_includes post.reload.content, "Second"
   end
 
   test "handle_changes filters files by extension" do
@@ -443,5 +426,26 @@ class ContentWatcherTest < ActiveSupport::TestCase
   ensure
     FileUtils.rm_f(old_file)
     FileUtils.rm_f(new_file)
+  end
+
+  # The listen gem's debug lines ("(silenced): <path>" for every ignored
+  # image variant) flooded the log; its warnings and errors still belong there.
+  test "the watcher passes on listen's warnings and errors, not its debug lines" do
+    log = StringIO.new
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log)
+    listen = ContentWatcher::ListenLog.new
+
+    listen.debug { "(silenced): \"images/variants/a-small.webp\"" }
+    listen.info "Listen loglevel set to: 0"
+    listen.warn "adapter fell back to polling"
+    listen.error { "callback failed" }
+
+    assert_not_includes log.string, "silenced"
+    assert_not_includes log.string, "loglevel"
+    assert_includes log.string, "[listen] adapter fell back to polling"
+    assert_includes log.string, "[listen] callback failed"
+  ensure
+    Rails.logger = original
   end
 end

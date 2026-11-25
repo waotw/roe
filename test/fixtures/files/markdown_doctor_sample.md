@@ -120,6 +120,23 @@ but this one isn't indented, so it leaves the note.
 A highlight has to open and close on the same line. This one ==starts here
 and ends on the next line==, so both sets of `==` show on the page.
 
+## 10. Links to files — NEEDS ATTENTION
+
+[[posts/no-such-post]] names no file, [[posts/sample-draft]] is a draft, and
+[the shared one](/sample-shared.md) could be a post or a page. On the page all
+three show as plain text.
+
+A card's name can be just as unclear: `about` is a page and a post.
+
+```card
+type: post-link
+post: about
+```
+
+An image that isn't in the media library shows as a broken image:
+
+![gone](/media/images/no-such-image.jpg)
+
 ## 11. Single backtick alone on a line
 
 A lone backtick isn't a fence — three or more are needed.

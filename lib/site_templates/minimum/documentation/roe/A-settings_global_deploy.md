@@ -1,5 +1,5 @@
 ---
-title: "Settings → Deployment"
+title: "Settings: Deployment"
 status: published
 url_name: settings-deployment
 tags: settings

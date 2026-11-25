@@ -35,6 +35,8 @@ module RenameRedirect
   # (back to the title) counts.
   def add_rename_redirect(model, old_address, metadata, file_path)
     return if params[:create_redirect_from].blank? || old_address.blank?
+    # The home page stays at "/" whatever it's renamed to.
+    return if old_address == "/"
     return unless metadata["status"].to_s.strip == "published"
 
     new_slug = metadata["url_name"].to_s.strip.presence ||
@@ -50,5 +52,25 @@ module RenameRedirect
     # — or follow one, like "Page published".
     added = "Redirect added: #{result.from} → #{result.to}."
     flash[:notice] = flash[:notice].present? ? "#{flash[:notice]}. #{added}" : added
+  end
+
+  # Where the site's own links point, before a save or rename moves the item:
+  # its file name and its address. Pass the result to update_internal_links.
+  def internal_link_source(record)
+    InternalLinkRewriter.source_for(record)
+  end
+
+  # Points other content's links at the item's new file name and address
+  # (InternalLinkRewriter), whether or not a redirect was asked for: the
+  # redirect is for visitors from outside, these are the site's own links.
+  # The item's own file is left alone on a save — the editor holds its text.
+  def update_internal_links(source, record, own_file: nil)
+    count = InternalLinkRewriter.follow(source, record.reload, except: own_file)
+    return if count.zero?
+
+    updated = "Updated #{count} #{'link'.pluralize(count)} to it."
+    flash[:notice] = flash[:notice].present? ? "#{flash[:notice]}. #{updated}" : updated
+  rescue StandardError => e
+    Rails.logger.error("[internal links] #{e.class}: #{e.message}")
   end
 end

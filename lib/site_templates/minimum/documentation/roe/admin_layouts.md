@@ -169,13 +169,7 @@ Music and podcast layouts have extra boxes, in their own section of BOXES: RELEA
 
 They work on music tracks, podcast episodes, and pages with `release:` or `podcast:`.
 
-`[player]` plays and `[playlist]` lists, the same as a player card and a `playlist` collection in the writing. A playlist plays in the nearest player above it, so put `[player]` on the line above `[playlist]` and they join into one box. The list is folded on a post and open on a page. A `[playlist]` with no `[player]` links each track to its post instead, and the editor warns about it.
-
-These boxes use the same CSS classes as the box they're like, plus their own. `[artist]` and `[creator]` are styled like `[author]` (`post-author post-artist`), `[release date]` like `[date]`, `[cover]` and `[artwork]` like `[image]`. Target `.post-artist` to style the artist differently.
-
-A box that isn't one of Roe's shows that field from the frontmatter, as a paragraph with the classes `post-field post-field-<name>` (`page-field-…` on a page). `[location]` shows `location:` as `<p class="post-field post-field-location">`. The release and podcast details without a box of their own (`[genre]`, `[label]`, `[copyright]`, `[category]`, `[podcast link]`) are fields too.
-
-Each page's `<article>` also has the class `page-<name>`, from the page's name: `page-about`, `page-store`. A page named like one of the boxes, such as `image`, `tags` or `content`, doesn't get one, because the page would then be styled like that box. The page editor tells you when this happens.
+`[player]` adds a player and `[playlist]` adds a list of tracks or episodes, the same as a player card and a `playlist` collection in the `[body]`. A playlist connects to the closest player above it, so put `[player]` on the line above `[playlist]` and they join into one box. The list is folded on a post and open on a page. A `[playlist]` with no `[player]` links each track to the post instead, and the editor will let you know.
 
 ### Create a content layout
 

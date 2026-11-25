@@ -131,7 +131,7 @@ module ContentMetadataSchema
     {
       # Core fields
       "title" => { type: :text, label: "title", required: true },
-      "subtitle" => { type: :text, label: "subtitle" },
+      "subtitle" => { type: :text, label: "subtitle", multiline: true },
       "date" => { type: :datetime, label: "date", required: true },
       "post_type" => { type: :select, label: "post_type", options: Post.post_type_options },
       "status" => { type: :select, label: "status", options: [ "draft", "published", "unlisted" ], required: true },
@@ -247,6 +247,7 @@ module ContentMetadataSchema
     {
       # Core product fields
       "title" => { type: :text, label: "title", required: true },
+      "subtitle" => { type: :text, label: "subtitle", multiline: true },
       "category" => {
         type: :text,
         label: "category",
@@ -305,12 +306,12 @@ module ContentMetadataSchema
 
   # Purposes Roe knows how to look for. A page naming one of these can be
   # moved, renamed and re-titled and still be found.
-  PAGE_TYPES = %w[signin signup upgrade account donate unsubscribe store].freeze
+  PAGE_TYPES = (%w[signin signup upgrade account donate unsubscribe store] + SystemPages::TYPES.keys).uniq.freeze
 
   def self.pages_fields(metadata = {})
     {
       "title" => { type: :text, label: "title", required: true },
-      "subtitle" => { type: :text, label: "subtitle" },
+      "subtitle" => { type: :text, label: "subtitle", multiline: true },
       "status" => { type: :select, label: "status", options: [ "draft", "published", "unlisted" ], required: true },
       "tags" => { type: :text, label: "tags", hint: "arts, culture, …" },
       "collection" => { type: :text, label: "collection", hint: "Collection name(s), comma-separated (e.g. nav, footer)" },

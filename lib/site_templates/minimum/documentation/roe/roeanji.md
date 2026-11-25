@@ -28,6 +28,11 @@ Simple Markdown extensions that are easy to learn and use. They all use the same
 
 This page is a quick tour — one example apiece. Each extension has its own reference doc with the full list of options.
 
+==Note:== When a card, collection, form, etc. is broken, there will be a warning. These do not show up for visitors to the live site. They only show up:
+
+- on the local site
+- on the live site if you're signed in as an admin
+
 ## Cards
 
 Styled blocks — pullquotes, asides, and post/product links — embedded in your Markdown.

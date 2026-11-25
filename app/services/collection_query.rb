@@ -111,22 +111,26 @@ class CollectionQuery
     (item.respond_to?(:url_name) ? item.url_name : nil).to_s
   end
 
-  # Order by an explicit, comma-separated list of url_names. Listed items come
-  # first, in list order; the rest fall to the end alphabetically by title, so
-  # nothing is dropped. A blank list falls back to date-descending.
+  # Order by an explicit, comma-separated list of names: url_names or file
+  # names, with or without a folder (ItemName). Listed items come first, in
+  # list order; the rest fall to the end alphabetically by title, so nothing
+  # is dropped. A blank list falls back to date-descending.
   def self.explicit_order(items, order_list)
-    wanted = order_list.to_s.split(",").map { |s| s.strip.downcase }.reject(&:empty?)
+    wanted = order_list.to_s.split(",").map(&:strip).reject(&:empty?)
 
     if wanted.empty?
       return items.to_a.sort_by { |i| date_key(i, descending: true) }
     end
 
+    all = items.to_a
     position = {}
-    wanted.each_with_index { |name, i| position[name] ||= i }
+    wanted.each_with_index do |name, i|
+      item = ItemName.pick(name, all)
+      position[item.object_id] ||= i if item
+    end
 
-    items.to_a.sort_by do |item|
-      slug = item.respond_to?(:url_name) ? item.url_name.to_s.downcase : ""
-      [ position.fetch(slug, Float::INFINITY), item.title.to_s.downcase ]
+    all.sort_by do |item|
+      [ position.fetch(item.object_id, Float::INFINITY), item.title.to_s.downcase ]
     end
   end
 
@@ -195,7 +199,7 @@ class CollectionQuery
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "pages"
-      collection = Page.public_pages
+      collection = show_unlisted ? Page.public_items : Page.public_pages
       collection = apply_tag_filters(collection, tags) if tags
       collection
     when "documentation"
@@ -250,11 +254,9 @@ class CollectionQuery
     end
 
     # Apply negative tags (exclude all of these, but keep untagged posts)
+    # Whole tag, case ignored: -lab drops lab and LAB, not lab-image.
     negative_tags.each do |neg_tag|
-      collection = collection.where(
-        "json_extract(metadata, '$.tags') IS NULL OR json_extract(metadata, '$.tags') NOT LIKE ?",
-        "%#{neg_tag}%"
-      )
+      collection = collection.not_tagged_with(neg_tag)
     end
 
     collection

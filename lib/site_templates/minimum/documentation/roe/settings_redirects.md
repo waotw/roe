@@ -1,5 +1,5 @@
 ---
-title: "Settings → Redirects"
+title: "Settings: Redirects"
 url_name: redirects
 status: published
 tags: settings
@@ -27,7 +27,11 @@ Two examples of why this is useful:
 
 The Redirects page shows your current redirects in a table, with the file itself below it for editing. Roe reads them from one file, `site/system/global/redirects.yml`, which syncs between your local and live sites like the rest of your content.
 
-## Roe can add them for you
+## Renaming internal links
+
+Renaming the files in Roe will automatically fix all internal links so those links aren't broken. Very convenient but it doesn't solve external sites linking to a page that was just renamed. This is where redirects come in handy.
+
+## Roe can add redirects for you
 
 The `url_name` for a post, page or product is set by:
 

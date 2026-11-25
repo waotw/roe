@@ -47,6 +47,7 @@ import {
   isolateHistory,
 } from "@codemirror/commands";
 import { syntaxHighlighting } from "@codemirror/language";
+import { startCompletion } from "@codemirror/autocomplete";
 import {
   search,
   searchKeymap,
@@ -58,6 +59,7 @@ import { livePreview } from "markdown_editor/live_preview";
 import { linkStyles } from "markdown_editor/links";
 import { roeBlocks } from "markdown_editor/roe_blocks";
 import { footnotePaste, footnoteAt, footnoteContinuation } from "markdown_editor/footnotes";
+import { internalLinks, wikilinks } from "markdown_editor/internal_links";
 
 // Marks a change made by assigning .value or calling setRangeText. A real
 // textarea fires no input event for those, so neither do we.
@@ -78,8 +80,8 @@ function modeExtensions(mode, blocksUrl) {
   const attrs = EditorView.editorAttributes.of({
     class: `roe-md-editor roe-md-${mode}`,
   });
-  if (mode === "source") return [attrs, linkStyles];
-  return [attrs, linkStyles, livePreview, roeBlocks({ checkUrl: blocksUrl })];
+  if (mode === "source") return [attrs, linkStyles, wikilinks(mode)];
+  return [attrs, linkStyles, livePreview, wikilinks(mode), roeBlocks({ checkUrl: blocksUrl })];
 }
 
 // ── document.execCommand ──────────────────────────────────────────────────
@@ -179,6 +181,9 @@ export class MarkdownEditor {
       dropCursor(),
       highlightSpecialChars(),
       search({ top: false }),
+      // The list of posts, pages, products and docs to link to (after `](/`,
+      // after `[[`, or on clicking a link to one).
+      internalLinks(),
       highlightSelectionMatches(),
       keymap.of([...searchKeymap, ...historyKeymap, ...defaultKeymap]),
       markdown(),
@@ -278,9 +283,16 @@ export class MarkdownEditor {
       ? toolbar.offsetHeight - (collapsible?.offsetHeight || 0) + (collapsible?.scrollHeight || 0)
       : 0;
     const drawer = document.querySelector('[data-controller~="editor-drawer"]');
+    // The find panel sits on top of the drawer, so the two stack. CodeMirror
+    // allows for the panel by itself, but takes the larger margin rather than
+    // the sum, and it measures where the panel is now — near the top of the
+    // page the drawer is tucked away, and it slides up (lifting the panel)
+    // as soon as the jump scrolls the page, covering the match. Counting the
+    // drawer whether it's up or not, plus the panel, keeps the match clear.
+    const panel = this.view?.dom.querySelector(".cm-panels-bottom");
     return {
       top: Math.min(toolbarHeight, window.innerHeight / 2) + 8,
-      bottom: (drawer?.offsetHeight || 0) + 16,
+      bottom: (drawer?.offsetHeight || 0) + (panel?.offsetHeight || 0) + 16,
     };
   }
 
@@ -332,6 +344,13 @@ export class MarkdownEditor {
       requestAnimationFrame(() => requestAnimationFrame(step));
     };
     step();
+  }
+
+  // The list of the site's posts, pages, products and docs, for the link at
+  // the caret (internal_links.js). Used when the Links page opens a broken
+  // link here, so a replacement is one click away.
+  openLinkList() {
+    setTimeout(() => startCompletion(this.view), 0);
   }
 
   goToLine(lineNumber, { select = false, ...options } = {}) {

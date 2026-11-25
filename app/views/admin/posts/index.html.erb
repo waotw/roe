@@ -1,5 +1,5 @@
 <div class="px-4 sm:px-0 font-mono"
-     data-controller="posts-filter bulk-select"
+     data-controller="posts-filter bulk-select tag-hits"
      data-posts-filter-total-value="<%= @posts.count %>">
 
   <div class="sm:flex sm:items-center">
@@ -70,7 +70,8 @@
       <input
         type="text"
         data-posts-filter-target="search"
-        data-action="input->posts-filter#filterBySearch"
+        data-tag-hits-target="search"
+        data-action="input->posts-filter#filterBySearch input->tag-hits#update"
         placeholder="Search by title, filename, tags..."
         class="block w-full rounded-xs border border-gray-500 focus:bg-blue-50 focus:ring-blue-300 text-xs font-mono px-4 py-2 bg-white"
 >
@@ -94,9 +95,12 @@
     </label>
   </div>
 
+  <%= render "admin/shared/tag_filter", path: request.path %>
+
   <%= render "admin/shared/bulk_toolbar",
              destroy_path: bulk_destroy_admin_posts_path,
-             publish_path: bulk_publish_admin_posts_path, label: "post" %>
+             publish_path: bulk_publish_admin_posts_path,
+             tags_path: bulk_tags_admin_posts_path, label: "post" %>
 
   <div class="mt-4 flex flex-col">
     <div class="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -143,6 +147,7 @@
                            data-bulk-select-target="checkbox"
                            data-action="change->bulk-select#update"
                            data-id="<%= post.id %>"
+                           data-tags="<%= TagList.clean(post.tags).to_json %>"
                            data-status="<%= post.status %>"
                            data-warnings="<%= post.publish_warnings? %>"
                            data-newsletter="<%= %w[newsletter both].include?(post.metadata['published_to'].to_s) %>"
@@ -171,6 +176,17 @@
                         </span>
                       <% end %>
                     </div>
+                    <%# Tags the search matched, each a link to the list filtered by it. %>
+                    <% if (post_tags = TagList.clean(post.tags)).any? %>
+                      <div class="hidden flex-wrap gap-1 mt-1" data-tag-hits-target="hits">
+                        <% post_tags.each do |tag| %>
+                          <%= link_to tag, "#{request.path}?#{{ tag: tag }.to_query}",
+                                class: "hidden px-1.5 py-0.5 text-[11px] font-mono font-normal bg-amber-100 border border-amber-300 text-amber-900 hover:bg-amber-200 rounded-xs",
+                                title: "Show only posts tagged #{tag}",
+                                data: { tag: tag.downcase } %>
+                        <% end %>
+                      </div>
+                    <% end %>
                   </td>
                   <td class="max-w-0 px-1.5 py-2 text-sm text-gray-500">
                     <%= render 'shared/inline_rename', resource: post, resource_type: 'post',

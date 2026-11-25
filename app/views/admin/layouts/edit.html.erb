@@ -20,7 +20,7 @@
     converting either way or updating in kind. Its own Stimulus controller;
     the inline script below (save, preview, cursor restore) is unchanged. %>
 <% links_for_picker = useful_links %>
-<% page_options = Page.published.map { |pg| [ pg.title.to_s.presence || pg.url_name, pg.url_name.to_s, "/#{pg.url_name}" ] }.sort_by { |l, _, _| l.downcase } %>
+<% page_options = Page.published.map { |pg| [ pg.title.to_s.presence || pg.url_name, pg.url_name.to_s, pg.public_url ] }.sort_by { |l, _, _| l.downcase } %>
 <div class="mb-5 flex gap-2.5 items-center"
      data-controller="site-links"
      data-site-links-convert-url-value="<%= admin_layouts_menu_builder_path %>"
@@ -206,6 +206,28 @@
       textarea.focus();
       textarea.setSelectionRange(parseInt(savedPosition), parseInt(savedPosition));
       sessionStorage.removeItem('cursorPosition');
+    }
+
+    // Arriving from the Links page (?highlight=…&line=N): select that
+    // reference, starting the search at its line.
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get('highlight');
+    if (wanted) {
+      const textarea = document.querySelector('[name="content"]');
+      const text = textarea.value;
+      let from = 0;
+      for (let n = 1; n < (parseInt(params.get('line'), 10) || 0) && from !== -1; n++) {
+        const next = text.indexOf('\n', from);
+        from = next === -1 ? -1 : next + 1;
+      }
+      let at = from === -1 ? -1 : text.indexOf(wanted, from);
+      if (at === -1) at = text.indexOf(wanted);
+      if (at !== -1) {
+        textarea.focus();
+        textarea.setSelectionRange(at, at + wanted.length);
+        textarea.blur(); // focusing again scrolls the selection into view
+        textarea.focus();
+      }
     }
 
     // Hide flash notice on any input

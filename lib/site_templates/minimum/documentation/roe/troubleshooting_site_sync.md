@@ -4,7 +4,7 @@ status: published
 url_name: ts-site-sync
 tags: troubleshoot
 related:
-  - troubleshoot-deploy
+  - troubleshoot-deployment
   - site-sync
 ---
 

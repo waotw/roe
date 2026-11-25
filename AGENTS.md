@@ -16,7 +16,7 @@ Write the migration, draft the commit message — then hand it over.
 3. **Don't run git commands that change state** unless asked for that specific
    action. Read-only git (`status`, `diff`, `log`, `show`) is always fine. When
    asked to commit, output the message text and let a person run it.
-4. **Be conservative with the admin editor JavaScript.** Don't modify existing
+4. **Be conservative with the admin editor JavaScript.** Be careful with existing
    Stimulus controllers on the editor pages; prefer a new isolated controller.
    Those pages carry many interlocking behaviours and small changes cascade.
 5. **No `#` comments in YAML config files** — put help text in the admin config
@@ -40,7 +40,7 @@ Reasoning, architecture decisions, known traps, and parked designs are in
 
 ## Overview
 
-Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store. Content (posts, pages, documentation, products) is authored as Markdown files in `site/` and synced to SQLite via `ContentSync`. The app can also generate a fully static version of the public site. Ruby 4.0.5.
+Roe is a Rails 8.1 file-backed CMS/blog with first-class support for podcasts, paid memberships, newsletters, and a built-in store. Content (posts, pages, documentation, products) is authored as Markdown files in `site/` and synced to SQLite via `ContentSync`. The app can also generate a fully static version of the public site. Ruby 4.0.10.
 
 **Architecture**: Roe uses a **versioned directory structure** that supports seamless updates without touching user content. The Rails application lives in `current/`, while user content remains in `site/` at the root level.
 

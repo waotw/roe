@@ -50,9 +50,12 @@ module ContentLayoutHelper
   end
 
   # Partials are rendered by name only from the fixed list, so a layout file
-  # can't reach any other template.
+  # can't reach any other template. A product's [description] is its own
+  # `description:`, not a podcast's, so it has its own partial.
   def render_layout_part(name, record, kind, context)
-    if ContentLayout::SERIES_PARTS.include?(name)
+    if name == "description" && kind == "product"
+      render(partial: "content_layouts/parts/product_description", locals: { record: record, kind: kind, context: context })
+    elsif ContentLayout::SERIES_PARTS.include?(name)
       render(partial: "content_layouts/parts/series", locals: { name: name, record: record, kind: kind, context: context })
     elsif ContentLayout::BUILT_PARTS.include?(name)
       render(partial: "content_layouts/parts/#{name}", locals: { record: record, kind: kind, context: context })
@@ -125,12 +128,12 @@ module ContentLayoutHelper
     content_tag(:div, safe_join(parts, "\n"), class: row.classes.join(" ").presence || "layout-row")
   end
 
-  # A part named after a metadata field the record has: its value, plainly.
+  # A part named after a metadata field the record has: its value, with inline
+  # Markdown (FieldText).
   def render_layout_field(name, record, kind)
     value = record.respond_to?(:metadata) ? record.metadata[name] : nil
-    value = value.join(", ") if value.is_a?(Array)
     return nil if value.blank? || value.is_a?(Hash)
 
-    content_tag(:p, value.to_s, class: "#{kind}-field #{kind}-field-#{name.dasherize}")
+    content_tag(:p, FieldText.html(value), class: "#{kind}-field #{kind}-field-#{name.dasherize}")
   end
 end

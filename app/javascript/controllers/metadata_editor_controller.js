@@ -14,6 +14,7 @@ export default class extends Controller {
     productCategories: Array,
     productGroups: Array,
     mediaPaths: Object,
+    tagOptions: Array,
   };
 
   static targets = [
@@ -432,7 +433,8 @@ export default class extends Controller {
              value=""
              placeholder="value"
              class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-             data-custom-value>
+             data-custom-value
+             data-multiline>
       ${this.removeButtonHtml()}
     `;
 
@@ -578,6 +580,46 @@ export default class extends Controller {
     return fieldConfig?.required === true;
   }
 
+  escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // A field that can hold lines (multiline_field_controller): a textarea
+  // when the value has a line break, a text input when it doesn't.
+  multilineFieldHtml(value, attributes) {
+    const text = String(value ?? "");
+    if (text.includes("\n")) {
+      const rows = Math.max(2, text.split("\n").length);
+      return `<textarea ${attributes} rows="${rows}" data-multiline>${this.escapeHtml(text)}</textarea>`;
+    }
+    return `<input type="text" value="${this.escapeHtml(text)}" ${attributes} data-multiline>`;
+  }
+
+  // Same markup as shared/_tag_field.html.erb; tag_field_controller.js
+  // draws the boxes from the hidden input's value.
+  tagFieldHtml(escapedValue) {
+    const options = JSON.stringify(
+      this.hasTagOptionsValue ? this.tagOptionsValue : [],
+    ).replace(/"/g, "&quot;");
+    return `<div class="flex-1 relative" data-controller="tag-field" data-tag-field-options-value="${options}">
+              <input type="hidden" id="metadata-field-tags" name="metadata_fields[tags]"
+                     value="${escapedValue}" data-metadata-field="tags" data-tag-field-target="value">
+              <div class="flex flex-wrap items-center gap-1 w-full min-h-[1.625rem] px-1 py-0.5 border border-gray-300 bg-white cursor-text"
+                   data-action="click->tag-field#focus">
+                <span class="contents" data-tag-field-target="chips"></span>
+                <input type="text" data-tag-field-target="entry" placeholder="Add a tag…" autocomplete="off"
+                       class="flex-1 min-w-[6rem] border-0 px-1 py-0.5 font-mono text-xs bg-transparent focus:ring-0 focus:outline-none"
+                       data-action="input->tag-field#typed focus->tag-field#suggest keydown->tag-field#keydown blur->tag-field#commit">
+              </div>
+              <div data-tag-field-target="dropdown"
+                   class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-gray-800 shadow-lg z-50 max-h-48 overflow-y-auto"></div>
+            </div>`;
+  }
+
   buildInputHtml(fieldName, config, value) {
     const escapedValue = String(value)
       .replace(/&/g, "&amp;")
@@ -591,6 +633,8 @@ export default class extends Controller {
           ? " bg-gray-100 text-gray-600"
           : "";
         const readonlyAttr = config.readonly ? " readonly" : "";
+
+        if (fieldName === "tags") return this.tagFieldHtml(escapedValue);
 
         // Special handling for category/group fields with autocomplete. Both
         // reuse the shared autocomplete controller; only the option list differs
@@ -666,22 +710,37 @@ export default class extends Controller {
                        data-controller="${acControllers}"
                        data-media-field-kind-value="${kind}"
                        ${acOptionsAttr}>
+                    <div class="flex gap-1">
                     <input type="text"
                            id="metadata-field-${fieldName}"
                            name="metadata_fields[${fieldName}]"
                            value="${escapedValue}"
                            autocomplete="off"
-                           class="w-full font-mono text-xs px-2 py-1 border border-gray-300"
+                           class="w-full min-w-0 font-mono text-xs px-2 py-1 border border-gray-300"
                            data-metadata-field="${fieldName}"
                            data-media-field-target="input"
                            ${acTargetAttr}
                            data-action="input->media-field#checkDebounced ${acActionFragment} blur->media-field#check change->media-field#check"
                            ${config.hint ? `placeholder="${config.hint}"` : ""}>
+                    ${
+                      kind === "file"
+                        ? ""
+                        : `<button type="button" data-action="click->media-field#choose" data-test="metadata-choose-media"
+                                   class="shrink-0 uppercase text-xs px-2 border border-blue-800 bg-blue-200 hover:bg-blue-300 font-mono rounded-xs">Choose…</button>`
+                    }
+                    </div>
                     ${dropdown}
                     <p class="text-xs text-red-600 hidden" data-media-field-target="warning">
                       ⚠ File not found under <code>site/media/</code>.
                     </p>
                   </div>`;
+        }
+
+        if (config.multiline) {
+          return this.multilineFieldHtml(
+            value,
+            `id="metadata-field-${fieldName}" name="metadata_fields[${fieldName}]" autocomplete="off" class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300" data-metadata-field="${fieldName}" ${config.hint ? `placeholder="${config.hint}"` : ""}`,
+          );
         }
 
         return `<input type="text"
@@ -834,7 +893,20 @@ export default class extends Controller {
       return `"${minutePrecision}Z"`;
     }
 
-    return `"${strValue.replace(/"/g, '\\"')}"`;
+    // A value with lines is a `|-` block, as HasMetadata writes it — inside
+    // double quotes YAML would fold each line break into a space. `|2-` when
+    // the first line starts with a space, which YAML would otherwise read as
+    // the indentation.
+    if (strValue.includes("\n")) {
+      const lines = strValue.replace(/\r\n?/g, "\n").split("\n");
+      const indicator = /^\s/.test(lines[0]) ? "|2-" : "|-";
+      return (
+        indicator +
+        lines.map((line) => (line === "" ? "" : `\n  ${line}`) || "\n").join("")
+      );
+    }
+
+    return `"${strValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
 
   formToYaml() {
@@ -917,20 +989,44 @@ export default class extends Controller {
     const lines = yamlText.split("\n");
     const fields = {};
 
-    lines.forEach((line) => {
-      if (!line.trim()) return;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      // A line that's indented belongs to the key above it.
+      if (/^\s/.test(line)) continue;
 
       const colonIndex = line.indexOf(":");
-      if (colonIndex === -1) return;
+      if (colonIndex === -1) continue;
 
       let key = line.substring(0, colonIndex).trim();
       let value = line.substring(colonIndex + 1).trim();
+
+      // A block of lines (`key: |` or `key: >`): its indented lines below.
+      const block = value.match(/^([|>])([1-9])?([+-])?([1-9])?\s*$/);
+      if (block) {
+        const body = [];
+        while (i + 1 < lines.length && (/^\s/.test(lines[i + 1]) || lines[i + 1] === "")) {
+          body.push(lines[++i]);
+        }
+        while (body.length && body[body.length - 1].trim() === "") body.pop();
+        const width =
+          Number(block[2] || block[4]) ||
+          Math.min(
+            ...body.filter((l) => l.trim()).map((l) => l.match(/^\s*/)[0].length),
+          );
+        const text = body.map((l) => l.slice(width));
+        fields[key] =
+          block[1] === "|"
+            ? text.join("\n")
+            : text.join("\n").replace(/([^\n])\n(?=[^\n])/g, "$1 ");
+        continue;
+      }
 
       // List fields (tags, related) — parse the YAML array back to comma-separated.
       if (key === "tags" || key === "related") {
         if (value === "[]" || value === "") {
           fields[key] = "";
-          return;
+          continue;
         }
 
         // Parse array format: ["tag1", "tag2"]
@@ -941,22 +1037,22 @@ export default class extends Controller {
             .map((tag) => tag.trim().replace(/^["']|["']$/g, ""))
             .filter((tag) => tag !== "");
           fields[key] = tags.join(", ");
-          return;
+          continue;
         }
       }
 
       // Standard parsing for other fields
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
+      if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
+        // Double quotes: \" \\ and \n are escapes.
+        value = value
+          .slice(1, -1)
+          .replace(/\\(["\\n])/g, (_, c) => (c === "n" ? "\n" : c));
+      } else if (value.startsWith("'") && value.endsWith("'") && value.length > 1) {
+        value = value.slice(1, -1).replace(/''/g, "'");
       }
 
-      value = value.replace(/\\"/g, '"').replace(/\\'/g, "'");
-
       fields[key] = value;
-    });
+    }
 
     // Clear and rebuild form
     const container = this.fieldsContainerTarget;
@@ -1069,15 +1165,14 @@ export default class extends Controller {
 
     row.innerHTML = `
       <input type="text"
-             value="${key}"
+             value="${this.escapeHtml(key)}"
              placeholder="field_name"
              class="font-mono text-xs px-2 py-1 border border-gray-300 metadata-label"
              data-custom-key>
-      <input type="text"
-             value="${value}"
-             placeholder="value"
-             class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300"
-             data-custom-value>
+      ${this.multilineFieldHtml(
+        value,
+        'placeholder="value" class="flex-1 font-mono text-xs px-2 py-1 border border-gray-300" data-custom-value',
+      )}
       ${this.removeButtonHtml()}
     `;
 

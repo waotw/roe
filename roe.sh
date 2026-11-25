@@ -793,7 +793,7 @@ _mise_write_target() {
 # When an install switches to mise, rbenv must stop managing Ruby — if
 # both are active they fight over .ruby-version and rbenv (which won't
 # have the new version) wins, producing:
-#   rbenv: version `4.0.5' is not installed (set by .../.ruby-version)
+#   rbenv: version `4.0.10' is not installed (set by .../.ruby-version)
 # even though mise has it. rbenv hooks in two independent ways, BOTH of
 # which we neutralize:
 #   1. `eval "$(rbenv init ...)"`           — the shell integration
@@ -1006,7 +1006,7 @@ install_mise() {
 # Runs from APP_DIR so rbenv/.ruby-version is honoured.
 check_ruby() {
     local required
-    required=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
+    required=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.10")
     local req_major req_minor req_patch
     IFS='.' read -r req_major req_minor req_patch <<< "$required"
 
@@ -1022,6 +1022,67 @@ check_ruby() {
     [ "$act_minor" -gt "$req_minor" ] && return 0
     [ "$act_minor" -eq "$req_minor" ] && [ "$act_patch" -ge "$req_patch" ] && return 0
     return 1
+}
+
+# A `git pull` can bring a .ruby-version or Gemfile.lock this install hasn't
+# caught up with. The in-app updater installs both before it switches
+# versions (UpdateOrchestrator: checking_ruby, installing_gems), so for an
+# install it updated this passes without a word. It speaks up only for an
+# install updated by hand: it asks to install the Ruby (`mise install`, like
+# the updater: the global Ruby is left alone, `mise env -C` pins it from
+# .ruby-version) and then the gems, and start carries on. Returns 1 when
+# either is still missing; nothing has been stopped or started by then.
+ensure_app_ruby_and_gems() {
+    local required actual
+    required=$(tr -d '[:space:]' < "$APP_DIR/.ruby-version" 2>/dev/null)
+
+    if [ -n "$required" ] && ! check_ruby; then
+        actual=$(cd "$APP_DIR" && ruby --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        # COPY: Ruby out of date after a git pull
+        log_warning "This install needs Ruby ${required}, but found ${actual:-none}."
+        if ! command_exists mise; then
+            echo "  Install Ruby ${required} with your version manager, then run 'bundle install' in ${APP_DIR}."
+            echo -e "  Or run ${CYAN}./roe.sh check${NC}, which can install it with mise."
+            return 1
+        fi
+        if ! _ask_yes "  Install Ruby ${required} now (with mise)? [Y/n]: "; then
+            echo -e "  RUN: ${CYAN}mise install ruby@${required}${NC}, then start again."
+            return 1
+        fi
+        configure_mise_for_ruby
+        if ! mise install "ruby@${required}"; then
+            log_error "Ruby ${required} didn't install — see the output above."
+            return 1
+        fi
+        mise_pin_app_ruby
+        if ! check_ruby; then
+            log_error "Ruby ${required} is installed but isn't being picked up. Open a new terminal and try again."
+            return 1
+        fi
+        log_success "Ruby ${required} installed"
+    fi
+
+    if ! (cd "$APP_DIR" && bundle check >/dev/null 2>&1); then
+        # COPY: gems out of date after a git pull or a new Ruby
+        log_warning "This install's gems aren't all installed (a new Ruby, or the Gemfile changed)."
+        if ! _ask_yes "  Install them now (bundle install)? [Y/n]: "; then
+            echo -e "  RUN: ${CYAN}cd \"${APP_DIR}\" && bundle install${NC}, then start again."
+            return 1
+        fi
+        if ! (cd "$APP_DIR" && bundle install); then
+            log_error "bundle install failed — see the output above."
+            return 1
+        fi
+        log_success "Gems installed"
+    fi
+}
+
+# Yes unless they say no; no when nobody can answer (piped or scripted).
+_ask_yes() {
+    [ -t 0 ] || return 1
+    local reply
+    read -rp "$1" reply
+    case "${reply:-y}" in [NnQq]*) return 1 ;; esac
 }
 
 check_git()     { command_exists git; }
@@ -1102,7 +1163,7 @@ usage() {
 # tooling) is handled in the friendlier setup flow once Ruby is present.
 print_requirements_summary() {
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.10")
 
     log_step "Checking what's already installed"
 
@@ -1487,7 +1548,7 @@ cmd_check() {
 
     local all_good=true
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.10")
 
     print_requirements_summary
 
@@ -1669,7 +1730,7 @@ cmd_setup() {
     log_step "Checking Requirements"
 
     local all_good=true
-    check_ruby    || { log_error "Ruby $(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")+ required"; all_good=false; }
+    check_ruby    || { log_error "Ruby $(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.10")+ required"; all_good=false; }
     check_git     || { log_error "Git required"; all_good=false; }
     check_bundler || { log_error "Bundler required"; all_good=false; }
 
@@ -2579,6 +2640,9 @@ cmd_start() {
 
     log_info "Starting Roe..."
 
+    # After a `git pull`: the Ruby and gems it needs (silent when they're in).
+    ensure_app_ruby_and_gems || return 1
+
     # A registered install has its own hostname and port; an unregistered
     # one behaves exactly as before (localhost, PORT or 3000).
     if ! load_registry_entry; then
@@ -2902,6 +2966,9 @@ cmd_restart() {
         [ -n "$restart_port" ] && export PORT="$restart_port"
     fi
 
+    # Before stopping, so a declined install leaves the running server up.
+    ensure_app_ruby_and_gems || return 1
+
     cmd_stop
     sleep 1
     cmd_start "$@"
@@ -2919,7 +2986,7 @@ cmd_console() {
 
 cmd_status() {
     local required_ruby
-    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.5")
+    required_ruby=$(cat "$APP_DIR/.ruby-version" 2>/dev/null || echo "4.0.10")
 
     echo -e "${BOLD}Roe Status${NC}"
     echo "=============="
@@ -3105,6 +3172,9 @@ case "${1:-}" in
     start)        shift; cmd_start "$@" ;;
     stop)    cmd_stop ;;
     restart) shift; cmd_restart "$@" ;;
+    # For the global `roe restart`, which stops and starts separately: asks
+    # about a missing Ruby or gems before anything is stopped.
+    ruby-ready) ensure_app_ruby_and_gems ;;
     console) cmd_console ;;
     status)  cmd_status ;;
     update)  cmd_update ;;
