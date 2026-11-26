@@ -205,7 +205,12 @@ dies with Roe's job process. When its record is "in progress", has no update
 folder, has been quiet for 20 minutes, the installed version is already its
 `to_version`, and the server started after it went quiet, the Updates page
 marks it finished. That clears records stuck like the one in the 0.5.0
-report. Not yet built: finishing an interrupted hand-off from `roe.sh start`.
+report.
+
+`roe.sh start` deliberately doesn't finish an interrupted hand-off on its
+own. The Updates page shows the exact `--resume` / `--rollback` commands, and
+a person running one leaves a log to diagnose from. Revisit if interrupted
+updates turn out to be common.
 
 ## Rehearsals (all passed before 0.5.1)
 
