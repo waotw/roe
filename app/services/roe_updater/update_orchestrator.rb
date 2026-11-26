@@ -6,6 +6,7 @@ module RoeUpdater
       { name: "validating",         percent: 5,   description: "Validating update prerequisites" },
       { name: "backing_up_db",      percent: 15,  description: "Creating database backup" },
       { name: "downloading",        percent: 30,  description: "Downloading new version" },
+      { name: "handing_off",        percent: 32,  description: "Handing over to the new version" },
       { name: "checking_ruby",      percent: 35,  description: "Checking Ruby compatibility" },
       { name: "testing",            percent: 50,  description: "Testing migrations" },
       { name: "migrating",          percent: 70,  description: "Running database migrations" },
@@ -73,8 +74,13 @@ module RoeUpdater
         # first pass, so it skips straight to the Ruby step and continues.
         unless resume
           execute_step(:validating) { validate_prerequisites }
-          execute_step(:backing_up_db) { BackupManager.backup_databases(@status) }
+          db_backup = nil
+          execute_step(:backing_up_db) { db_backup = BackupManager.backup_databases(@status) }
           execute_step(:downloading) { Downloader.download_version(@version, @status) }
+
+          # A release that ships its own update steps (bin/update) installs
+          # itself from here, outside this process. See Handoff.
+          return hand_off(db_backup) if Handoff.available?
         end
 
         # ensure_ruby_available throws :roe_awaiting_ruby when the release
@@ -103,6 +109,23 @@ module RoeUpdater
       end
 
       private
+
+      # Start the downloaded release's own update script and stop. Nothing
+      # has changed yet but the database backup and staging/, so a failure to
+      # start it only needs staging/ cleared.
+      def hand_off(db_backup)
+        execute_step(:handing_off) do
+          dir = Handoff.start(@status, db_backup: db_backup)
+          log("→ Roe #{@version} is installing itself. Its log: #{dir.sub(RoeSitePaths::ROE_ROOT, '')}/log.txt")
+        end
+      rescue => e
+        Downloader.cleanup_staging
+        @status.update!(
+          status: "rolled_back",
+          error_message: "Couldn't start Roe #{@version}'s installer: #{e.message}",
+          current_step: "Nothing was changed"
+        )
+      end
 
       # HARD SAFETY NET: refuse to run the updater on a developer checkout of
       # Roe — HEAD on a named git branch — because the version swap clones a

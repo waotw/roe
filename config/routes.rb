@@ -50,6 +50,7 @@ Rails.application.routes.draw do
     post "updates/start",             to: "updates#start",          as: "start_update"
     post "updates/confirm_ruby",      to: "updates#confirm_ruby",   as: "confirm_ruby_update"
     post "updates/cancel_ruby",       to: "updates#cancel_ruby",    as: "cancel_ruby_update"
+    post "updates/answer",            to: "updates#answer",         as: "answer_update"
     post "updates/rollback",          to: "updates#rollback",       as: "rollback_update"
     get  "updates/status",            to: "updates#status",         as: "update_status"
     post "updates/deploy",                  to: "updates#start_deploy",          as: "start_deploy"

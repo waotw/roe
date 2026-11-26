@@ -1,0 +1,582 @@
+#!/usr/bin/env bash
+# Roe's update steps for this release.
+#
+# The updater in the version being replaced backs up the databases, downloads
+# this release into staging/, copies this file to the update's own folder
+# (backups/updates/<time>-<id>/update.sh) and runs it there, outside Roe's
+# server. From then on this file does the work, so every release brings its
+# own update steps. See docs/agents/updater-handoff.md.
+#
+# What it may change freely: everything below the contract section.
+# What it must keep: the arguments it accepts, and the files it writes in the
+# update folder (status.json, log.txt, journal, pid), as the contract says.
+# Older Roe versions start it and read those files back.
+#
+# By hand, from any terminal:
+#   bash <root>/backups/updates/<folder>/update.sh --resume     carry on
+#   bash <root>/backups/updates/<folder>/update.sh --rollback   go back
+
+set -u
+
+# ── Contract (protocol 1) ───────────────────────────────────────────────────
+
+SUPPORTED_PROTOCOLS="1"
+EXIT_DONE=0
+EXIT_WAITING=10
+
+PROTOCOL="" ROOT="" UPDATE_ID="" FROM="" TO="" DB_BACKUP=""
+CONFIRMED="" MODE="run"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --protocol)  PROTOCOL="$2"; shift 2 ;;
+        --root)      ROOT="$2"; shift 2 ;;
+        --update-id) UPDATE_ID="$2"; shift 2 ;;
+        --from)      FROM="$2"; shift 2 ;;
+        --to)        TO="$2"; shift 2 ;;
+        --db-backup) DB_BACKUP="$2"; shift 2 ;;
+        --confirmed) CONFIRMED="$2"; shift 2 ;;
+        --cancel)    MODE="cancel"; shift ;;
+        --resume)    MODE="resume"; shift ;;
+        --rollback)  MODE="rollback"; shift ;;
+        *)           echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+DIR="$(cd "$(dirname "$0")" && pwd -P)"
+if [ "$(basename "$DIR")" = "bin" ]; then
+    echo "This is the copy inside a release. Run the one in backups/updates/<folder>/update.sh." >&2
+    exit 2
+fi
+
+# The first run saves its arguments, so a person can --resume or --rollback
+# with no others.
+if [ -n "$ROOT" ]; then
+    {
+        printf 'PROTOCOL=%q\nROOT=%q\nUPDATE_ID=%q\nFROM=%q\nTO=%q\nDB_BACKUP=%q\n' \
+            "$PROTOCOL" "$ROOT" "$UPDATE_ID" "$FROM" "$TO" "$DB_BACKUP"
+    } > "$DIR/args"
+elif [ -f "$DIR/args" ]; then
+    # shellcheck disable=SC1091
+    . "$DIR/args"
+else
+    echo "Missing --root, and no saved arguments in $DIR/args." >&2
+    exit 2
+fi
+
+STATUS="$DIR/status.json"
+LOG="$DIR/log.txt"
+JOURNAL="$DIR/journal"
+STAGING="$ROOT/staging"
+CURRENT="$ROOT/current"
+BACKUP="$ROOT/current.backup"
+
+ST_STATE="running" ST_STEP="" ST_PERCENT=32 ST_MESSAGE="" ST_HELP="" ST_QUESTION="null"
+ST_COMPLETED_AT="" ST_CANCELLED="false" ST_RESTARTED="false"
+
+json_str() {
+    local s="$1"
+    s="${s//\\/\\\\}"; s="${s//\"/\\\"}"; s="${s//$'\n'/\\n}"; s="${s//$'\r'/}"; s="${s//$'\t'/\\t}"
+    printf '"%s"' "$s"
+}
+
+json_or_null() { if [ -n "$1" ]; then json_str "$1"; else printf 'null'; fi; }
+
+now_iso() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# Replace status.json whole, through a temporary file, so a reader never sees
+# half of it.
+write_status() {
+    local tmp="$STATUS.$$.tmp"
+    {
+        printf '{\n'
+        printf '  "protocol": 1,\n'
+        printf '  "state": %s,\n' "$(json_str "$ST_STATE")"
+        printf '  "step": %s,\n' "$(json_str "$ST_STEP")"
+        printf '  "percent": %s,\n' "$ST_PERCENT"
+        printf '  "message": %s,\n' "$(json_or_null "$ST_MESSAGE")"
+        printf '  "help": %s,\n' "$(json_or_null "$ST_HELP")"
+        printf '  "question": %s,\n' "$ST_QUESTION"
+        printf '  "db_backup": %s,\n' "$(json_or_null "$DB_BACKUP")"
+        printf '  "completed_at": %s,\n' "$(json_or_null "$ST_COMPLETED_AT")"
+        printf '  "restarted": %s,\n' "$ST_RESTARTED"
+        printf '  "cancelled": %s,\n' "$ST_CANCELLED"
+        printf '  "updated_at": %s\n' "$(json_str "$(now_iso)")"
+        printf '}\n'
+    } > "$tmp" && mv -f "$tmp" "$STATUS"
+}
+
+# status <state> <step> [percent]
+status() {
+    ST_STATE="$1"; ST_STEP="$2"; [ -n "${3:-}" ] && ST_PERCENT="$3"
+    write_status
+}
+
+log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
+
+journal_has() { [ -f "$JOURNAL" ] && grep -qx "$1" "$JOURNAL"; }
+journal_add() { echo "$1" >> "$JOURNAL"; }
+
+case " $SUPPORTED_PROTOCOLS " in
+    *" ${PROTOCOL:-1} "*) ;;
+    *)
+        ST_MESSAGE="This release's installer doesn't understand protocol ${PROTOCOL}."
+        status failed "Couldn't start the update"
+        exit 2
+        ;;
+esac
+
+# ── Running ─────────────────────────────────────────────────────────────────
+
+# One run at a time. A lock left by a run that has gone is taken over.
+LOCK="$DIR/lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+    other="$(cat "$LOCK/pid" 2>/dev/null)"
+    if [ -n "$other" ] && kill -0 "$other" 2>/dev/null; then
+        echo "This update is already running (process $other)." >&2
+        exit 3
+    fi
+    rm -rf "$LOCK"; mkdir "$LOCK"
+fi
+echo $$ > "$LOCK/pid"
+echo $$ > "$DIR/pid"
+trap 'rm -rf "$LOCK"' EXIT
+
+# Everything goes to log.txt; from a terminal, to the screen as well.
+if [ -t 1 ]; then
+    exec > >(tee -a "$LOG") 2>&1
+else
+    exec >> "$LOG" 2>&1
+fi
+
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+unset BUNDLE_GEMFILE BUNDLE_BIN_PATH RUBYOPT RUBYLIB BUNDLER_SETUP BUNDLER_VERSION
+
+app_dir() { if journal_has switch; then echo "$CURRENT"; else echo "$STAGING"; fi; }
+
+find_mise() {
+    command -v mise 2>/dev/null && return 0
+    local candidate
+    for candidate in "$HOME/.local/bin/mise" /opt/homebrew/bin/mise /usr/local/bin/mise; do
+        [ -x "$candidate" ] && { echo "$candidate"; return 0; }
+    done
+    return 1
+}
+MISE="$(find_mise)" || MISE=""
+RESTART_ATTEMPTED="" RESTART_PORT=""
+
+required_ruby() { tr -d '[:space:]' < "$(app_dir)/.ruby-version" 2>/dev/null; }
+
+# Run a command with the release's Ruby, from the release's folder.
+rb() {
+    local ruby_version; ruby_version="$(required_ruby)"
+    if [ -n "${MISE:-}" ] && [ -n "$ruby_version" ]; then
+        (cd "$(app_dir)" && "$MISE" exec "ruby@$ruby_version" -- "$@")
+    else
+        (cd "$(app_dir)" && "$@")
+    fi
+}
+
+# run_limited <seconds> <label> <progress pattern or ""> <command…>
+# Runs a command with nothing to read from, its output in the log, and a time
+# limit. With a pattern, the step shows how many matching lines it has
+# written, and status.json only changes when that count does, so a stalled
+# command shows as quiet on the Updates page.
+run_limited() {
+    local limit="$1" label="$2" pattern="$3"; shift 3
+    local start waited=0 shown="" count text pid
+    start="$(wc -c < "$LOG" | tr -d ' ')"
+    "$@" < /dev/null >> "$LOG" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 2
+        waited=$((waited + 2))
+        if [ -n "$pattern" ]; then
+            count="$(tail -c +"$((start + 1))" "$LOG" | grep -cE "$pattern")"
+            text="$label ($count so far)"
+            if [ "$text" != "$shown" ]; then status running "$text"; shown="$text"; fi
+        fi
+        if [ "$waited" -ge "$limit" ]; then
+            log "Stopped after $((limit / 60)) minutes with no result."
+            pkill -TERM -P "$pid" 2>/dev/null
+            kill -TERM "$pid" 2>/dev/null
+            sleep 3
+            pkill -KILL -P "$pid" 2>/dev/null
+            kill -KILL "$pid" 2>/dev/null
+            wait "$pid" 2>/dev/null
+            return 124
+        fi
+    done
+    wait "$pid"
+}
+
+FAIL_MESSAGE="" FAIL_HELP=""
+fail() { FAIL_MESSAGE="$1"; FAIL_HELP="${2:-}"; return 1; }
+
+# ── Steps ───────────────────────────────────────────────────────────────────
+
+step_ruby() {
+    local version; version="$(required_ruby)"
+    [ -z "$version" ] && return 0
+
+    if [ -n "$MISE" ] && "$MISE" where "ruby@$version" >/dev/null 2>&1; then
+        log "Ruby $version is installed."
+        return 0
+    fi
+    if [ -z "$MISE" ] && command -v ruby >/dev/null 2>&1 &&
+       [ "$(ruby -e 'print RUBY_VERSION' 2>/dev/null)" = "$version" ]; then
+        log "Ruby $version is installed."
+        return 0
+    fi
+
+    if [ "$CONFIRMED" != "install-ruby-$version" ]; then
+        # COPY: the question before installing a new Ruby
+        ST_QUESTION="{\"key\": $(json_str "install-ruby-$version"), \
+\"title\": $(json_str "Ruby $version required"), \
+\"text\": $(json_str "This update needs Ruby $version, which isn't installed on this computer. Roe can install it for you with [mise](/documentation/roe/glossary#mise). It usually takes under a minute.
+
+Nothing on your site has changed yet."), \
+\"confirm\": \"INSTALL & CONTINUE\", \"cancel\": \"CANCEL\"}"
+        log "This release needs Ruby $version, which isn't installed. Waiting for the go-ahead."
+        status waiting "Ruby $version required to continue" 35
+        exit "$EXIT_WAITING"
+    fi
+    ST_QUESTION="null"
+
+    if [ -z "$MISE" ]; then
+        status running "Installing mise" 36
+        log "mise isn't installed. Installing it (https://mise.run)."
+        run_limited 300 "Installing mise" "" sh -c 'curl -fsSL https://mise.run | sh' ||
+            fail "mise couldn't be installed." "Check the internet connection, then run the update again." || return 1
+        MISE="$(find_mise)" || { fail "mise was installed but can't be found."; return 1; }
+    fi
+    "$MISE" settings set idiomatic_version_file_enable_tools ruby >/dev/null 2>&1
+    "$MISE" settings set ruby.compile false >/dev/null 2>&1
+
+    status running "Installing Ruby $version" 38
+    log "Installing Ruby $version with mise."
+    run_limited 1200 "Installing Ruby $version" "" "$MISE" install "ruby@$version" ||
+        { fail "Ruby $version couldn't be installed." \
+               "Check the internet connection, then run the update again. The log above shows what mise reported."; return 1; }
+    log "Ruby $version installed."
+}
+
+step_gems() {
+    local attempt
+    for attempt in 1 2 3; do
+        status running "Installing gems" 42
+        log "Installing gems (try $attempt of 3)."
+        if run_limited 900 "Installing gems" '^(Fetching|Installing) ' rb bundle install; then
+            log "Gems installed."
+            return 0
+        fi
+        log "bundle install didn't finish."
+        sleep 5
+    done
+    fail "The gems couldn't be installed after three tries." \
+         "This is usually the internet connection, or a firewall holding a connection for \`ruby\`. Check them, then run the update again."
+}
+
+# The migrations this release ships that the database hasn't run, one per line.
+unapplied_migrations() {
+    local db="$ROOT/site/db/development/development.sqlite3" applied
+    [ -f "$db" ] || return 0
+    applied="$(sqlite3 "$db" "SELECT version FROM schema_migrations" 2>/dev/null)"
+    local file version
+    for file in "$STAGING"/db/migrate/*.rb; do
+        [ -e "$file" ] || continue
+        version="$(basename "$file" | sed -n 's/^\([0-9]*\)_.*/\1/p')"
+        [ -n "$version" ] && ! printf '%s\n' "$applied" | grep -qx "$version" && echo "$version"
+    done
+}
+
+step_test_migrations() {
+    local pending; pending="$(unapplied_migrations | grep -c .)"
+    if [ "$pending" -eq 0 ]; then
+        log "No new migrations in this version."
+        return 0
+    fi
+    status running "Testing $pending new migration(s) on a copy" 60
+    local copy="$STAGING/test_site"
+    rm -rf "$copy"
+    rsync -a --delete --exclude='media/images/variants/' "$ROOT/site/" "$copy/" ||
+        { fail "Couldn't copy the site to test the migrations."; return 1; }
+    if ! run_limited 600 "Testing migrations" "" rb env RAILS_ENV=development ROE_SITE_PATH="$copy" bin/rails db:migrate; then
+        rm -rf "$copy"
+        fail "A new migration failed on a copy of the site, so nothing was changed." \
+             "The log shows the error. Please report it, with the log."
+        return 1
+    fi
+    rm -rf "$copy"
+    log "Migration test passed."
+}
+
+step_migrate() {
+    status running "Running database migrations" 70
+    run_limited 600 "Running database migrations" "" \
+        rb env RAILS_ENV=development ROE_SITE_PATH="$ROOT/site" bin/rails db:migrate ||
+        { fail "The database migrations failed."; return 1; }
+    log "Database migrations finished."
+}
+
+step_switch() {
+    status running "Switching to the new version" 80
+    [ -d "$STAGING" ] || { fail "The downloaded version is missing (staging/)."; return 1; }
+    rm -rf "$BACKUP"
+    mv "$CURRENT" "$BACKUP" || { fail "Couldn't move the current version aside."; return 1; }
+    if ! mv "$STAGING" "$CURRENT"; then
+        mv "$BACKUP" "$CURRENT"
+        fail "Couldn't move the new version into place."
+        return 1
+    fi
+    log "Switched to $TO."
+}
+
+step_secrets() {
+    local relpath
+    for relpath in tmp/local_secret.txt; do
+        if [ -f "$BACKUP/$relpath" ]; then
+            mkdir -p "$(dirname "$CURRENT/$relpath")"
+            cp "$BACKUP/$relpath" "$CURRENT/$relpath" && log "Kept $relpath."
+        fi
+    done
+}
+
+step_root_files() {
+    local name
+    for name in roe.sh README.md LICENSE; do
+        [ -f "$CURRENT/$name" ] && cp "$CURRENT/$name" "$ROOT/$name" && log "Copied $name to the Roe folder."
+    done
+    chmod +x "$ROOT/roe.sh" 2>/dev/null
+    return 0
+}
+
+step_docs() {
+    local source="$CURRENT/lib/site_templates/minimum/documentation/roe"
+    local dest="$ROOT/site/documentation/roe"
+    [ -d "$source" ] || { log "No bundled docs in this version."; return 0; }
+    mkdir -p "$dest"
+    local output updated deleted
+    output="$(rsync -aci --delete "$source/" "$dest/" 2>&1)" ||
+        { fail "Couldn't update Roe's docs: $output"; return 1; }
+    updated="$(printf '%s\n' "$output" | grep -cE '^[<>c]f')"
+    deleted="$(printf '%s\n' "$output" | grep -c '^\*deleting')"
+    log "Roe's docs: $updated updated, $deleted removed."
+}
+
+step_version() {
+    rb ruby -ryaml -rdate -e '
+      version, root, current = ARGV
+      [File.join(root, "VERSION"), File.join(current, "VERSION")].each do |path|
+        data = (File.exist?(path) && YAML.safe_load(File.read(path), permitted_classes: [Date])) || {}
+        data = {} unless data.is_a?(Hash)
+        File.write(path, data.merge("version" => version, "release_date" => Date.today.iso8601).to_yaml)
+      end' "$TO" "$ROOT" "$CURRENT" ||
+        { fail "Couldn't write the VERSION files."; return 1; }
+    log "VERSION files say $TO."
+}
+
+step_assets() {
+    status running "Building assets" 88
+    run_limited 600 "Building assets" "" rb env RAILS_ENV=development bin/rails assets:precompile ||
+        { fail "The assets couldn't be built."; return 1; }
+    log "Assets built."
+}
+
+# This install's Roe servers: Puma processes whose title names current/.
+server_pids() {
+    ps -axo pid=,command= 2>/dev/null |
+        awk -v dir="[$CURRENT]" 'index($0, "puma") && index($0, dir) { print $1 }'
+}
+
+server_port() {
+    ps -o command= -p "$1" 2>/dev/null | sed -n 's/.*tcp:\/\/[^:]*:\([0-9][0-9]*\).*/\1/p' | head -1
+}
+
+# Is anything answering on the port? 5xx means Roe started but is broken.
+roe_answers() {
+    local code
+    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://localhost:$1/up" 2>/dev/null)"
+    [ "${code:-000}" -ge 200 ] 2>/dev/null && [ "$code" -lt 500 ]
+}
+
+wait_for_roe() {
+    local port="$1" i
+    for i in $(seq 1 60); do
+        roe_answers "$port" && return 0
+        sleep 2
+    done
+    return 1
+}
+
+# Stop Roe and start it again in the background. A Roe started in a terminal
+# window ends there and carries on in the background.
+restart_roe() {
+    local pids pid port="" parent foreground=""
+    pids="$(server_pids)"
+    for pid in $pids; do
+        [ -z "$port" ] && port="$(server_port "$pid")"
+        parent="$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')"
+        case "$(ps -o command= -p "$parent" 2>/dev/null)" in *roe.sh*) foreground="$parent" ;; esac
+    done
+    port="${port:-3000}"
+
+    (cd "$ROOT" && PORT="$port" bash ./roe.sh stop) || true
+    # A terminal's roe.sh tidies up after its server ends; let it finish
+    # before starting, so it doesn't stop the new server's helpers.
+    local i
+    for i in $(seq 1 20); do
+        [ -z "$foreground" ] && break
+        kill -0 "$foreground" 2>/dev/null || break
+        sleep 1
+    done
+    RESTART_PORT="$port"
+    # roe.sh start waits up to 30 seconds for the port and says if Roe died
+    # starting. Only a server that is up but not answering yet is waited on.
+    (cd "$ROOT" && PORT="$port" bash ./roe.sh start --daemon --no-browser) || return 1
+    wait_for_roe "$port"
+}
+
+# The error a Roe that wouldn't start printed last, from this start's part of
+# its background log.
+start_error() {
+    local log_file="$CURRENT/log/roe-daemon.log"
+    [ -f "$log_file" ] || return 0
+    awk '/^==> Roe starting /{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' "$log_file" |
+        grep -E '\([A-Z][A-Za-z:]*(Error|Exception)\)|Error:|error:' | head -1 | sed 's/^[[:space:]]*//' | cut -c1-300
+}
+
+step_restart() {
+    if [ -z "$(server_pids)" ]; then
+        log "Roe isn't running, so it wasn't restarted."
+        ST_COMPLETED_AT="$(now_iso)"
+        # COPY: an update finished while Roe wasn't running
+        ST_HELP="Start Roe to use version $TO."
+        return 0
+    fi
+    status running "Restarting Roe" 95
+    log "Restarting Roe."
+    ST_COMPLETED_AT="$(now_iso)"
+    ST_RESTARTED="true"
+    write_status
+    # Give the Updates page's last check time to get its answer.
+    sleep 3
+    RESTART_ATTEMPTED=1
+    if restart_roe; then
+        log "Roe is running $TO."
+        return 0
+    fi
+    ST_RESTARTED="false"
+    local why; why="$(start_error)"
+    # COPY: the new version wouldn't start, so the update was undone
+    fail "Roe $TO didn't start${why:+: $why}" \
+         "The update was undone, and Roe was started again on $FROM. The full log is \`$LOG\`."
+}
+
+# ── Rolling back ────────────────────────────────────────────────────────────
+
+restore_databases() {
+    [ -n "$DB_BACKUP" ] || { log "No database backup recorded."; return 1; }
+    local env_dir backup original ok=0
+    for env_dir in "$ROOT"/site/db/*/; do
+        [ -d "$env_dir/backup/$DB_BACKUP" ] || continue
+        for backup in "$env_dir/backup/$DB_BACKUP"/*.sqlite3; do
+            [ -e "$backup" ] || continue
+            original="$env_dir$(basename "$backup")"
+            sqlite3 "$original" ".restore '$backup'" || ok=1
+        done
+    done
+    [ "$ok" -eq 0 ] && log "Databases restored from the backup taken before the update ($DB_BACKUP)."
+    return "$ok"
+}
+
+# rollback <reason> [help]
+rollback() {
+    local reason="$1" help="${2:-}" problems=""
+    status running "Rolling back" "$ST_PERCENT"
+    log "Rolling back: $reason"
+
+    if journal_has switch && ! journal_has rolled_back_switch; then
+        local was_running=""; [ -n "$(server_pids)" ] && was_running=1
+        if [ -d "$BACKUP" ]; then
+            [ -n "$was_running" ] && (cd "$ROOT" && bash ./roe.sh stop) >/dev/null 2>&1
+            local broken="$ROOT/current.broken-$(date +%s)"
+            mv "$CURRENT" "$broken" && mv "$BACKUP" "$CURRENT" && rm -rf "$broken" &&
+                journal_add rolled_back_switch && log "Back on $FROM's code." ||
+                problems="the previous version's folder couldn't be put back"
+            local name
+            for name in roe.sh README.md LICENSE VERSION; do
+                [ -f "$CURRENT/$name" ] && cp "$CURRENT/$name" "$ROOT/$name"
+            done
+        else
+            problems="the previous version's folder (current.backup) is missing"
+        fi
+    fi
+    if journal_has migrate || journal_has switch; then
+        restore_databases || problems="${problems:+$problems; }the databases couldn't be restored"
+    fi
+    rm -rf "$STAGING"
+
+    if [ -n "$RESTART_ATTEMPTED" ] || [ -n "${was_running:-}" ]; then
+        local port="${RESTART_PORT:-3000}"
+        (cd "$ROOT" && PORT="$port" bash ./roe.sh start --daemon --no-browser) >/dev/null 2>&1
+    fi
+
+    ST_MESSAGE="$reason"
+    if [ -n "$problems" ]; then
+        ST_MESSAGE="$reason Rolling back didn't finish: $problems."
+        ST_HELP="$help"
+        status failed "The update didn't finish"
+        log "Rolling back didn't finish: $problems."
+        return 1
+    fi
+    ST_HELP="$help"
+    status rolled_back "Rolled back to $FROM" "$ST_PERCENT"
+    log "Rolled back to $FROM."
+}
+
+# ── Main ────────────────────────────────────────────────────────────────────
+
+log "── Roe $TO update script ($MODE) ──"
+
+case "$MODE" in
+    rollback)
+        rollback "Rolled back by hand."
+        exit $?
+        ;;
+    cancel)
+        if journal_has switch; then
+            log "Too late to cancel: the new version is already in place."
+            exit 1
+        fi
+        rm -rf "$STAGING"
+        ST_CANCELLED="true"
+        ST_QUESTION="null"
+        # COPY: the update was cancelled at a question
+        ST_MESSAGE="Update cancelled. Nothing on your site was changed."
+        status rolled_back "Update cancelled"
+        log "Cancelled. Nothing was changed."
+        exit 0
+        ;;
+esac
+
+STEPS="ruby gems test_migrations migrate switch secrets root_files docs version assets restart"
+for name in $STEPS; do
+    journal_has "$name" && continue
+    if [ "$name" = "switch" ] && [ ! -d "$STAGING" ] && [ ! -d "$BACKUP" ]; then
+        rollback "The downloaded version is missing (staging/), so the update can't carry on."
+        exit 1
+    fi
+    if "step_$name"; then
+        journal_add "$name"
+    else
+        rollback "${FAIL_MESSAGE:-The step \"$name\" failed.}" "$FAIL_HELP"
+        exit 1
+    fi
+done
+
+rm -rf "$BACKUP"
+ST_PERCENT=100
+status done "Update completed successfully" 100
+log "Update to $TO finished."
+exit "$EXIT_DONE"
