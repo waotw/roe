@@ -1,4 +1,6 @@
 class System::ThemesController < ApplicationController
+  include FileValidators
+
   skip_before_action :require_authentication
   skip_before_action :verify_authenticity_token
 
@@ -32,18 +34,9 @@ class System::ThemesController < ApplicationController
       return
     end
 
-    # Use file modification time for caching
-    last_modified = File.mtime(file_path)
+    return if file_fresh?(file_path)
 
-    # Cache headers
-    response.headers["Cache-Control"] = "no-cache, must-revalidate"
-    response.headers["Last-Modified"] = last_modified.httpdate
-    response.headers["ETag"] = last_modified.to_i.to_s
-
-    # Check if browser's cached version is still valid
-    if stale?(last_modified: last_modified, etag: last_modified.to_i)
-      send_file file_path, type: content_type, disposition: "inline"
-    end
+    send_file file_path, type: content_type, disposition: "inline"
   end
 
   private

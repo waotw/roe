@@ -1,10 +1,14 @@
 class System::ImagesController < ApplicationController
+  include FileValidators
+
   skip_before_action :require_authentication
 
   def show
     image_path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "images", params[:filename])
 
     if File.exist?(image_path)
+      return if file_fresh?(image_path)
+
       send_file image_path,
         type: image_mime_type(params[:filename]),
         disposition: "inline"
