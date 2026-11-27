@@ -195,7 +195,34 @@ class StorePagesTest < ActionDispatch::IntegrationTest
     assert_equal :ok, LinkTargets.address_status("/products/category/fiction").first
     assert_equal :missing, LinkTargets.address_status("/products/category/nope").first
     assert_equal :ok, LinkTargets.address_status("/products/my-book").first
-    assert_equal :ok, LinkTargets.address_status("/store/my-book").first
+    assert_equal [ :moved, "/products/my-book" ], LinkTargets.address_status("/store/my-book")
+  end
+
+  # ── Old /store/ links in content ──────────────────────────────────────────
+
+  test "a link to an old /store/ address is listed as a warning, with where it lives now" do
+    product("my-book", category: "fiction")
+    product("draft-book", status: "draft")
+    page("about", "", body: "[Book](/store/my-book) and [Fiction](/store/fiction?x=1) and [Draft](/store/draft-book) and [Gone](/store/nope)")
+
+    problems = LinkCheck.new.call["problems"].select { |p| p["title"] == "About" }.to_h { |p| [ p["target"], p ] }
+    assert_equal "old_address", problems.dig("/store/my-book", "type")
+    assert problems.dig("/store/my-book", "warning"), "it still works, so it isn't counted as broken"
+    assert_includes problems.dig("/store/my-book", "message"), "/products/my-book"
+    assert_includes problems.dig("/store/fiction?x=1", "message"), "/products/category/fiction?x=1"
+    assert_equal "draft_link", problems.dig("/store/draft-book", "type")
+    assert_equal "broken_internal_link", problems.dig("/store/nope", "type")
+  end
+
+  test "Fix All in the editor changes old /store/ links, and only links" do
+    product("my-book")
+    sign_in_as(User.take)
+    content = "[Book](/store/my-book#buy) <a href=\"/store/my-book\">x</a> `/store/my-book` stays.\n"
+
+    post admin_fix_markdown_path, params: { content: content }
+
+    fixed = JSON.parse(response.body)["content"]
+    assert_equal "[Book](/products/my-book#buy) <a href=\"/products/my-book\">x</a> `/store/my-book` stays.\n", fixed
   end
 
   # ── The static build ──────────────────────────────────────────────────────

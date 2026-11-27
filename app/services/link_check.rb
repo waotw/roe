@@ -33,11 +33,12 @@ class LinkCheck
     broken_internal_link: "links",
     unclear_internal_link: "links",
     unclear_name: "links",
+    old_address: "links",
     draft_link: "drafts"
   }.freeze
-  # Could mean two things: the link still works, so it's listed but not
-  # counted as broken.
-  WARNINGS = %i[unclear_internal_link unclear_name].freeze
+  # Could mean two things, or an old address that still arrives: the link
+  # still works, so it's listed but not counted as broken.
+  WARNINGS = %i[unclear_internal_link unclear_name old_address].freeze
 
   # Anything wrong inside a draft goes in its own section: nobody sees it
   # until it's published, so it's listed but doesn't count and doesn't fail

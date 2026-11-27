@@ -50,10 +50,11 @@ module LinkTargets
   # product or doc address; anything else (a feed, a tag page, the admin) is
   # :ok because there's nothing here to check it against. A redirect counts
   # as working: the link still arrives.
-  #   [:ok, record|nil]  [:draft, record]  [:missing, nil]
+  #   [:ok, record|nil]  [:draft, record]  [:missing, nil]  [:moved, new_path]
   def address_status(path)
     path = path.to_s.split(/[?#]/, 2).first.to_s.chomp("/")
     return [ :ok, nil ] if path.empty? || redirected?(path)
+    return old_store_status(path) if path.match?(%r{\A/store/[^/]+\z})
 
     params = route_params(path)
     record = params ? record_for(params) : :unchecked
@@ -96,6 +97,22 @@ module LinkTargets
       docs.find { |d| d.url_name == name } || (BundledDocumentation.find(scope, name) if scope.present?)
     else :unchecked
     end
+  end
+
+  # Products and their categories were at /store/<name> before 0.5.1. The
+  # address still answers (ProductsController#show), but the link should
+  # say where the item lives now: :moved, with that address.
+  def old_store_status(path)
+    name = path.delete_prefix("/store/")
+    product = Product.where("json_extract(metadata, '$.url_name') = ?", name).first
+    return [ product.published? ? :moved : :draft, product.published? ? product.public_url : product ] if product
+
+    category = StorePages.category_for_slug(name)
+    return [ :moved, StorePages.category_url(category) ] if category
+
+    # A product renamed since: /store/<old> goes on to /products/<old>, and
+    # the rename's redirect from there.
+    redirected?(Product.public_url_for(name)) ? [ :moved, Product.public_url_for(name) ] : [ :missing, nil ]
   end
 
   def redirected?(path)
