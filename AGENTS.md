@@ -436,6 +436,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Long-running operations (image variants, newsletter sends, Substack imports, Postmark webhooks, updates) run as jobs
 
 ### Views
+- Public pages get `?v=<version>` added to every `/media/`, `/theme/`, `/javascript/`, `/system/images/` and `/system/fonts/` URL as they're sent (`VersionedFileUrls`, `config/initializers/versioned_file_urls.rb`). Write plain file URLs; don't add your own `?v=`. On live a matching `?v=` is cached for a year (`FileValidators`); local, `/admin`, static mode and feeds keep the check on every load.
 - Layout inheritance uses `content_for` flags for conditional rendering
 - `admin.html.erb` - Wrapper that sets `content_for :admin_nav, true`
 - `application.html.erb` - Base layout with conditional navigation

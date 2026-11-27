@@ -22,9 +22,9 @@ class VideoPostPageTest < ActionDispatch::IntegrationTest
 
     get post_path(post.url_name)
     assert_response :success
-    assert_select ".video-player-container[data-player=video] video.video-player-video[controls][poster=?]", "/media/video/variants/post-clip-poster.jpg"
+    assert_select ".video-player-container[data-player=video] video.video-player-video[controls][poster^=?]", "/media/video/variants/post-clip-poster.jpg?v="
     assert_select "video.video-player-video source", 2
-    assert_select "video.video-player-video source:first-child[src=?]", "/media/video/variants/post-clip-720p.mp4"
+    assert_select "video.video-player-video source:first-child[src^=?]", "/media/video/variants/post-clip-720p.mp4?v="
     assert_select ".video-player-container [data-player-ui][hidden] [data-player-part=play]"
     assert_no_match(%r{post-clip\.mov}, response.body.scan(/<video.*?<\/video>/m).join, "the 1 GB original isn't offered, not even as the download link")
   end
@@ -35,6 +35,6 @@ class VideoPostPageTest < ActionDispatch::IntegrationTest
 
     get post_path(post.url_name)
     assert_response :success
-    assert_select ".card-player-video video[data-player-part=media] source[src=?]", "/media/video/variants/pod-clip-720p.mp4"
+    assert_select ".card-player-video video[data-player-part=media] source[src^=?]", "/media/video/variants/pod-clip-720p.mp4?v="
   end
 end

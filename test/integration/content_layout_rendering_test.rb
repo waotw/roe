@@ -363,8 +363,8 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
       content: "![Thing](/media/images/x.jpg)\n\n# My heading\n\n```button\nsku: THING-X\n```\n\nAbout it.")
     get product_path(product.url_name)
     assert_equal [ product.title, "My heading" ], css_select("h1.product-title").map { |h| h.text.strip }
-    assert_select ".product-top img[src='/media/images/x.jpg']", 1
-    assert_select "img[src='/media/images/x.jpg']", 2
+    assert_select ".product-top img[src^='/media/images/x.jpg']", 1
+    assert_select "img[src^='/media/images/x.jpg']", 2
     assert_select ".product-top .product-price", 0, "the body's button stands in for the layout's"
   end
 
@@ -522,7 +522,7 @@ class ContentLayoutRenderingTest < ActionDispatch::IntegrationTest
     link = row.at_css("a.player-track-link")
     assert_equal "#{post_path(b.url_name)}?play", link["href"]
     assert_nil link["target"], "without a player it opens in the same tab"
-    assert_select "audio.player-track-audio[hidden][src='/media/audio/b.mp3']", 1
+    assert_select "audio.player-track-audio[hidden][src^='/media/audio/b.mp3']", 1
     assert_select "audio.player-track-audio[controls]", 0, "no browser audio bar per row"
   end
 

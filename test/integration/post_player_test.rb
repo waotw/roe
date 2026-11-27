@@ -68,7 +68,7 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
       post = media_post(type, audio: "/media/audio/track.mp3")
       get post_path(post.url_name)
       assert_equal 1, card_players
-      assert_select ".card-player audio source[src='/media/audio/track.mp3']", minimum: 1
+      assert_select ".card-player audio source[src^='/media/audio/track.mp3']", minimum: 1
 
       own = media_post(type, audio: "/media/audio/track.mp3", content: "Intro.\n\n#{CARD}")
       get post_path(own.url_name)
@@ -186,7 +186,7 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
 
     get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", duration: "00:30:00", content: song).url_name)
     assert_select ".post-player .card-player", 1
-    assert_select ".post-content .card-player audio source[src='/media/audio/song.mp3']", minimum: 1
+    assert_select ".post-content .card-player audio source[src^='/media/audio/song.mp3']", minimum: 1
 
     get post_path(media_post("audio", audio: "/media/audio/track.mp3", content: song).url_name)
     assert_equal 2, card_players, "the post's track, and the song"
@@ -228,7 +228,7 @@ class PostPlayerTest < ActionDispatch::IntegrationTest
     chapters = [ { "time" => 0, "title" => "Intro" }, { "time" => 75, "title" => "Middle" } ]
     get post_path(media_post("podcast", audio: "/media/audio/ep.mp3", episode_number: 3, chapters: chapters).url_name)
 
-    assert_select ".card-player.card-player-plain audio[controls]:not([hidden]) source[src='/media/audio/ep.mp3']", minimum: 1
+    assert_select ".card-player.card-player-plain audio[controls]:not([hidden]) source[src^='/media/audio/ep.mp3']", minimum: 1
     assert_select "[data-player]", 0, "player.js must leave it alone, whatever its version"
     assert_select "[data-player-ui]", 0
     assert_select ".card-player-plain .player-now-episode", "E3"

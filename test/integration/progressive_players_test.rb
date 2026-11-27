@@ -29,7 +29,7 @@ class ProgressivePlayersTest < ActionDispatch::IntegrationTest
   test "the player card plays without the script" do
     get post_path(media_post("audio", audio: "/media/audio/track.mp3").url_name)
     assert_plays_without_script ".card-player[data-player=audio]"
-    assert_select ".card-player audio source[src='/media/audio/track.mp3']", minimum: 1
+    assert_select ".card-player audio source[src^='/media/audio/track.mp3']", minimum: 1
   end
 
   test "a podcast episode's player plays without the script, chapters readable" do
@@ -51,7 +51,7 @@ class ProgressivePlayersTest < ActionDispatch::IntegrationTest
   test "the layout loads player.js like the other site scripts, and no Stimulus wiring is left" do
     get post_path(media_post("audio", audio: "/media/audio/track.mp3").url_name)
 
-    assert_select "script[src='/javascript/player.js'][defer]"
+    assert_select "script[src^='/javascript/player.js?v='][defer]"
     assert_no_match(/audio-player#|data-audio-player|data-controller="audio-player"/, response.body)
   end
 
