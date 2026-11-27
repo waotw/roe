@@ -2594,7 +2594,7 @@ module HasMarkdownExtensions
     elsif item.is_a?(Documentation)
       item.public_url
     elsif item.is_a?(Product)
-      "/store/#{item.url_name}"
+      item.public_url
     elsif item.is_a?(Page)
       item.public_url
     else
@@ -2982,7 +2982,7 @@ module HasMarkdownExtensions
   end
 
   # A product-link is a live post-link card pointed at a product. post-link
-  # already resolves products (find_post_by_slug → /store/<slug>, title,
+  # already resolves products (find_post_by_slug → /products/<slug>, title,
   # excerpt, image), so we just alias `product:` → `post:` and give it a
   # product-appropriate default link text, then reuse render_post_link. Any
   # explicit override (title, image, link_text, …) still wins.
@@ -3161,7 +3161,7 @@ module HasMarkdownExtensions
         # Derive the public URL based on the record type
         record_url = case referenced_post
         when Page          then referenced_post.public_url
-        when Product       then "/store/#{referenced_post.url_name}"
+        when Product       then referenced_post.public_url
         when Documentation then referenced_post.public_url
         else "/posts/#{referenced_post.url_name}"
         end

@@ -119,7 +119,7 @@ Product descriptions are truncated to ~100 characters in grids.
 
 ## Product Pages
 
-Each published product gets a page at `/store/product-url-name`.
+Each published product gets a page at `/products/product-url-name`.
 
 Product pages display:
 

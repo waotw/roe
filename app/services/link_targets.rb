@@ -88,6 +88,8 @@ module LinkTargets
     when %w[posts show]    then Post.all.find { |p| p.url_name == name }
     when %w[pages show]    then Page.all.find { |p| p.url_name == name }
     when %w[products show] then Product.where("json_extract(metadata, '$.url_name') = ?", name).first
+    # A category's address answers while a published product is in it.
+    when %w[products category] then StorePages.category_for_slug(route[:category]) ? :unchecked : nil
     when %w[documentation show]
       scope = route[:scope]
       docs = scope.present? ? Documentation.in_directory(scope) : Documentation.root

@@ -175,6 +175,7 @@ class LinkCheck
       add(record, issue, line: issue[:line])
     end
     check_metadata(record)
+    check_category_page(record) if record.is_a?(Page)
   rescue StandardError => e
     Rails.logger.warn("[LinkCheck] #{record.class.name} #{record.id}: #{e.class}: #{e.message}")
   end
@@ -204,6 +205,28 @@ class LinkCheck
         add(record, { type: :unclear_name, target: name,
                       message: "#{name} could be #{names.join(' or ')}. Roe uses #{names.first}. Add the folder to clarify which #{name}" }, field: "related")
       end
+    end
+  end
+
+  # `category:` on a page makes it that category's page (StorePages). Said
+  # when it names no category, when another page has it already, and on the
+  # store page, which can't also be a category's.
+  def check_category_page(page)
+    category = page.metadata["category"]
+    return unless category.is_a?(String) && category.strip.present?
+
+    @links += 1
+    name = category.strip
+    # COPY: category page messages
+    if page.id.present? && page.id == SystemPages.find("store")&.id
+      add(page, { type: :unclear_name, target: name,
+                  message: "This is the store page, so category: #{name} is left out. The store page can't also be a category's page" }, field: "category")
+    elsif !StorePages.categories.include?(StorePages.normalize(name))
+      add(page, { type: :broken_internal_link, target: name,
+                  message: "No published product is in the category #{name}, so this page isn't a category's page" }, field: "category")
+    elsif page.published? && (first = StorePages.category_page(name)) && first.id != page.id
+      add(page, { type: :unclear_name, target: name,
+                  message: "#{first.title} is already the page for #{name}, so Roe uses that one. Remove category: from one of them" }, field: "category")
     end
   end
 

@@ -125,7 +125,7 @@ export default class extends Controller {
     originalUrlName: String,
     filenameSlug: String,
     published: Boolean,
-    // Where this kind of content lives: "/posts/", "/" for pages, "/store/"
+    // Where this kind of content lives: "/posts/", "/" for pages, "/products/"
     // for products. Used only by the slug-change redirect modal.
     publicPathPrefix: { type: String, default: "/posts/" },
     homePage: Boolean,

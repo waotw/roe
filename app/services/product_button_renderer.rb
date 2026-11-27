@@ -227,9 +227,9 @@ class ProductButtonRenderer
     validation_url = if domain.present?
       # Remove protocol prefix and trailing slashes
       clean_domain = domain.to_s.sub(/\Ahttps?:\/\//, "").sub(/\/+\z/, "")
-      "https://#{clean_domain}/store/#{product.url_name}"
+      "https://#{clean_domain}#{product.public_url}"
     else
-      "/store/#{product.url_name}"
+      product.public_url
     end
 
     # Product#snipcart_attributes is the one place that decides what Snipcart

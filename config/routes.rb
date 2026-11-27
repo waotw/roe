@@ -563,7 +563,14 @@ Rails.application.routes.draw do
   # before the flat route so /documentation/<name> only matches root docs.
   get "documentation/:scope/:url_name", to: "documentation#show", as: :scoped_documentation
   get "documentation/:url_name", to: "documentation#show", as: :documentation
-  get "store/:url_name", to: "products#show", as: :product
+  # Products, as posts are at /posts/<name>. Categories have their own
+  # spot so a product and a category can never want the same address.
+  get "products/category/:category", to: "products#category", as: :product_category
+  get "products/:url_name", to: "products#show", as: :product
+  # Where products were before 0.5.1. Still serves the product, with a
+  # canonical link to /products/<name>: links already shared, search results
+  # and Snipcart carts started before the move keep working.
+  get "store/:url_name", to: "products#show", as: :legacy_product
   # get "store/:url_name/validate", to: "products#validate", as: :product_validate, defaults: { format: :json }
 
   # Collections and posts archive

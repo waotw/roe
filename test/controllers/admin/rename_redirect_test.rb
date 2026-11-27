@@ -76,17 +76,17 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     assert_nil flash[:notice]
   end
 
-  test "renaming a published product writes a 301 under /store" do
+  test "renaming a published product writes a 301 under /products" do
     sign_in_as(@admin)
     product = product_with("poster")
 
     patch admin_product_path(product), params: {
       metadata: "title: Poster\nstatus: published\nprice: 10\nurl_name: big-poster\n",
-      content: "Body.", create_redirect_from: "/store/poster"
+      content: "Body.", create_redirect_from: "/products/poster"
     }
 
     assert_redirected_to edit_admin_product_path(product)
-    assert_equal "/store/big-poster", RedirectManager.rules["/store/poster"]["to"]
+    assert_equal "/products/big-poster", RedirectManager.rules["/products/poster"]["to"]
   end
 
   test "the old address comes from the saved record, not from what the browser sent" do
@@ -124,7 +124,7 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     draft = product_with("draft-poster", status: "draft")
     patch admin_product_path(draft), params: {
       metadata: "title: Poster\nstatus: draft\nprice: 10\nurl_name: renamed\n",
-      content: "Body.", create_redirect_from: "/store/draft-poster"
+      content: "Body.", create_redirect_from: "/products/draft-poster"
     }
     assert_empty RedirectManager.rules
   end
@@ -133,7 +133,7 @@ class RenameRedirectTest < ActionDispatch::IntegrationTest
     assert_equal "/posts/a", Post.public_url_for("a")
     assert_equal "/a", Page.public_url_for("a")
     assert_equal "/", Page.public_url_for("home")
-    assert_equal "/store/a", Product.public_url_for("a")
+    assert_equal "/products/a", Product.public_url_for("a")
   end
 
   # The site's own links follow the item, redirect or not: links written as

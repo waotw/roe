@@ -6,6 +6,16 @@ class ProductsController < SiteController
     matches = Product.where("metadata->>'url_name' = ?", params[:url_name])
     @product = matches.detect(&:primary?) || matches.first
 
+    # An old /store/<name> address whose product has since been renamed:
+    # on to /products/<name>, where a rename's redirect (RenameRedirect)
+    # takes it the rest of the way.
+    # The breadcrumbs before 0.5.1 linked a category to /store/<category>.
+    if !@product && request.path.start_with?("/store/")
+      category = StorePages.category_for_slug(params[:url_name])
+      target = category ? StorePages.category_url(category) : Product.public_url_for(params[:url_name])
+      return redirect_to target, status: :moved_permanently
+    end
+
     # Raise 404 if not found
     raise ActiveRecord::RecordNotFound unless @product
 
@@ -27,6 +37,20 @@ class ProductsController < SiteController
     end
   end
 
+  # /products/category/<category>: the category's page when it has one
+  # (`category:` on a page), else Roe's listing of its products.
+  def category
+    name = StorePages.category_for_slug(params[:category])
+    raise ActiveRecord::RecordNotFound unless name
+
+    if (page = StorePages.category_page(name))
+      return redirect_to page.public_url, status: :moved_permanently
+    end
+
+    @page = StorePages.listing_page(name)
+    render "pages/show"
+  end
+
   private
 
   def product_url_for_validation(product)
@@ -39,10 +63,10 @@ class ProductsController < SiteController
       clean_domain = domain.to_s.sub(/\Ahttps?:\/\//, "").sub(/\/+\z/, "")
 
       protocol = clean_domain.include?("localhost") ? "http" : "https"
-      "#{protocol}://#{clean_domain}/store/#{product.url_name}.json"
+      "#{protocol}://#{clean_domain}#{product.public_url}.json"
     else
       # Development: use request base URL
-      "#{request.base_url}/store/#{product.url_name}.json"
+      "#{request.base_url}#{product.public_url}.json"
     end
   end
 end

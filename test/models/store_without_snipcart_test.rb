@@ -94,7 +94,7 @@ class StoreWithoutSnipcartTest < ActiveSupport::TestCase
     html = grid_for(write_product("sws-page", "price" => "10", "sku" => "SWS-PAGE"))
 
     assert_not_includes html, "snipcart-add-item"
-    assert_includes html, %(<a href="/store/sws-page" class="btn-primary btn-grid">View</a>)
+    assert_includes html, %(<a href="/products/sws-page" class="btn-primary btn-grid">View</a>)
   end
 
   test "button text names the button either way" do
@@ -111,7 +111,7 @@ class StoreWithoutSnipcartTest < ActiveSupport::TestCase
     store("snipcart:\n  enabled: false\n")
     html = grid_for(write_product("sws-nosku"))
 
-    assert_includes html, %(href="/store/sws-nosku" class="btn-primary btn-grid")
+    assert_includes html, %(href="/products/sws-nosku" class="btn-primary btn-grid")
   end
 
   test "a product with no price shows no price, rather than $0.00" do
@@ -149,7 +149,7 @@ class StoreWithoutSnipcartTest < ActiveSupport::TestCase
 
     html = ProductButtonRenderer.render({ "sku" => "sws-by-name" }, authenticated: true)
 
-    assert_includes html, %(href="/store/sws-by-name")
+    assert_includes html, %(href="/products/sws-by-name")
     assert_includes html, ">View</a>", "an unset label reads as a link, not a cart"
   end
 

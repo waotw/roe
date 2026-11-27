@@ -479,7 +479,7 @@ class MarkdownDoctor
   end
 
   # Links written as an address rather than a file: `[x](/posts/lab)`,
-  # `[x](/about)`, `href="/store/mug"`. Anything Roe can't tell is one of its
+  # `[x](/about)`, `href="/products/mug"`. Anything Roe can't tell is one of its
   # own pages (a feed, a tag page, the admin) is left alone; the callable
   # decides. `.md` links and /media/ files have checks of their own.
   ADDRESS_LINK_RE = %r{\]\(<?(/(?!/)[^)\s>]*)>?(?:\s+"[^"]*")?\)|href=["'](/(?!/)[^"']*)["']}
