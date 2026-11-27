@@ -41,7 +41,7 @@ class StaticSiteMiddleware
 
     if request.get? && !rails_only?(request.path) && static_mode?
       file_path = find_static_file(request.path)
-      return serve(file_path) if file_path
+      return serve(file_path, request) if file_path
     end
 
     @app.call(env)
@@ -107,17 +107,38 @@ class StaticSiteMiddleware
     nil
   end
 
-  def serve(file_path)
+  # Checked on every load, like the files Rails serves (FileValidators): an
+  # ETag and Last-Modified with "no-cache", so an unchanged file is a 304 and
+  # a rebuilt page or replaced image shows on the next load. This used to be
+  # "max-age=3600", which kept an old page or image for up to an hour after
+  # a rebuild.
+  def serve(file_path, request)
+    stat = File.stat(file_path)
+    etag = FileFingerprint.etag(file_path, stat)
+    headers = {
+      "ETag" => etag,
+      "Last-Modified" => stat.mtime.httpdate,
+      "Cache-Control" => "no-cache, public"
+    }
+    return [ 304, headers, [] ] if not_modified?(request, etag, stat.mtime)
+
     content_type = MIME_TYPES[File.extname(file_path).downcase] || "application/octet-stream"
-    [
-      200,
-      {
-        "Content-Type" => content_type,
-        "Content-Length" => File.size(file_path).to_s,
-        "Cache-Control" => "public, max-age=3600"
-      },
-      [ File.binread(file_path) ]
-    ]
+    headers["Content-Type"] = content_type
+    headers["Content-Length"] = stat.size.to_s
+    [ 200, headers, [ File.binread(file_path) ] ]
+  end
+
+  # If-None-Match decides when it's sent; If-Modified-Since only when it isn't.
+  def not_modified?(request, etag, mtime)
+    if_none_match = request.get_header("HTTP_IF_NONE_MATCH")
+    return if_none_match.split(",").map(&:strip).include?(etag) || if_none_match.strip == "*" if if_none_match
+
+    if_modified_since = request.get_header("HTTP_IF_MODIFIED_SINCE")
+    return false unless if_modified_since
+
+    Time.httpdate(if_modified_since) >= Time.at(mtime.to_i)
+  rescue ArgumentError
+    false
   end
 end
 

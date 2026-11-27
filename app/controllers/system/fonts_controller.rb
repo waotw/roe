@@ -1,4 +1,6 @@
 class System::FontsController < ApplicationController
+  include FileValidators
+
   skip_before_action :require_authentication
 
   def show
@@ -6,8 +8,9 @@ class System::FontsController < ApplicationController
     file_path = File.join(RoeSitePaths::SITE_PATH, "system/assets/fonts", filename)
 
     if File.exist?(file_path)
-      # Set aggressive caching for fonts (they rarely change)
-      expires_in 1.year, public: true
+      # Checked on every load like other files, not cached for a year: a font
+      # replaced under the same name has to show up on the next visit.
+      return if file_fresh?(file_path)
 
       send_file file_path,
         type: font_mime_type(filename),  # Changed from mime_type_for

@@ -13,8 +13,6 @@
 module FileValidators
   extend ActiveSupport::Concern
 
-  DIGEST_UP_TO = 512.kilobytes
-
   private
 
   # Sets the validators and Cache-Control for the file at path. Returns true,
@@ -27,24 +25,9 @@ module FileValidators
   # exists and hasn't changed.
   def file_fresh?(path, private: false)
     stat = File.stat(path)
-    fresh_when(strong_etag: file_etag(stat, path), last_modified: stat.mtime.utc, public: false)
+    fresh_when(strong_etag: FileFingerprint.key(path, stat), last_modified: stat.mtime.utc, public: false)
     response.cache_control.replace(no_cache: true, extras: [ private ? "private" : "public" ])
     request.fresh?(response)
-  end
-
-  # The file's size, inode and modification time to the nanosecond. A file
-  # replaced under the same name, a regenerated variant, or one Site Sync
-  # rewrote gets a new value. Last-Modified only has whole seconds, so the
-  # ETag is what the browser's check really turns on.
-  #
-  # Some disks (HFS+, FAT) keep whole seconds too, so a file saved twice in
-  # one second at the same size (a CSS edit from "red" to "tan") would keep
-  # its ETag. Small files add a digest of their bytes, which closes that gap
-  # where it can happen; reading them is cheaper than sending them.
-  def file_etag(stat, path)
-    parts = [ stat.size, stat.ino, stat.mtime.to_i, stat.mtime.nsec ]
-    parts << Digest::MD5.file(path).hexdigest if stat.size <= DIGEST_UP_TO
-    parts.join("-")
   end
 
   # For a Range request: true when If-Range is absent or still matches the

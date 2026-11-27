@@ -183,4 +183,75 @@ class FileValidatorsTest < ActionDispatch::IntegrationTest
     revalidate("/system/images/validators-test.png")
     assert_response :not_modified
   end
+
+  test "fonts are checked on every load instead of kept for a year" do
+    path = File.join(RoeSitePaths::SITE_PATH, "system", "assets", "fonts", "validators-test.woff2")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.binwrite(path, "FONT V1")
+    @written << path
+
+    get "/system/fonts/validators-test.woff2"
+    assert_response :success
+    assert_equal "no-cache, public", response.headers["Cache-Control"]
+    refute_match(/max-age/, response.headers["Cache-Control"])
+    first_etag = response.headers["ETag"]
+
+    revalidate("/system/fonts/validators-test.woff2")
+    assert_response :not_modified
+
+    File.binwrite(path, "FONT V2")
+    revalidate("/system/fonts/validators-test.woff2", etag: first_etag)
+    assert_response :success
+    assert_equal "FONT V2", response.body
+  end
+
+  # ── Static mode ───────────────────────────────────────────────────────────
+
+  def static_app
+    middleware = StaticSiteMiddleware.new(->(_env) { [ 404, {}, [ "rails" ] ] })
+    middleware.define_singleton_method(:static_mode?) { true }
+    middleware
+  end
+
+  def static_get(app, path, headers = {})
+    app.call(Rack::MockRequest.env_for(path, headers))
+  end
+
+  test "static mode checks on every load and answers 304 when unchanged" do
+    path = File.join(RoeSitePaths::STATIC_SITE_PATH, "media", "images", "validators-static.webp")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.binwrite(path, "STATIC V1")
+    @written << path
+    app = static_app
+
+    status, headers, body = static_get(app, "/media/images/validators-static.webp")
+    assert_equal 200, status
+    assert_equal "STATIC V1", body.join
+    assert_equal "no-cache, public", headers["Cache-Control"]
+    etag = headers["ETag"]
+    assert_match(/\A"[0-9a-f]+"\z/, etag)
+
+    status, _, body = static_get(app, "/media/images/validators-static.webp", "HTTP_IF_NONE_MATCH" => etag)
+    assert_equal 304, status
+    assert_empty body.join
+
+    status, _, = static_get(app, "/media/images/validators-static.webp", "HTTP_IF_MODIFIED_SINCE" => headers["Last-Modified"])
+    assert_equal 304, status, "If-Modified-Since alone works when no ETag is sent"
+  end
+
+  test "static mode sends a rebuilt page again" do
+    path = File.join(RoeSitePaths::STATIC_SITE_PATH, "validators-static-page.html")
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, "<p>old</p>")
+    @written << path
+    app = static_app
+
+    _, headers, = static_get(app, "/validators-static-page")
+    File.write(path, "<p>new</p>")
+
+    status, _, body = static_get(app, "/validators-static-page",
+      "HTTP_IF_NONE_MATCH" => headers["ETag"], "HTTP_IF_MODIFIED_SINCE" => headers["Last-Modified"])
+    assert_equal 200, status, "a changed ETag wins over a matching date"
+    assert_equal "<p>new</p>", body.join
+  end
 end
