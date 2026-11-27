@@ -120,7 +120,10 @@ class Product < ApplicationRecord
     self.class.public_url_for(url_name)
   end
 
-  def self.public_url_for(slug) = "/store/#{slug}"
+  # Products live at /products/<name>, as posts live at /posts/<name>. Before
+  # 0.5.1 they were at /store/<name>; that address still serves the product
+  # (with a canonical link here), so links already shared keep working.
+  def self.public_url_for(slug) = "/products/#{slug}"
 
   # Snipcart data attributes
   # A downloadable product rather than something posted. The toggle is what

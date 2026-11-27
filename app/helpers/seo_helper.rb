@@ -197,8 +197,11 @@ module SeoHelper
   # query strings because pagination/filter variants are typically
   # not what we want crawlers indexing as duplicates (collections
   # being the exception, handled below).
+  #
+  # A product is the exception: it's also served at its pre-0.5.1 address,
+  # /store/<name>, and both point here, at /products/<name>.
   def seo_canonical_url
-    full_site_url + request.path
+    full_site_url + (seo_subject.is_a?(Product) ? seo_subject.public_url : request.path)
   end
 
   # Site URL with protocol. Uses SiteConfig.site_url when it's set to

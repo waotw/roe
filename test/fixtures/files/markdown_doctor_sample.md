@@ -133,6 +133,9 @@ type: post-link
 post: about
 ```
 
+[An old product address](/store/sample-product) still works, but the product
+lives at /products/sample-product now. Fix All changes it.
+
 An image that isn't in the media library shows as a broken image:
 
 ![gone](/media/images/no-such-image.jpg)

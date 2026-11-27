@@ -138,24 +138,48 @@ export function spotIn(line, col, explicit) {
 // Items matching what's typed, best first: the link's current target, then
 // exact names, then titles and file names that start with it, then the most
 // recently changed.
+//
+// The / that opens the list isn't part of the search: `/book` looks for
+// "book", like `/ book`. A kind at the start narrows the list to it:
+// `/posts`, `/posts/long`, `/posts long` (also pages, products,
+// documentation, and docs for short). A page actually called that (say
+// url_name `products`) still shows, first.
 export function rank(query, current) {
   if (!items) return [];
-  const q = query.toLowerCase().replace(/\.md$/, "").trim();
-  const words = q.split(/\s+/).filter(Boolean);
-  const bare = q.replace(/^\//, "");
+  const typed = query.toLowerCase().replace(/\.md$/, "").trim();
+  const bare = typed.replace(/^\/+/, "").trim();
+  const kindMatch = bare.match(KIND_AT_START);
+  const kind = kindMatch ? KINDS[kindMatch[1]] : null;
+  const rest = kindMatch ? (kindMatch[2] || "").trim() : bare;
+  const words = rest.split(/\s+/).filter(Boolean);
+
+  const exact = (it) => it.ref === bare || it.name === bare || it.url_name === bare || it.address === typed;
   const score = (it) => {
     if (it === current) return -1;
-    if (!q) return 2;
-    if (it.ref === bare || it.name === bare || it.url_name === bare || it.address === q) return 0;
-    if (it.title.toLowerCase().startsWith(q) || it.name.startsWith(bare)) return 1;
+    if (!bare) return 2;
+    if (exact(it)) return 0;
+    if (rest && (it.title.toLowerCase().startsWith(rest) || it.name.startsWith(rest))) return 1;
     return 2;
   };
+  const matches = (it) => {
+    if (it === current || (bare && exact(it))) return true;
+    if (kind && kindOf(it) !== kind) return false;
+    return words.every((w) => it.hay.includes(w));
+  };
   return items
-    .filter((it) => it === current || words.every((w) => it.hay.includes(w)))
+    .filter(matches)
     .map((it) => ({ it, s: score(it) }))
     .sort((a, b) => a.s - b.s || b.it.updated - a.it.updated)
     .slice(0, 100)
     .map(({ it }) => it);
+}
+
+const KINDS = { posts: "posts", pages: "pages", products: "products", documentation: "documentation", docs: "documentation" };
+const KIND_AT_START = /^(posts|pages|products|documentation|docs)(?:(?:\/|\s+)(.*))?$/;
+
+// posts, pages, products or documentation: the folder the file is in.
+function kindOf(item) {
+  return item.ref.split("/")[0];
 }
 
 // The second line of a list entry: the file, and the url_name when it differs.

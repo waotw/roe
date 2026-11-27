@@ -89,6 +89,7 @@ class StaticGenerator
 
     # Clean up deleted content
     cleanup_deleted_files
+    remove_legacy_store_files
 
     # Reload only the configs that actually changed
     if changes[:changed_configs][:site]
@@ -219,7 +220,7 @@ class StaticGenerator
     posts = changed_items(Post.not_draft, "posts")
     pages = changed_items(static_pages_scope, "pages")
     docs = changed_items(Documentation.not_draft, "documentation")
-    products = changed_items(Product.published, "products")
+    products = changed_items(Product.published, "products") | products_missing_output
 
     # Track which specific configs changed
     site_config_changed = config_file_changed?("site")
@@ -269,6 +270,13 @@ class StaticGenerator
         members: members_config_changed
       }
     }
+  end
+
+  # Products whose page isn't in the output yet. Before 0.5.1 products were
+  # written to store/<name>.html; an unchanged product wouldn't be rebuilt at
+  # its new address without this.
+  def products_missing_output
+    Product.published.reject { |product| @output_dir.join("products", "#{product.url_name}.html").exist? }
   end
 
   def changed_items(scope, type)
@@ -439,6 +447,7 @@ class StaticGenerator
     when "Post" then "posts/#{url_name}.html"
     when "Page" then "#{url_name}.html"
     when "Documentation" then "documentation/#{url_name}.html"
+    when "Product" then "products/#{url_name}.html"
     end
   end
 
@@ -446,7 +455,7 @@ class StaticGenerator
     deleted = 0
 
     # Records that have been removed from the database entirely.
-    %w[posts pages documentation].each do |type|
+    %w[posts pages documentation products].each do |type|
       @manifest.fetch(type, {}).each do |id, data|
         model = type.singularize.capitalize.constantize
         unless model.exists?(id.to_i)
@@ -639,7 +648,7 @@ class StaticGenerator
   # PRODUCTS (STORE)
   # ============================================================================
 
-  # Generate static product pages at /store/<url_name>.html. Mirrors
+  # Generate static product pages at /products/<url_name>.html. Mirrors
   # generate_posts / generate_pages — same render-and-write pattern,
   # change detection via the products manifest, errors logged but
   # don't abort the whole build.
@@ -672,7 +681,46 @@ class StaticGenerator
 
   def generate_product(product)
     html = render_with_layout(template: "products/show", assigns: { product: product })
-    write_file("store/#{product.url_name}.html", html)
+    write_file("products/#{product.url_name}.html", html)
+  end
+
+  # Builds before 0.5.1 wrote products to store/<name>.html. Static builds
+  # don't keep those copies (a site Roe serves still answers /store/<name>):
+  # a store/ folder next to a store page's store.html can make a static host
+  # serve the folder instead of the page. Anything a page writes there stays.
+  def remove_legacy_store_files
+    folder = @output_dir.join("store")
+    return unless folder.directory?
+
+    kept = static_pages_scope.filter_map { |page| html_filename_for_type("Page", page.url_name) }.to_set
+    removed = 0
+    Dir.glob(folder.join("**", "*.html").to_s).each do |file|
+      next if kept.include?(Pathname(file).relative_path_from(@output_dir).to_s)
+
+      File.delete(file)
+      removed += 1
+    end
+    Dir.glob(folder.join("**", "*").to_s).select { |d| File.directory?(d) }.sort.reverse.each do |dir|
+      Dir.rmdir(dir) if Dir.empty?(dir)
+    end
+    Dir.rmdir(folder) if Dir.empty?(folder)
+    puts "🗑️  Removed #{removed} old store/ product pages" if removed > 0
+  end
+
+  # /products/category/<category>.html for each category without a page of
+  # its own (`category:` on a page). A category with a page is reached
+  # through it: the breadcrumbs link there.
+  def generate_product_categories
+    folder = @output_dir.join("products", "category")
+    FileUtils.rm_rf(folder)
+    StorePages.categories.each do |category|
+      next if StorePages.category_page(category)
+
+      html = render_with_layout(template: "pages/show", assigns: { page: StorePages.listing_page(category) })
+      write_file("products/category/#{StorePages.slug(category)}.html", html)
+    rescue => e
+      log_error("product category", category, e)
+    end
   end
 
   # ============================================================================
@@ -684,6 +732,7 @@ class StaticGenerator
 
     generate_posts_archive
     generate_embedded_collections
+    generate_product_categories
 
     puts "  ✓ Generated #{@stats[:collection_pages]} collection pages"
   end

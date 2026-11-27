@@ -1,12 +1,18 @@
 class MediaController < ApplicationController
+  include FileValidators
+
   skip_before_action :require_authentication
 
   before_action :resolve_file
   before_action :authorize_media
 
+  # authorize_media has already run, so a 304 is never an answer to a
+  # visitor who may not see the file.
   def show
+    return if file_fresh?(@file_path, private: protected_file?)
+
     range_header = request.headers["HTTP_RANGE"] || request.headers["Range"]
-    return serve_whole_file unless range_header
+    return serve_whole_file unless range_header && if_range_matches?
 
     range = parse_range(range_header, @file_size)
     if range.nil?
@@ -50,7 +56,9 @@ class MediaController < ApplicationController
   # have no row of their own, so checking the requested path directly served
   # every resized copy of a paid image to anyone.
   def protected_file?
-    Medium.protected_path?(requested_media_path)
+    return @protected_file if defined?(@protected_file)
+
+    @protected_file = Medium.protected_path?(requested_media_path)
   end
 
   # The /media/... path as stored on Medium, rebuilt from the route wildcard.

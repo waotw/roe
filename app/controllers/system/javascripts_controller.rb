@@ -1,4 +1,6 @@
 class System::JavascriptsController < ApplicationController
+  include FileValidators
+
   skip_before_action :require_authentication
   skip_before_action :verify_authenticity_token
 
@@ -18,13 +20,8 @@ class System::JavascriptsController < ApplicationController
       return
     end
 
-    last_modified = File.mtime(file_path)
-    response.headers["Cache-Control"] = "no-cache, must-revalidate"
-    response.headers["Last-Modified"] = last_modified.httpdate
-    response.headers["ETag"] = last_modified.to_i.to_s
+    return if file_fresh?(file_path)
 
-    if stale?(last_modified: last_modified, etag: last_modified.to_i)
-      send_file file_path, type: content_type, disposition: "inline"
-    end
+    send_file file_path, type: content_type, disposition: "inline"
   end
 end

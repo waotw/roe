@@ -56,7 +56,7 @@ class PostLinkPreview
     slug = @slug
       .sub(%r{^/posts/}, "")
       .sub(%r{^/pages/}, "")
-      .sub(%r{^/store/}, "")
+      .sub(%r{^/(?:products|store)/}, "")
       .sub(%r{^/documentation/}, "")
       .sub(%r{^/}, "")
     return nil if slug.blank?
@@ -71,7 +71,7 @@ class PostLinkPreview
   def url_for(record)
     case record
     when Page          then record.public_url
-    when Product       then "/store/#{record.url_name}"
+    when Product       then record.public_url
     when Documentation then record.public_url
     else "/posts/#{record.url_name}"
     end

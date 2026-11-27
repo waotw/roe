@@ -17,6 +17,7 @@ an agent — would otherwise have to rediscover. The conventions are summarised 
 | [theme-editor.md](theme-editor.md) | The theme editor: CodeMirror 6, the in-page preview, SECTIONS, INSPECT, SAVE AS…. |
 | [site-classes.md](site-classes.md) | Every public site CSS class, which shipped, the 0.5.0 changes, and the naming exceptions kept on purpose. |
 | [roadmap.md](roadmap.md) | Status and direction for the larger pieces of work. |
+| [updater-handoff.md](updater-handoff.md) | Design (not built): the updater hands off to a script in the new release. |
 | [specs-parked.md](specs-parked.md) | Designs agreed but deliberately not built, including Sync History per-file restore. |
 
 ## How to use these

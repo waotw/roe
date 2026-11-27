@@ -20,6 +20,8 @@ export default class extends Controller {
     "currentStep",
     "log",
     "inProgressPanel",
+    "slowNotice",
+    "help",
     // Deploy targets (new)
     "deployInProgressPanel",
     "deployLog",
@@ -72,6 +74,14 @@ export default class extends Controller {
       const response = await fetch("/admin/updates/status", {
         headers: { Accept: "application/json" },
       });
+      // Sent to the sign-in page, which can happen when Roe restarts at the
+      // end of an update: reload, so the page shows it rather than polling
+      // forever.
+      if (response.redirected) {
+        this.stopPolling();
+        window.location.reload();
+        return;
+      }
       if (!response.ok) return;
 
       const data = await response.json();
@@ -92,6 +102,9 @@ export default class extends Controller {
         window.location.reload();
       }
     } catch (e) {
+      // Keep polling. An update restarts Roe at the end, so for a few
+      // seconds there's no server to answer; the next answer reloads the
+      // page onto the new version.
       console.warn("[updates] polling error:", e);
     }
   }
@@ -106,6 +119,14 @@ export default class extends Controller {
     if (this.hasLogTarget && data.log) {
       this.logTarget.innerHTML = this.formatLog(data.log);
       this.logTarget.scrollTop = this.logTarget.scrollHeight;
+    }
+    // From an update the new version runs itself (RoeUpdater::Handoff).
+    if (this.hasSlowNoticeTarget) {
+      this.slowNoticeTarget.classList.toggle("hidden", !data.slow);
+    }
+    if (this.hasHelpTarget) {
+      this.helpTarget.innerHTML = data.help_html || "";
+      this.helpTarget.classList.toggle("hidden", !data.help_html);
     }
   }
 

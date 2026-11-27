@@ -28,7 +28,7 @@ class Admin::MarkdownController < Admin::BaseController
   # MarkdownDoctor::FIXABLE_TYPES are touched; everything else comes back in
   # `remaining` for the writer to decide about.
   def fix
-    fixed, applied = MarkdownDoctor.fix(content_param)
+    fixed, applied = MarkdownDoctor.fix(content_param, **LinkTargets.doctor_options)
 
     render json: {
       content: fixed,

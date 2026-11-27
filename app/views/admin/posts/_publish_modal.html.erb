@@ -66,7 +66,7 @@
         derived_slug     = title_for_slug.parameterize.presence
         # The same prefixes as each model's public_url.
         slug_prefix      = case slug_item
-                           when Product then "/store/"
+                           when Product then "/products/"
                            when Page    then "/"
                            else              "/posts/"
                            end

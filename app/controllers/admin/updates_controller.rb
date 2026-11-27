@@ -14,9 +14,9 @@ class Admin::UpdatesController < Admin::BaseController
   # users can see "an update is available" and know to run the update from
   # their local install. The view surfaces a production-mode notice.
   before_action :block_in_production, only: %i[
-    start confirm_ruby cancel_ruby rollback start_deploy reset_and_retry_deploy dismiss_deploy
+    start confirm_ruby cancel_ruby answer rollback start_deploy reset_and_retry_deploy dismiss_deploy
   ]
-  before_action :block_on_dev_install, only: %i[start confirm_ruby rollback]
+  before_action :block_on_dev_install, only: %i[start confirm_ruby answer rollback]
 
   def index
     @current_version    = RoeUpdater::VersionChecker.current_version
@@ -25,6 +25,11 @@ class Admin::UpdatesController < Admin::BaseController
     @prerelease_channel = RoeUpdater::VersionChecker.prerelease_channel?
     @update_info        = RoeUpdater::VersionChecker.check_for_updates
     @last_update        = UpdateStatus.order(created_at: :desc).first
+    RoeUpdater::StuckUpdate.finish_if_installed(@last_update)
+    # An update the new release is running itself: its status.json is the
+    # truth, mirrored into the record here (see RoeUpdater::Handoff).
+    @handoff            = RoeUpdater::Handoff.sync(@last_update)
+    @last_update        = nil if @last_update&.destroyed?
     @in_progress        = UpdateStatus.where(status: "in_progress").exists?
 
     # A paused update waiting for the user to approve an in-browser Ruby
@@ -103,7 +108,7 @@ class Admin::UpdatesController < Admin::BaseController
   def start
     version = params[:version]
 
-    if UpdateStatus.where(status: "in_progress").exists?
+    if UpdateStatus.where(status: %w[in_progress awaiting_input]).exists?
       flash[:alert] = "An update is already in progress. Please wait for it to complete."
       redirect_to admin_updates_path
       return
@@ -140,6 +145,8 @@ class Admin::UpdatesController < Admin::BaseController
 
   def status
     update_status = UpdateStatus.order(created_at: :desc).first
+    handoff = RoeUpdater::Handoff.sync(update_status)
+    update_status = nil if update_status&.destroyed?
 
     render json: {
       status:        update_status&.status,
@@ -147,8 +154,23 @@ class Admin::UpdatesController < Admin::BaseController
       progress:      update_status&.progress_percent,
       error:         update_status&.error_message,
       log:           update_status&.log,
-      required_ruby: (awaiting_required_ruby if update_status&.status == "awaiting_ruby")
+      required_ruby: (awaiting_required_ruby if update_status&.status == "awaiting_ruby"),
+      help_html:     helpers.update_help_html(handoff&.help),
+      slow:          handoff&.slow || false
     }
+  end
+
+  # POST — the person answered a question the new release's update script
+  # asked (status awaiting_input): confirm=1 carries on, anything else cancels.
+  def answer
+    status = UpdateStatus.where(status: "awaiting_input").order(created_at: :desc).first
+    confirm = params[:confirm] == "1"
+    if status && RoeUpdater::Handoff.answer(status, confirm: confirm)
+      flash[:notice] = confirm ? "Continuing the update." : "Cancelling the update. Nothing on your site was changed."
+    else
+      flash[:alert] = "No update is waiting for an answer."
+    end
+    redirect_to admin_updates_path
   end
 
   # POST — the user approved the in-browser Ruby install after the update

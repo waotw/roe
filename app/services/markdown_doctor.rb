@@ -45,6 +45,7 @@ class MarkdownDoctor
     unclear_internal_link: "Link that matches more than one file",
     unclear_name: "Name that matches more than one item",
     draft_link: "Link to a draft",
+    old_address: "Update link when the address has changed",
     missing_media: "Media file that isn't there",
     site_name: "Names one of the site's own posts or pages"
   }.freeze
@@ -62,7 +63,12 @@ class MarkdownDoctor
   # page doesn't change — the file just stops misleading. It's withheld
   # (issue[:unsafe]) when the text below holds an unclosed fence, because
   # moved above the notes, that fence would swallow them.
+  #
+  # old_address swaps a link for the address it already arrives at (a
+  # product's /store/<name> for /products/<name>), so the page goes to the
+  # same place. Only found when address_status is given, as in the editor.
   FIXABLE_TYPES = %i[
+    old_address
     list_spacing
     unindented_blockquote_in_list
     absorbed_by_list
@@ -157,6 +163,8 @@ class MarkdownDoctor
   # and nowhere else. Optional; without it every name is checked.
   def initialize(content, page_ids: nil, gfm: false, link_status: nil, name_matches: nil,
                  address_status: nil, media_exists: nil, site_names: nil)
+    @options = { page_ids: page_ids, gfm: gfm, link_status: link_status, name_matches: name_matches,
+                 address_status: address_status, media_exists: media_exists, site_names: site_names }
     @lines = content.to_s.lines
     @issues = []
     @page_ids = page_ids
@@ -206,7 +214,7 @@ class MarkdownDoctor
     # now are. After the move nothing is below the notes, so it can't recur;
     # @moved is a guard all the same.
     if !@moved && (move = fixable.find { |i| i[:type] == :content_after_footnotes })
-      next_pass = self.class.new(move_above_footnotes(move))
+      next_pass = self.class.new(move_above_footnotes(move), **@options)
       next_pass.instance_variable_set(:@moved, true)
       moved, more = next_pass.fix
       return [ moved, [ move, *more ] ]
@@ -231,14 +239,22 @@ class MarkdownDoctor
         # Already indented, just not to four. Top it up rather than prepending,
         # so the line ends up at four rather than four-plus-what-was-there.
         out[idx] = "    " + out[idx].sub(/\A[ \t]+/, "")
+      when :old_address
+        # Only where it's a link's address, so the same text elsewhere on
+        # the line (in prose, in code) stays as written.
+        out[idx] = out[idx].gsub(/(\]\(<?|href=["'])#{Regexp.escape(issue[:target])}(?=[)\s>"'])/) do
+          "#{Regexp.last_match(1)}#{issue[:replacement]}"
+        end
       end
     end
 
     [ out.join, fixable ]
   end
 
-  def self.fix(content)
-    new(content).fix
+  # The same options as diagnose. Without address_status, links aren't
+  # checked, so old addresses stay as written.
+  def self.fix(content, **options)
+    new(content, **options).fix
   end
 
   private
@@ -479,7 +495,7 @@ class MarkdownDoctor
   end
 
   # Links written as an address rather than a file: `[x](/posts/lab)`,
-  # `[x](/about)`, `href="/store/mug"`. Anything Roe can't tell is one of its
+  # `[x](/about)`, `href="/products/mug"`. Anything Roe can't tell is one of its
   # own pages (a feed, a tag page, the admin) is left alone; the callable
   # decides. `.md` links and /media/ files have checks of their own.
   ADDRESS_LINK_RE = %r{\]\(<?(/(?!/)[^)\s>]*)>?(?:\s+"[^"]*")?\)|href=["'](/(?!/)[^"']*)["']}
@@ -493,7 +509,14 @@ class MarkdownDoctor
         path = target.split(/[?#]/, 2).first.to_s
         next if path.empty? || path == "/" || path.start_with?("/media/") || path.match?(/\.md\z/i)
 
-        state, = @address_status.call(path)
+        state, detail = @address_status.call(path)
+        if state == :moved
+          replacement = detail + target.delete_prefix(path)
+          # COPY: old address message
+          @issues << { type: :old_address, line: line_num, target: target, replacement: replacement,
+                       message: "#{target} still works, but it's an old address. Change it to #{replacement}" }
+          next
+        end
         issue = internal_link_issue(state, nil, target)
         @issues << issue.merge(line: line_num, target: target) if issue
       end

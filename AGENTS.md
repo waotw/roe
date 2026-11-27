@@ -247,6 +247,8 @@ Two distinct workflows that target different audiences.
 
 Updates the developer's local Roe install to a new tagged release from the forge (see `RoeUpdater::Forge` for the mirror list). Hidden in production: `Admin::UpdatesController#block_in_production` redirects every action and the nav link is conditionally rendered. Migrations always target the development SQLite — production DBs are migrated by the deploy flow (Kamal/Fly release_command), not by this system. `RAILS_ENV` is hardcoded to `development` for the migration subprocess to close the footgun where booting dev with `RAILS_ENV=production` would otherwise route migrations at the wrong DB.
 
+**Hand-off (0.5.1+)**: after backing up and downloading, the orchestrator hands off to the release's own `bin/update` (`RoeUpdater::Handoff`), which runs outside Roe and does the remaining steps, including the restart. The steps below run in-process only for a release without `bin/update`. Contract and decisions: [`docs/agents/updater-handoff.md`](docs/agents/updater-handoff.md). `Handoff` and the contract are frozen once shipped; `bin/update` can change in any release.
+
 Orchestrated by `RoeUpdater::UpdateOrchestrator`, run inside `PerformUpdateJob`. Components:
 
 - **VersionChecker**: Reads root `/VERSION` for the installed version; queries the forge mirrors via `git ls-remote --tags` (HTTPS → SSH fallback) for the latest tag. Tags must carry the `v` prefix (`v0.1.0`); bare-numbered tags are ignored. Suffixed tags (`-nightly.N`, `-rc.N`) are pre-releases — shown only to dev installs / the `nightly` channel, and ordered via `Gem::Version`. Tag & release scheme: `docs/21-development-workflow.md`.
@@ -434,6 +436,7 @@ Follow **rubocop-rails-omakase** (configured in `.rubocop.yml`). Key rules:
 - Long-running operations (image variants, newsletter sends, Substack imports, Postmark webhooks, updates) run as jobs
 
 ### Views
+- Public pages get `?v=<version>` added to every `/media/`, `/theme/`, `/javascript/`, `/system/images/` and `/system/fonts/` URL as they're sent (`VersionedFileUrls`, `config/initializers/versioned_file_urls.rb`). Write plain file URLs; don't add your own `?v=`. On live a matching `?v=` is cached for a year (`FileValidators`); local, `/admin`, static mode and feeds keep the check on every load.
 - Layout inheritance uses `content_for` flags for conditional rendering
 - `admin.html.erb` - Wrapper that sets `content_for :admin_nav, true`
 - `application.html.erb` - Base layout with conditional navigation

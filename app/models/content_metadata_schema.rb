@@ -347,7 +347,26 @@ module ContentMetadataSchema
         options: [ "" ] + PAGE_TYPES,
         hint: "Only for pages Roe has to find — sign-in, the store. Survives renaming the page."
       }
-    }.merge(page_series_fields(metadata))
+    }.merge(page_series_fields(metadata)).merge(page_store_fields(metadata))
+  end
+
+  # A page naming a product category is that category's page: the product
+  # breadcrumbs link to it and /products/category/<category> redirects to it
+  # (StorePages). Only offered with the store on; a value already in a file
+  # still shows, so saving never clears it.
+  def self.page_store_fields(metadata)
+    store_on = SiteFeature.store_enabled? rescue false
+    current = metadata["category"].to_s.strip
+    categories = ((ProductCategory.all rescue []) + (StorePages.categories rescue [])).map { |c| c.to_s.strip.downcase }
+    # The value as the file writes it (`Fiction`), so the select shows it.
+    categories = categories.reject { |c| c == current.downcase } + [ current ] if current.present?
+    {
+      "category" => {
+        type: :select, label: "category", options: [ "" ] + categories.uniq.sort, available: store_on,
+        # COPY: page category hint
+        hint: "Makes this the category's page: product breadcrumbs link here instead of Roe's list of the category."
+      }
+    }
   end
 
   # A page connected to a podcast or a release is that show's or release's
@@ -387,5 +406,5 @@ module ContentMetadataSchema
     keys + [ current ]
   end
 
-  private_class_method :post_fields, :product_fields, :pages_fields, :page_series_fields
+  private_class_method :post_fields, :product_fields, :pages_fields, :page_series_fields, :page_store_fields
 end

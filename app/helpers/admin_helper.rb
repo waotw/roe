@@ -57,6 +57,13 @@ module AdminHelper
     html.gsub("<a href=", %(<a target="_blank" rel="noopener" href=)).html_safe
   end
 
+  # Help and question text written by a release's own update script
+  # (RoeUpdater::Handoff): Markdown, rendered like release notes, so a code
+  # span shows as a command to copy.
+  def update_help_html(markdown)
+    release_notes_html(markdown)
+  end
+
   # "GitHub" for a github.com URL, and so on — for "View release notes on …"
   # links, which used to say Codeberg whatever the URL was.
   FORGE_NAMES = { "github.com" => "GitHub", "codeberg.org" => "Codeberg" }.freeze

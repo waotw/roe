@@ -66,7 +66,7 @@ class Admin::ProductsPublishModalTest < ActionDispatch::IntegrationTest
     # Category is subsumed by the SKU while SKU is missing.
     assert_not_includes response.body, 'name="metadata_fields[category]"'
     # The URL name field shows a product's real address, not a post's.
-    assert_includes response.body, "/store/pm-test"
+    assert_includes response.body, "/products/pm-test"
     assert_includes response.body, "this product's web address"
   end
 

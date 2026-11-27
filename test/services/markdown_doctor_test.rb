@@ -391,6 +391,7 @@ class MarkdownDoctorTest < ActiveSupport::TestCase
       link_status: link_status,
       name_matches: ->(name) { name == "about" ? [ "the page “About”", "the post “About”" ] : [] },
       media_exists: ->(path) { path != "/media/images/no-such-image.jpg" },
+      address_status: ->(path) { path == "/store/sample-product" ? [ :moved, "/products/sample-product" ] : [ :ok, nil ] },
     )
 
     # Text after the notes can't be shown here: it needs the notes to be the

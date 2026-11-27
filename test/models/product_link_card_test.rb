@@ -34,7 +34,7 @@ class ProductLinkCardTest < ActiveSupport::TestCase
     out = render_card
 
     assert_includes out, "Test Widget", "should pull the product's title"
-    assert_includes out, "/store/test-widget", "should link to the product page"
+    assert_includes out, "/products/test-widget", "should link to the product page"
     assert_includes out, "View product", "product-appropriate link text"
   end
 

@@ -19,8 +19,8 @@
 # a short name could be two items, Roe uses the first and the Markdown check
 # says so (`matches`). Adding the folder or `.md` settles it.
 module ItemName
-  # Folders as written, and the kind of item each holds. `store` is where
-  # products live on the site, so `/store/x` reads as a product too.
+  # Folders as written, and the kind of item each holds. Products lived at
+  # `/store/x` before 0.5.1, so `/store/x` still reads as a product.
   FOLDERS = {
     "posts" => "Post", "pages" => "Page", "products" => "Product",
     "store" => "Product", "documentation" => "Documentation"

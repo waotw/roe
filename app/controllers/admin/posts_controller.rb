@@ -533,7 +533,7 @@ class Admin::PostsController < Admin::BaseController
 
     results = posts.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/posts/#{r.url_name}", type: "Post", ref: card_ref(r) } } +
               pages.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Page", ref: card_ref(r) } } +
-              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/store/#{r.url_name}", type: "Product", ref: card_ref(r) } } +
+              products.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: r.public_url, type: "Product", ref: card_ref(r) } } +
               docs.map { |r| { id: r.id, title: r.title, url_name: r.url_name, url: "/documentation/#{r.url_name}", type: "Doc", ref: card_ref(r) } }
 
     render json: results

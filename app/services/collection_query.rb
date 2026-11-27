@@ -263,7 +263,9 @@ class CollectionQuery
   end
 
   def apply_category_filter(collection, category)
-    collection.where("json_extract(metadata, '$.category') = ?", category.strip)
+    # Without regard to case: store.yml keeps categories in lowercase, and a
+    # product written `category: Fiction` is in "fiction".
+    collection.where("LOWER(TRIM(json_extract(metadata, '$.category'))) = ?", category.to_s.strip.downcase)
   end
 
   def apply_podcast_filter(collection, podcast_key)

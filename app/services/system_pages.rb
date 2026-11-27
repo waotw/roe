@@ -33,7 +33,8 @@ module SystemPages
     "checkout-cancel" => { purpose: "when a checkout is cancelled", file: "checkout-cancel", url_name: "checkout-cancel" },
     "donation-success" => { purpose: "after a donation", file: "donation-success", url_name: "donation-success" },
     "donation-cancel" => { purpose: "when a donation is cancelled", file: "donation-cancel", url_name: "donation-cancel" },
-    "archive" => { purpose: "as \"View all\" for a collection with no filters", file: "archive", url_name: "archive" }
+    "archive" => { purpose: "as \"View all\" for a collection with no filters", file: "archive", url_name: "archive" },
+    "store" => { purpose: "as the store, linked from every product's breadcrumbs", file: "store", url_name: "store" }
   }.freeze
 
   module_function

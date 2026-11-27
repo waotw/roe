@@ -39,7 +39,7 @@
        data-editor-original-url-name-value="<%= @product.url_name %>"
        data-editor-filename-slug-value="<%= File.basename(@product.file_path.to_s, '.md') %>"
        data-editor-published-value="<%= @product.published? %>"
-       data-editor-public-path-prefix-value="/store/">
+       data-editor-public-path-prefix-value="/products/">
 
     <%# Set by the editor when the user picks "Save new URL & redirect" in the
         slug-change modal; ProductsController#update writes the 301 (RenameRedirect). %>
